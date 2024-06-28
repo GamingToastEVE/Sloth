@@ -7,6 +7,7 @@ The following data points are collected from users:
 Server ids
 Text channel ids
 User ids
+message content -> for log channel feature, data will NOT be safed outside of discord
 The custom settings a user can set for a guild
 
 Why I need your information
