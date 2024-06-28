@@ -49,7 +49,6 @@ public class databaseHandler {
             Statement statement = connection.createStatement();
             ResultSet rs = statement.executeQuery("SELECT * FROM log_channels");
             while (rs.next()) {
-                System.out.println(rs.getString("guildid"));
                 if (rs.getString("guildid").equals(guildID))
                 {
                     return true;
