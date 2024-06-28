@@ -28,13 +28,13 @@ public class databaseHandler {
     public String getLogChannelID (String guildID) {
         try {
             connection.setAutoCommit(false);
-            String hasLogChannel1 = "SELECT channelid WHERE guildid = ? FROM log_channels";
+            String hasLogChannel1 = "SELECT channelid FROM log_channels WHERE guildid=?";
             PreparedStatement hasLogChannel2 = connection.prepareStatement(hasLogChannel1);
             hasLogChannel2.setString(1, guildID);
             ResultSet rs = hasLogChannel2.executeQuery();
             String channelid = rs.getString("channelid");
             if (channelid == null || channelid.equals("0")) {
-                return "Nothing found";
+                return "Couldnt find a Log Channel";
             }
             return channelid;
         } catch (SQLException e) {
@@ -46,12 +46,12 @@ public class databaseHandler {
     public boolean hasLogChannel (String guildID) {
         try {
             connection.setAutoCommit(false);
-            String hasLogChannel1 = "SELECT channelid WHERE guildid = ? FROM log_channels";
+            String hasLogChannel1 = "SELECT channelid FROM log_channels WHERE guildid=?";
             PreparedStatement hasLogChannel2 = connection.prepareStatement(hasLogChannel1);
             hasLogChannel2.setString(1, guildID);
             ResultSet rs = hasLogChannel2.executeQuery();
             String channelid = rs.getString("channelid");
-            if (channelid.equals("0") || channelid == null) {
+            if (channelid == null || channelid.equals("0")) {
                 return false;
             }
             return true;
@@ -77,7 +77,7 @@ public class databaseHandler {
                 PreparedStatement updateLogChannel = connection.prepareStatement(setLogChannel);
                 updateLogChannel.setString(1, guildID);
                 updateLogChannel.setString(2, channelID);
-                updateLogChannel.executeQuery();
+                updateLogChannel.executeUpdate();
                 connection.commit();
                 return channelID;
             }
