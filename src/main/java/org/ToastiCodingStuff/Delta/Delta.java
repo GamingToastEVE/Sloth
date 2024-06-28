@@ -8,13 +8,14 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 
 public class Delta {
     public static void main(String[] args) throws Exception {
+        databaseHandler handler = new databaseHandler();
         Dotenv dotenv = Dotenv.load();
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
         //api.addEventListener(new OnMessageListener());
-        api.addEventListener(new logchannelSlashCommandListener());
+        api.addEventListener(new logchannelSlashCommandListener(handler));
         Guild guild = api.getGuildById("1169699077986988112");
         addGuildSlashCommands adder = new addGuildSlashCommands(guild);
         adder.addlogChannelCommands();

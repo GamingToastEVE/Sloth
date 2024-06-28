@@ -28,37 +28,37 @@ public class databaseHandler {
     public String getLogChannelID (String guildID) {
         try {
             connection.setAutoCommit(false);
-            Statement statement = connection.createStatement();
-            ResultSet rs = statement.executeQuery("SELECT * FROM log_channels");
-            while (rs.next()) {
-                if (rs.getString("guildid").equals(guildID))
-                {
-                    return rs.getString("channelid");
-                }
+            String hasLogChannel1 = "SELECT channelid WHERE guildid = ? FROM log_channels";
+            PreparedStatement hasLogChannel2 = connection.prepareStatement(hasLogChannel1);
+            hasLogChannel2.setString(1, guildID);
+            ResultSet rs = hasLogChannel2.executeQuery();
+            String channelid = rs.getString("channelid");
+            if (channelid == null || channelid.equals("0")) {
+                return "Nothing found";
             }
+            return channelid;
         } catch (SQLException e) {
             e.printStackTrace();
             return "Error: " + e;
         }
-        return "Nothing found";
     }
 
     public boolean hasLogChannel (String guildID) {
         try {
             connection.setAutoCommit(false);
-            Statement statement = connection.createStatement();
-            ResultSet rs = statement.executeQuery("SELECT * FROM log_channels");
-            while (rs.next()) {
-                if (rs.getString("guildid").equals(guildID))
-                {
-                    return true;
-                }
+            String hasLogChannel1 = "SELECT channelid WHERE guildid = ? FROM log_channels";
+            PreparedStatement hasLogChannel2 = connection.prepareStatement(hasLogChannel1);
+            hasLogChannel2.setString(1, guildID);
+            ResultSet rs = hasLogChannel2.executeQuery();
+            String channelid = rs.getString("channelid");
+            if (channelid.equals("0") || channelid == null) {
+                return false;
             }
+            return true;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
-        return false;
     }
 
     public String setLogChannel (String guildID, String channelID) {
