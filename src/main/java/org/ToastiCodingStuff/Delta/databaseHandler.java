@@ -25,6 +25,8 @@ public class databaseHandler {
         }
     }
 
+    //Log Channel Databasekram
+
     public String getLogChannelID (String guildID) {
         try {
             connection.setAutoCommit(false);
@@ -84,6 +86,23 @@ public class databaseHandler {
         } catch (SQLException e) {
             e.printStackTrace();
             return "Error";
+        }
+    }
+
+
+    //Warn System Kram
+    public boolean hasWarnSystemSettings (String guildID) {
+        try {
+            String hasWarnSystemSettingsAndStuff = "SELECT max_warns, minutes_muted, role_id, warn_time_hours FROM warn_system_settings WHERE guild_id=?";
+            PreparedStatement hasWarnSystem = connection.prepareStatement(hasWarnSystemSettingsAndStuff);
+            hasWarnSystem.setString(1, guildID);
+            ResultSet rs = hasWarnSystem.executeQuery();
+            if (rs == null) {
+                return false;
+            }
+            return true;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
     }
 }
