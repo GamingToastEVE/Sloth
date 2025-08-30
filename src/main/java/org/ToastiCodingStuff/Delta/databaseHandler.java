@@ -11,12 +11,13 @@ public class databaseHandler {
         try {
             connection1 = DriverManager.getConnection("jdbc:sqlite:server.db");
             // Initialize database tables
-            initializeTables();
+
         } catch (SQLException e) {
             connection1 = null;
             System.err.println("Database connection error: " + e.getMessage());
         }
         this.connection = connection1;
+        initializeTables();
     }
 
     /**

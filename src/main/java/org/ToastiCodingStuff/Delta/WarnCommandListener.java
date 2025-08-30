@@ -16,7 +16,6 @@ public class WarnCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
-    @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
 
