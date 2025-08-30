@@ -18,4 +18,19 @@ public class addGuildSlashCommands {
                 Commands.slash("get-log-channel", "gets the log channel")
         ).queue();
     }
+
+    public void addWarnCommands() {
+        guild.updateCommands().addCommands(
+                Commands.slash("warn", "Issue a warning to a user")
+                        .addOption(OptionType.USER, "user", "User to warn", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
+                        .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
+                Commands.slash("set-warn-settings", "Configure warning system settings")
+                        .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before action", true)
+                        .addOption(OptionType.INTEGER, "minutes_muted", "Minutes to mute user when reaching max warns", true)
+                        .addOption(OptionType.ROLE, "mute_role", "Role to assign when muting", true)
+                        .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
+                Commands.slash("get-warn-settings", "View current warning system settings")
+        ).queue();
+    }
 }

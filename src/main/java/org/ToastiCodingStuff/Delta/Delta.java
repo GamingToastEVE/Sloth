@@ -16,8 +16,11 @@ public class Delta {
         api.awaitReady();
 
         api.addEventListener(new logchannelSlashCommandListener(handler));
+        api.addEventListener(new WarnCommandListener(handler));
+        
         Guild guild = api.getGuildById("1169699077986988112");
         addGuildSlashCommands adder = new addGuildSlashCommands(guild);
         adder.addlogChannelCommands();
+        adder.addWarnCommands();
     }
 }
