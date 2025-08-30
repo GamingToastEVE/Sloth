@@ -139,7 +139,7 @@ public class DatabaseHandler {
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "moderator_id INTEGER NOT NULL, " +
-            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'MUTE', 'TEMP_MUTE', 'UNMUTE', 'UNBAN')), " +
+            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'MUTE', 'TEMP_MUTE', 'UNMUTE', 'UNBAN', 'WARN')), " +
             "reason TEXT NOT NULL, " +
             "duration INTEGER, " +
             "expires_at TEXT, " +
@@ -687,28 +687,6 @@ public class DatabaseHandler {
     }
 
     /**
-     * Insert or update guild data in the guilds table with custom prefix and language
-     */
-    public void insertOrUpdateGuild(String guildId, String guildName, String prefix, String language) {
-        try {
-            String upsertGuild = "INSERT OR REPLACE INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
-                "VALUES (?, ?, ?, ?, " +
-                "COALESCE((SELECT created_at FROM guilds WHERE id = ?), CURRENT_TIMESTAMP), " +
-                "CURRENT_TIMESTAMP, 1)";
-            PreparedStatement stmt = connection.prepareStatement(upsertGuild);
-            stmt.setString(1, guildId);
-            stmt.setString(2, guildName);
-            stmt.setString(3, prefix != null ? prefix : "!");
-            stmt.setString(4, language != null ? language : "de");
-            stmt.setString(5, guildId); // For created_at COALESCE
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Error inserting/updating guild with custom settings: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
      * Mark guild as inactive when bot leaves
      */
     public void deactivateGuild(String guildId) {
@@ -986,24 +964,51 @@ public class DatabaseHandler {
      */
     public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority) {
         try {
+            // Ensure the guild exists in the guilds table
+            String checkGuildQuery = "SELECT id FROM guilds WHERE id = ?";
+            PreparedStatement checkGuildStmt = connection.prepareStatement(checkGuildQuery);
+            checkGuildStmt.setString(1, guildId);
+            ResultSet guildResult = checkGuildStmt.executeQuery();
+
+            if (!guildResult.next()) {
+                String insertGuildQuery = "INSERT INTO guilds (id) VALUES (?)";
+                PreparedStatement insertGuildStmt = connection.prepareStatement(insertGuildQuery);
+                insertGuildStmt.setString(1, guildId);
+                insertGuildStmt.executeUpdate();
+            }
+
+            // Ensure the user exists in the users table
+            String checkUserQuery = "SELECT id FROM users WHERE id = ?";
+            PreparedStatement checkUserStmt = connection.prepareStatement(checkUserQuery);
+            checkUserStmt.setString(1, userId);
+            ResultSet userResult = checkUserStmt.executeQuery();
+
+            if (!userResult.next()) {
+                String insertUserQuery = "INSERT INTO users (id) VALUES (?)";
+                PreparedStatement insertUserStmt = connection.prepareStatement(insertUserQuery);
+                insertUserStmt.setString(1, userId);
+                insertUserStmt.executeUpdate();
+            }
+
+            // Insert the ticket
             String insertTicket = "INSERT INTO tickets (guild_id, user_id, channel_id, category, subject, priority, status) VALUES (?, ?, ?, ?, ?, ?, 'OPEN')";
             PreparedStatement stmt = connection.prepareStatement(insertTicket, Statement.RETURN_GENERATED_KEYS);
-            stmt.setLong(1, Long.parseLong(guildId));
-            stmt.setLong(2, Long.parseLong(userId));
-            stmt.setLong(3, Long.parseLong(channelId));
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, channelId);
             stmt.setString(4, category != null ? category : "general");
             stmt.setString(5, subject);
             stmt.setString(6, priority != null ? priority : "MEDIUM");
-            
+
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected > 0) {
                 ResultSet generatedKeys = stmt.getGeneratedKeys();
                 if (generatedKeys.next()) {
-                    return generatedKeys.getInt(1);
+                    return generatedKeys.getInt(1); // Return the generated ticket ID
                 }
             }
             return 0;
-        } catch (SQLException | NumberFormatException e) {
+        } catch (SQLException e) {
             System.err.println("Error creating ticket: " + e.getMessage());
             e.printStackTrace();
             return 0;
