@@ -14,7 +14,7 @@ public class Delta {
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
-        api.addEventListener(new OnMessageListener(handler));
+
         api.addEventListener(new logchannelSlashCommandListener(handler));
         Guild guild = api.getGuildById("1169699077986988112");
         addGuildSlashCommands adder = new addGuildSlashCommands(guild);
