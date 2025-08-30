@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Delta;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
 public class addGuildSlashCommands {
     private final Guild guild;
@@ -47,6 +48,18 @@ public class addGuildSlashCommands {
                 Commands.slash("assign-ticket", "Assign current ticket to a staff member")
                         .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
                 Commands.slash("ticket-info", "Get information about the current ticket")
+        ).queue();
+    }
+
+    public void addSystemManagementCommands() {
+        OptionData systemOption = new OptionData(OptionType.STRING, "system", "Which system to add", true)
+                .addChoice("Log Channel System", "log-channel")
+                .addChoice("Warning System", "warn-system")
+                .addChoice("Ticket System", "ticket-system");
+
+        guild.updateCommands().addCommands(
+                Commands.slash("add-system", "Add commands for a specific system")
+                        .addOptions(systemOption)
         ).queue();
     }
 }
