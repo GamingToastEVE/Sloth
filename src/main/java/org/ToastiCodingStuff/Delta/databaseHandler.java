@@ -661,8 +661,150 @@ public class databaseHandler {
     }
 
     public boolean isTicketSystem(String guildId) {
-        // Basic implementation to satisfy compilation
-        // TODO: Implement proper ticket system check logic
-        return false;
+        try {
+            String query = "SELECT ticket_category, ticket_channel FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                // Check if either ticket_category or ticket_channel is configured (not null and not 0)
+                long ticketCategory = rs.getLong("ticket_category");
+                boolean hasCategorySet = !rs.wasNull() && ticketCategory != 0;
+                
+                long ticketChannel = rs.getLong("ticket_channel");
+                boolean hasChannelSet = !rs.wasNull() && ticketChannel != 0;
+                
+                return hasCategorySet || hasChannelSet;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.err.println("Error checking ticket system status: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get ticket category ID for a guild
+     */
+    public String getTicketCategory(String guildId) {
+        try {
+            String query = "SELECT ticket_category FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                long categoryId = rs.getLong("ticket_category");
+                if (!rs.wasNull() && categoryId != 0) {
+                    return String.valueOf(categoryId);
+                }
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket category: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get ticket channel ID for a guild
+     */
+    public String getTicketChannel(String guildId) {
+        try {
+            String query = "SELECT ticket_channel FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                long channelId = rs.getLong("ticket_channel");
+                if (!rs.wasNull() && channelId != 0) {
+                    return String.valueOf(channelId);
+                }
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Set ticket system settings for a guild
+     */
+    public boolean setTicketSettings(String guildId, String categoryId, String channelId, String roleId, boolean transcriptEnabled) {
+        try {
+            // First check if guild settings exist
+            String checkQuery = "SELECT id FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
+            checkStmt.setString(1, guildId);
+            ResultSet rs = checkStmt.executeQuery();
+            
+            if (rs.next()) {
+                // Update existing settings
+                String updateQuery = "UPDATE guild_settings SET ticket_category = ?, ticket_channel = ?, ticket_role = ?, ticket_transcript = ? WHERE guild_id = ?";
+                PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+                
+                if (categoryId != null && !categoryId.isEmpty()) {
+                    updateStmt.setLong(1, Long.parseLong(categoryId));
+                } else {
+                    updateStmt.setNull(1, Types.INTEGER);
+                }
+                
+                if (channelId != null && !channelId.isEmpty()) {
+                    updateStmt.setLong(2, Long.parseLong(channelId));
+                } else {
+                    updateStmt.setNull(2, Types.INTEGER);
+                }
+                
+                if (roleId != null && !roleId.isEmpty()) {
+                    updateStmt.setLong(3, Long.parseLong(roleId));
+                } else {
+                    updateStmt.setNull(3, Types.INTEGER);
+                }
+                
+                updateStmt.setInt(4, transcriptEnabled ? 1 : 0);
+                updateStmt.setString(5, guildId);
+                
+                int rowsUpdated = updateStmt.executeUpdate();
+                return rowsUpdated > 0;
+            } else {
+                // Insert new settings
+                String insertQuery = "INSERT INTO guild_settings (guild_id, ticket_category, ticket_channel, ticket_role, ticket_transcript) VALUES (?, ?, ?, ?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, guildId);
+                
+                if (categoryId != null && !categoryId.isEmpty()) {
+                    insertStmt.setLong(2, Long.parseLong(categoryId));
+                } else {
+                    insertStmt.setNull(2, Types.INTEGER);
+                }
+                
+                if (channelId != null && !channelId.isEmpty()) {
+                    insertStmt.setLong(3, Long.parseLong(channelId));
+                } else {
+                    insertStmt.setNull(3, Types.INTEGER);
+                }
+                
+                if (roleId != null && !roleId.isEmpty()) {
+                    insertStmt.setLong(4, Long.parseLong(roleId));
+                } else {
+                    insertStmt.setNull(4, Types.INTEGER);
+                }
+                
+                insertStmt.setInt(5, transcriptEnabled ? 1 : 0);
+                
+                int rowsInserted = insertStmt.executeUpdate();
+                return rowsInserted > 0;
+            }
+        } catch (SQLException | NumberFormatException e) {
+            System.err.println("Error setting ticket settings: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
     }
 }
