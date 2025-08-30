@@ -807,4 +807,120 @@ public class databaseHandler {
             return false;
         }
     }
+
+    /**
+     * Create a new ticket
+     */
+    public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority) {
+        try {
+            String insertTicket = "INSERT INTO tickets (guild_id, user_id, channel_id, category, subject, priority, status) VALUES (?, ?, ?, ?, ?, ?, 'OPEN')";
+            PreparedStatement stmt = connection.prepareStatement(insertTicket, Statement.RETURN_GENERATED_KEYS);
+            stmt.setLong(1, Long.parseLong(guildId));
+            stmt.setLong(2, Long.parseLong(userId));
+            stmt.setLong(3, Long.parseLong(channelId));
+            stmt.setString(4, category != null ? category : "general");
+            stmt.setString(5, subject);
+            stmt.setString(6, priority != null ? priority : "MEDIUM");
+            
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException | NumberFormatException e) {
+            System.err.println("Error creating ticket: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Close a ticket
+     */
+    public boolean closeTicket(int ticketId, String closedById, String reason) {
+        try {
+            String closeTicket = "UPDATE tickets SET status = 'CLOSED', closed_by = ?, closed_reason = ?, closed_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(closeTicket);
+            stmt.setLong(1, Long.parseLong(closedById));
+            stmt.setString(2, reason);
+            stmt.setInt(3, ticketId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException | NumberFormatException e) {
+            System.err.println("Error closing ticket: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get ticket by channel ID
+     */
+    public String getTicketByChannelId(String channelId) {
+        try {
+            String query = "SELECT id, user_id, category, subject, status, priority, assigned_to, created_at FROM tickets WHERE channel_id = ? AND status != 'CLOSED'";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setLong(1, Long.parseLong(channelId));
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return String.format("ID: %d | User: <@%d> | Category: %s | Subject: %s | Status: %s | Priority: %s | Created: %s",
+                    rs.getInt("id"), rs.getLong("user_id"), rs.getString("category"),
+                    rs.getString("subject"), rs.getString("status"), rs.getString("priority"),
+                    rs.getString("created_at"));
+            }
+            return null;
+        } catch (SQLException | NumberFormatException e) {
+            System.err.println("Error getting ticket by channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get ticket role ID for a guild
+     */
+    public String getTicketRole(String guildId) {
+        try {
+            String query = "SELECT ticket_role FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                long roleId = rs.getLong("ticket_role");
+                if (!rs.wasNull() && roleId != 0) {
+                    return String.valueOf(roleId);
+                }
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket role: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Assign ticket to a staff member
+     */
+    public boolean assignTicket(int ticketId, String assignedToId) {
+        try {
+            String assignTicket = "UPDATE tickets SET assigned_to = ?, status = 'IN_PROGRESS' WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(assignTicket);
+            stmt.setLong(1, Long.parseLong(assignedToId));
+            stmt.setInt(2, ticketId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException | NumberFormatException e) {
+            System.err.println("Error assigning ticket: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

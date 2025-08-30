@@ -1,6 +1,6 @@
 plugins {
     application
-    id("com.github.johnrengelman.shadow") version "7.1.2"
+    java
 }
 
 application.mainClass = "org.ToastiCodingStuff.Delta.Delta" //
