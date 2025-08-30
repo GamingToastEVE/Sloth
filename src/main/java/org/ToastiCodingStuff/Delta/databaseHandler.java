@@ -590,4 +590,13 @@ public class databaseHandler {
             throw new RuntimeException(e);
         }
     }
+
+    public void insertModerationAction(String guildId, String userId, String moderatorId, String warn, String reason, Object o, String expiresAt) {
+    }
+
+    public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt) {
+    }
+
+    public void insertOrUpdateUser(String moderatorId, String effectiveName, String discriminator, String avatarUrl) {
+    }
 }

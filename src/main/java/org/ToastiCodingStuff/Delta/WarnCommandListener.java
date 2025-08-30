@@ -19,7 +19,7 @@ public class WarnCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
-        
+
         switch (event.getName()) {
             case "warn":
                 handleWarnCommand(event, guildId);
@@ -37,25 +37,25 @@ public class WarnCommandListener extends ListenerAdapter {
         Member targetMember = event.getOption("user").getAsMember();
         String reason = event.getOption("reason").getAsString();
         String severity = event.getOption("severity") != null ? event.getOption("severity").getAsString() : "MEDIUM";
-        
+
         if (targetMember == null) {
             event.reply("User not found in this server.").setEphemeral(true).queue();
             return;
         }
-        
+
         String userId = targetMember.getId();
         String moderatorId = event.getMember().getId();
-        
+
         // Insert or update user data using new method
-        handler.insertOrUpdateUser(userId, targetMember.getEffectiveName(), 
-                                  targetMember.getUser().getDiscriminator(), 
-                                  targetMember.getUser().getAvatarUrl());
-        
+        handler.insertOrUpdateUser(userId, targetMember.getEffectiveName(),
+                targetMember.getUser().getDiscriminator(),
+                targetMember.getUser().getAvatarUrl());
+
         // Insert or update moderator data
         handler.insertOrUpdateUser(moderatorId, event.getMember().getEffectiveName(),
-                                  event.getUser().getDiscriminator(),
-                                  event.getUser().getAvatarUrl());
-        
+                event.getUser().getDiscriminator(),
+                event.getUser().getAvatarUrl());
+
         // Calculate expiration time based on warn settings
         String expiresAt = null;
         if (handler.hasWarnSystemSettings(guildId)) {
@@ -65,15 +65,15 @@ public class WarnCommandListener extends ListenerAdapter {
                 expiresAt = expiration.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             }
         }
-        
+
         // Use new insertWarning method instead of legacy approach
         int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt);
-        
+
         if (warningId > 0) {
-            event.reply("Warning issued to " + targetMember.getAsMention() + " for: " + reason + 
-                       "\nWarning ID: " + warningId + 
-                       (expiresAt != null ? "\nExpires: " + expiresAt : "")).queue();
-            
+            event.reply("Warning issued to " + targetMember.getAsMention() + " for: " + reason +
+                    "\nWarning ID: " + warningId +
+                    (expiresAt != null ? "\nExpires: " + expiresAt : "")).queue();
+
             // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
         } else {
@@ -85,17 +85,17 @@ public class WarnCommandListener extends ListenerAdapter {
         int maxWarns = event.getOption("max_warns").getAsInt();
         int minutesMuted = event.getOption("minutes_muted").getAsInt();
         Role muteRole = event.getOption("mute_role").getAsRole();
-        int warnTimeHours = event.getOption("warn_time_hours") != null ? 
-                           event.getOption("warn_time_hours").getAsInt() : 24;
-        
+        int warnTimeHours = event.getOption("warn_time_hours") != null ?
+                event.getOption("warn_time_hours").getAsInt() : 24;
+
         // Use existing setWarnSettings method (already updated to use proper parameters)
         handler.setWarnSettings(guildId, maxWarns, minutesMuted, muteRole.getId(), warnTimeHours);
-        
+
         event.reply("Warn settings updated successfully!\n" +
-                   "Max Warns: " + maxWarns + "\n" +
-                   "Mute Duration: " + minutesMuted + " minutes\n" +
-                   "Mute Role: " + muteRole.getAsMention() + "\n" +
-                   "Warning Expiry: " + warnTimeHours + " hours").queue();
+                "Max Warns: " + maxWarns + "\n" +
+                "Mute Duration: " + minutesMuted + " minutes\n" +
+                "Mute Role: " + muteRole.getAsMention() + "\n" +
+                "Warning Expiry: " + warnTimeHours + " hours").queue();
     }
 
     private void handleGetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
@@ -103,20 +103,20 @@ public class WarnCommandListener extends ListenerAdapter {
             event.reply("No warn system settings configured for this server. Use `/set-warn-settings` to configure.").setEphemeral(true).queue();
             return;
         }
-        
+
         // Use existing getter methods
         int maxWarns = handler.getMaxWarns(guildId);
         int timeMuted = handler.getTimeMuted(guildId);
         String roleId = handler.getWarnRoleID(guildId);
         int warnTimeHours = handler.getWarnTimeHours(guildId);
-        
+
         Role muteRole = event.getGuild().getRoleById(roleId);
         String roleMention = muteRole != null ? muteRole.getAsMention() : "Role not found";
-        
+
         event.reply("**Current Warn Settings:**\n" +
-                   "Max Warns: " + maxWarns + "\n" +
-                   "Mute Duration: " + timeMuted + " minutes\n" +
-                   "Mute Role: " + roleMention + "\n" +
-                   "Warning Expiry: " + warnTimeHours + " hours").queue();
+                "Max Warns: " + maxWarns + "\n" +
+                "Mute Duration: " + timeMuted + " minutes\n" +
+                "Mute Role: " + roleMention + "\n" +
+                "Warning Expiry: " + warnTimeHours + " hours").queue();
     }
 }
