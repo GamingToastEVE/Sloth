@@ -5,10 +5,10 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
-public class addGuildSlashCommands {
+public class AddGuildSlashCommands {
     private final Guild guild;
 
-    public addGuildSlashCommands(Guild guild) {
+    public AddGuildSlashCommands(Guild guild) {
         this.guild = guild;
     }
 

@@ -4,11 +4,11 @@ import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-public class logchannelSlashCommandListener extends ListenerAdapter {
+public class LogChannelSlashCommandListener extends ListenerAdapter {
 
-    private final databaseHandler handler;
+    private final DatabaseHandler handler;
 
-    public logchannelSlashCommandListener(databaseHandler handler) {
+    public LogChannelSlashCommandListener(DatabaseHandler handler) {
         this.handler = handler;
     }
 
