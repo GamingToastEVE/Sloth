@@ -687,6 +687,28 @@ public class DatabaseHandler {
     }
 
     /**
+     * Insert or update guild data in the guilds table with custom prefix and language
+     */
+    public void insertOrUpdateGuild(String guildId, String guildName, String prefix, String language) {
+        try {
+            String upsertGuild = "INSERT OR REPLACE INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
+                "VALUES (?, ?, ?, ?, " +
+                "COALESCE((SELECT created_at FROM guilds WHERE id = ?), CURRENT_TIMESTAMP), " +
+                "CURRENT_TIMESTAMP, 1)";
+            PreparedStatement stmt = connection.prepareStatement(upsertGuild);
+            stmt.setString(1, guildId);
+            stmt.setString(2, guildName);
+            stmt.setString(3, prefix != null ? prefix : "!");
+            stmt.setString(4, language != null ? language : "de");
+            stmt.setString(5, guildId); // For created_at COALESCE
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error inserting/updating guild with custom settings: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * Mark guild as inactive when bot leaves
      */
     public void deactivateGuild(String guildId) {
@@ -698,6 +720,88 @@ public class DatabaseHandler {
         } catch (SQLException e) {
             System.err.println("Error deactivating guild: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get guild prefix from database
+     */
+    public String getGuildPrefix(String guildId) {
+        try {
+            String query = "SELECT prefix FROM guilds WHERE id = ? AND active = 1";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                String prefix = rs.getString("prefix");
+                return prefix != null ? prefix : "!";
+            }
+            return "!"; // Default prefix
+        } catch (SQLException e) {
+            System.err.println("Error getting guild prefix: " + e.getMessage());
+            e.printStackTrace();
+            return "!"; // Default prefix on error
+        }
+    }
+
+    /**
+     * Get guild language from database
+     */
+    public String getGuildLanguage(String guildId) {
+        try {
+            String query = "SELECT language FROM guilds WHERE id = ? AND active = 1";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                String language = rs.getString("language");
+                return language != null ? language : "de";
+            }
+            return "de"; // Default language
+        } catch (SQLException e) {
+            System.err.println("Error getting guild language: " + e.getMessage());
+            e.printStackTrace();
+            return "de"; // Default language on error
+        }
+    }
+
+    /**
+     * Update guild prefix
+     */
+    public boolean updateGuildPrefix(String guildId, String prefix) {
+        try {
+            String updatePrefix = "UPDATE guilds SET prefix = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
+            PreparedStatement stmt = connection.prepareStatement(updatePrefix);
+            stmt.setString(1, prefix != null ? prefix : "!");
+            stmt.setString(2, guildId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating guild prefix: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update guild language
+     */
+    public boolean updateGuildLanguage(String guildId, String language) {
+        try {
+            String updateLanguage = "UPDATE guilds SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
+            PreparedStatement stmt = connection.prepareStatement(updateLanguage);
+            stmt.setString(1, language != null ? language : "de");
+            stmt.setString(2, guildId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating guild language: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 
@@ -714,6 +818,12 @@ public class DatabaseHandler {
             // Then, insert or update all current guilds as active
             for (Guild guild : currentGuilds) {
                 insertOrUpdateGuild(guild.getId(), guild.getName());
+                
+                // Check and log current prefix and language settings
+                String currentPrefix = getGuildPrefix(guild.getId());
+                String currentLanguage = getGuildLanguage(guild.getId());
+                System.out.println("Guild " + guild.getName() + " (ID: " + guild.getId() + 
+                    ") - Prefix: '" + currentPrefix + "', Language: '" + currentLanguage + "'");
             }
             
             System.out.println("Synced " + currentGuilds.size() + " guilds to database");
