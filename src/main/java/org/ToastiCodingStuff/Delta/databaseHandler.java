@@ -52,9 +52,8 @@ public class databaseHandler {
             // Create legacy tables for backward compatibility
             createLegacyTables();
             
-        } catch (SQLException e) {
-            System.err.println("Error initializing database tables: " + e.getMessage());
             e.printStackTrace();
+            throw e;
         }
     }
 
