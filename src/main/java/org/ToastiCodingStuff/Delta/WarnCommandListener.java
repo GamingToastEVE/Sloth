@@ -10,9 +10,9 @@ import java.time.format.DateTimeFormatter;
 
 public class WarnCommandListener extends ListenerAdapter {
 
-    private final databaseHandler handler;
+    private final DatabaseHandler handler;
 
-    public WarnCommandListener(databaseHandler handler) {
+    public WarnCommandListener(DatabaseHandler handler) {
         this.handler = handler;
     }
 

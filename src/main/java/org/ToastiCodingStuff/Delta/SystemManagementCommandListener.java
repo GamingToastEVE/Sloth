@@ -23,7 +23,7 @@ public class SystemManagementCommandListener extends ListenerAdapter {
 
         String systemType = event.getOption("system").getAsString();
         Guild guild = event.getGuild();
-        addGuildSlashCommands adder = new addGuildSlashCommands(guild);
+        AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
 
         switch (systemType) {
             case "log-channel":

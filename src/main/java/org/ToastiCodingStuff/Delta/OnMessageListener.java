@@ -7,9 +7,9 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public class OnMessageListener extends ListenerAdapter {
 
-    private final databaseHandler handler;
+    private final DatabaseHandler handler;
 
-    public OnMessageListener(databaseHandler handler) {
+    public OnMessageListener(DatabaseHandler handler) {
         this.handler = handler;
     }
 

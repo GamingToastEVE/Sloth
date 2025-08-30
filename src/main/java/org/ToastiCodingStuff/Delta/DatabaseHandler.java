@@ -3,10 +3,10 @@ package org.ToastiCodingStuff.Delta;
 import java.io.PrintStream;
 import java.sql.*;
 
-public class databaseHandler {
+public class DatabaseHandler {
 
     private final Connection connection;
-    public databaseHandler() {
+    public DatabaseHandler() {
         Connection connection1;
         try {
             connection1 = DriverManager.getConnection("jdbc:sqlite:server.db");

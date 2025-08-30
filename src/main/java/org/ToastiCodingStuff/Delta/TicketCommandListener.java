@@ -20,9 +20,9 @@ import java.util.EnumSet;
 
 public class TicketCommandListener extends ListenerAdapter {
 
-    private final databaseHandler handler;
+    private final DatabaseHandler handler;
 
-    public TicketCommandListener(databaseHandler handler) {
+    public TicketCommandListener(DatabaseHandler handler) {
         this.handler = handler;
     }
 
