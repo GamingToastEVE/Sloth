@@ -33,4 +33,20 @@ public class addGuildSlashCommands {
                 Commands.slash("get-warn-settings", "View current warning system settings")
         ).queue();
     }
+
+    public void addTicketCommands() {
+        guild.updateCommands().addCommands(
+                Commands.slash("ticket-setup", "Configure the ticket system for this server")
+                        .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
+                        .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
+                        .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false)
+                        .addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false),
+                Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"),
+                Commands.slash("close-ticket", "Close the current ticket")
+                        .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
+                Commands.slash("assign-ticket", "Assign current ticket to a staff member")
+                        .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
+                Commands.slash("ticket-info", "Get information about the current ticket")
+        ).queue();
+    }
 }
