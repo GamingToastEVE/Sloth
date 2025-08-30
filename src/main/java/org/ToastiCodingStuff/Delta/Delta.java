@@ -22,6 +22,7 @@ public class Delta {
         api.addEventListener(new WarnCommandListener(handler));
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new SystemManagementCommandListener());
+        api.addEventListener(new GuildEventListener(handler));
         
         // Register global system management command
         OptionData systemOption = new OptionData(OptionType.STRING, "system", "Which system to add", true)
@@ -33,6 +34,9 @@ public class Delta {
                 Commands.slash("add-system", "Add commands for a specific system")
                         .addOptions(systemOption)
         ).queue();
+        
+        // Sync all current guilds to database
+        handler.syncGuilds(api.getGuilds());
         
         Guild guild = api.getGuildById("1169699077986988112");
         AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
