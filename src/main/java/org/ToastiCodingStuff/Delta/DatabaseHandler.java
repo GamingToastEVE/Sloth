@@ -22,10 +22,30 @@ public class DatabaseHandler {
     }
 
     /**
+     * Check if database tables already exist
+     */
+    private boolean tablesAlreadyExist() {
+        try {
+            Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='guilds'");
+            return rs.next(); // Returns true if guilds table exists
+        } catch (SQLException e) {
+            System.err.println("Error checking if tables exist: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Initialize all database tables if they don't exist
      */
     private void initializeTables() {
         try {
+            // Check if tables already exist, if so break the method
+            if (tablesAlreadyExist()) {
+                System.out.println("Database tables already exist, skipping initialization.");
+                return;
+            }
+            
             // Enable foreign keys
             Statement stmt = connection.createStatement();
             stmt.execute("PRAGMA foreign_keys = ON;");
