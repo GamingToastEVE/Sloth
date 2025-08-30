@@ -1,20 +1,72 @@
 
 TERMS OF SERVICE AGREEMENT
 
-This Terms of Service Agreement (the "Agreement") is entered into between [Anshul Chauhan] ("Bot Owner") and the user ("User") of the [Bot Name] Discord bot (the "Bot").
+This Terms of Service Agreement (the "Agreement") is entered into between gamingtoasti ("Bot Owner") and the user ("User") of the Sloth Discord bot (the "Bot").
 
-By using the Bot, the User agrees to be bound by the terms of this Agreement. If the User does not agree to the terms of this Agreement, they should immediately discontinue use of the Bot.
+Terms of Service for Sloth
 
-1. Use of the Bot: The Bot Owner grants the User a non-exclusive, non-transferable, limited license to use the Bot for personal or non-commercial purposes.
-2. Prohibited Use: The User may not use the Bot in any way that violates applicable laws, rules, or regulations or infringes upon the rights of any third party. The User may not use the Bot for any commercial purposes without the express written consent of the Bot Owner.
-3. Limitation of Liability: The Bot Owner shall not be liable for any damages arising out of the use or inability to use the Bot, including but not limited to, damages for loss of profits, loss of data, or other intangible losses.
-4. Modifications to the Bot: The Bot Owner may modify or discontinue the Bot at any time without notice. The User agrees that the Bot Owner shall not be liable to the User or any third party for any modification, suspension, or discontinuance of the Bot.
-5. Intellectual Property: The Bot and all intellectual property rights therein are and shall remain the property of the Bot Owner. The User agrees not to copy, modify, or distribute the Bot or any portion thereof without the express written consent of the Bot Owner.
-6. Indemnification: The User agrees to indemnify and hold harmless the Bot Owner, its affiliates, and their respective directors, officers, employees, and agents from any and all claims, damages, liabilities, costs, and expenses, including reasonable attorneys' fees, arising out of the User's use of the Bot.
-7. Termination: This Agreement may be terminated by either party at any time for any reason. Upon termination, the User must immediately cease all use of the Bot.
-8. Governing Law: This Agreement shall be governed by and construed in accordance with the laws of Germany.
-9. Entire Agreement: This Agreement constitutes the entire agreement between the parties and supersedes all prior or contemporaneous agreements or representations, whether written or oral, relating to the Bot.
+Last updated: 30.8.25
 
-By using the Bot, the User acknowledges that they have read this Agreement, understand it, and agree to be bound by its terms and conditions.
+These Terms of Service ("Terms") govern the use of the Discord bot [Bot Name] ("the Bot"), provided by [Your Name/Entity] ("we", "us", or "our"). By inviting or using the Bot, you agree to these Terms.
 
-The owner of the bot (me) is NOT responsible for anything the user does with it.
+1. Eligibility
+
+You must be at least 16 years old to use the Bot, in compliance with the Discord Terms of Service
+.
+
+If you are under 18, you confirm that your legal guardian has reviewed and agreed to these Terms.
+
+2. Use of the Bot
+
+The Bot may only be used in accordance with Discord’s Community Guidelines and applicable German law.
+
+You agree not to misuse the Bot, including but not limited to:
+
+Spamming, harassment, or hate speech.
+
+Violating copyright, data protection, or intellectual property rights.
+
+Attempting to exploit, reverse-engineer, or overload the Bot.
+
+3. Availability
+
+The Bot is provided "as is" without guarantee of continuous availability.
+
+We reserve the right to modify, restrict, or discontinue the Bot at any time without prior notice.
+
+4. Data Collection & Privacy
+
+The Bot may process limited user data such as usernames, user IDs, server IDs, and message content only if necessary for its functionality.
+
+All data is handled in compliance with the General Data Protection Regulation (GDPR/DSGVO).
+
+For details on what data is collected and how it is processed, please see our Privacy Policy.
+
+5. Liability
+
+We are not liable for any damages, losses, or legal issues arising from the use or misuse of the Bot.
+
+We are not responsible for third-party content or behavior within Discord servers where the Bot is active.
+
+6. Termination
+
+We may suspend or permanently ban users or servers from using the Bot at our sole discretion, especially in cases of abuse or violation of these Terms.
+
+You may stop using the Bot at any time by removing it from your server.
+
+7. Governing Law
+
+These Terms are governed by the laws of the Federal Republic of Germany.
+
+If any provision of these Terms is found invalid, the remaining provisions shall remain in effect.
+
+8. Changes to the Terms
+
+We reserve the right to update or modify these Terms at any time.
+
+Continued use of the Bot after changes are published constitutes acceptance of the updated Terms.
+
+9. Contact
+
+If you have questions about these Terms, you can contact us at:
+https://discord.gg/dQT53fD8M5
