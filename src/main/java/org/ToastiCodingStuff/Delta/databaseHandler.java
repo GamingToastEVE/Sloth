@@ -591,12 +591,78 @@ public class databaseHandler {
         }
     }
 
-    public void insertModerationAction(String guildId, String userId, String moderatorId, String warn, String reason, Object o, String expiresAt) {
+    public void insertModerationAction(String guildId, String userId, String moderatorId, String actionType, String reason, Object duration, String expiresAt) {
+        try {
+            String insertAction = "INSERT INTO moderation_actions (guild_id, user_id, moderator_id, action_type, reason, duration, expires_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertAction);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, moderatorId);
+            stmt.setString(4, actionType);
+            stmt.setString(5, reason);
+            if (duration != null) {
+                stmt.setObject(6, duration);
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
+            stmt.setString(7, expiresAt);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error inserting moderation action: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt) {
+        try {
+            String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, expires_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertWarning, Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, moderatorId);
+            stmt.setString(4, reason);
+            stmt.setString(5, severity);
+            stmt.setString(6, expiresAt);
+            
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error inserting warning: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
     }
 
-    public void insertOrUpdateUser(String moderatorId, String effectiveName, String discriminator, String avatarUrl) {
+    public void insertOrUpdateUser(String userId, String effectiveName, String discriminator, String avatarUrl) {
+        try {
+            String upsertUser = "INSERT OR REPLACE INTO users (id, username, discriminator, avatar, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, " +
+                "COALESCE((SELECT created_at FROM users WHERE id = ?), CURRENT_TIMESTAMP), " +
+                "CURRENT_TIMESTAMP)";
+            PreparedStatement stmt = connection.prepareStatement(upsertUser);
+            stmt.setString(1, userId);
+            stmt.setString(2, effectiveName);
+            stmt.setString(3, discriminator);
+            stmt.setString(4, avatarUrl);
+            stmt.setString(5, userId); // For the COALESCE subquery
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error inserting/updating user: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isTicketSystem(String guildId) {
+        // Basic implementation to satisfy compilation
+        // TODO: Implement proper ticket system check logic
+        return false;
     }
 }
