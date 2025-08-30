@@ -52,8 +52,9 @@ public class databaseHandler {
             // Create legacy tables for backward compatibility
             createLegacyTables();
             
+        } catch (SQLException e) {
             e.printStackTrace();
-            throw e;
+            throw new RuntimeException(e);
         }
     }
 
