@@ -5,6 +5,7 @@ class DeltaDashboard {
         this.currentSection = 'overview';
         this.user = null;
         this.guilds = [];
+        this.selectedGuild = null;
         this.init();
     }
 
@@ -139,10 +140,15 @@ class DeltaDashboard {
             let guildsList = '<h3>Your Moderated Servers</h3><div class="guilds-list">';
             this.guilds.forEach(guild => {
                 const iconUrl = guild.icon || '/default-guild-icon.png';
+                const isSelected = this.selectedGuild && this.selectedGuild.id === guild.id;
                 guildsList += `
-                    <div class="guild-item" data-guild-id="${guild.id}">
+                    <div class="guild-item ${isSelected ? 'selected' : ''}" data-guild-id="${guild.id}">
                         <img class="guild-icon" src="${iconUrl}" alt="${guild.name}" />
-                        <span class="guild-name">${guild.name}</span>
+                        <div class="guild-info">
+                            <span class="guild-name">${guild.name}</span>
+                            <small class="guild-actions">Click to select for statistics</small>
+                        </div>
+                        ${isSelected ? '<div class="selected-indicator">✓</div>' : ''}
                     </div>
                 `;
             });
@@ -150,8 +156,63 @@ class DeltaDashboard {
             
             // Insert after the cards
             const cards = overviewSection.querySelector('.cards');
-            if (cards && !overviewSection.querySelector('.guilds-list')) {
-                cards.insertAdjacentHTML('afterend', guildsList);
+            const existingGuildsList = overviewSection.querySelector('.guilds-list');
+            if (cards) {
+                if (existingGuildsList) {
+                    existingGuildsList.outerHTML = guildsList;
+                } else {
+                    cards.insertAdjacentHTML('afterend', guildsList);
+                }
+                
+                // Add click handlers for guild selection
+                this.setupGuildSelection();
+            }
+        }
+    }
+
+    setupGuildSelection() {
+        const guildItems = document.querySelectorAll('.guild-item');
+        guildItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const guildId = item.getAttribute('data-guild-id');
+                const guild = this.guilds.find(g => g.id === guildId);
+                if (guild) {
+                    this.selectGuild(guild);
+                }
+            });
+        });
+    }
+
+    selectGuild(guild) {
+        this.selectedGuild = guild;
+        console.log('Selected guild:', guild.name, '(ID:', guild.id + ')');
+        
+        // Update visual selection
+        this.updateGuildsList();
+        
+        // Show notification
+        this.showNotification(`Selected ${guild.name} for statistics viewing`, 'success');
+        
+        // If we're already on the statistics page, reload the data
+        if (this.currentSection === 'statistics') {
+            this.loadStatistics();
+        }
+        
+        // Update the statistics section header to show selected guild
+        this.updateStatisticsHeader();
+    }
+
+    updateStatisticsHeader() {
+        const statisticsSection = document.getElementById('statistics');
+        if (statisticsSection && this.selectedGuild) {
+            const sectionTitle = statisticsSection.querySelector('.section-title');
+            if (sectionTitle) {
+                sectionTitle.innerHTML = `Server Statistics - ${this.selectedGuild.name}`;
+            }
+        } else if (statisticsSection) {
+            const sectionTitle = statisticsSection.querySelector('.section-title');
+            if (sectionTitle) {
+                sectionTitle.innerHTML = 'Server Statistics';
             }
         }
     }
@@ -171,6 +232,7 @@ class DeltaDashboard {
             
             // Load data for specific sections
             if (sectionId === 'statistics') {
+                this.updateStatisticsHeader();
                 this.loadStatistics();
             }
         }
@@ -183,12 +245,20 @@ class DeltaDashboard {
             
             if (!todayElement || !weeklyElement) return;
 
+            // Check if we have a selected guild
+            if (!this.selectedGuild) {
+                const noGuildMessage = '<div class="no-guild-selected">Please select a server from the Overview section to view statistics.<br><small><a href="#" onclick="showSection(\'overview\')">← Go to Overview</a></small></div>';
+                todayElement.innerHTML = noGuildMessage;
+                weeklyElement.innerHTML = noGuildMessage;
+                return;
+            }
+
             // Show loading state
             todayElement.innerHTML = '<div class="loading">Loading today\'s statistics...</div>';
             weeklyElement.innerHTML = '<div class="loading">Loading weekly statistics...</div>';
 
-            // Use first available guild or demo
-            const guildId = this.guilds.length > 0 ? this.guilds[0].id : 'demo';
+            // Use selected guild ID
+            const guildId = this.selectedGuild.id;
             
             // Fetch statistics from API
             const response = await fetch(`/api/statistics?guildId=${guildId}`);
@@ -388,7 +458,7 @@ style.textContent = `
 
     .guilds-list {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 1rem;
         margin-top: 2rem;
     }
@@ -400,9 +470,10 @@ style.textContent = `
         padding: 1rem;
         background: var(--card-bg);
         border-radius: 8px;
-        border: 1px solid var(--border-color);
+        border: 2px solid var(--border-color);
         cursor: pointer;
         transition: all 0.2s;
+        position: relative;
     }
 
     .guild-item:hover {
@@ -410,16 +481,64 @@ style.textContent = `
         transform: translateY(-2px);
     }
 
+    .guild-item.selected {
+        border-color: var(--success-color);
+        background: rgba(87, 242, 135, 0.1);
+    }
+
     .guild-icon {
         width: 40px;
         height: 40px;
         border-radius: 50%;
         background: var(--bg-secondary);
+        flex-shrink: 0;
+    }
+
+    .guild-info {
+        flex: 1;
+        min-width: 0;
     }
 
     .guild-name {
         font-weight: 500;
         color: var(--text-color);
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .guild-actions {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 0.25rem;
+    }
+
+    .selected-indicator {
+        color: var(--success-color);
+        font-size: 1.2rem;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+
+    .no-guild-selected {
+        text-align: center;
+        color: var(--text-muted);
+        font-style: italic;
+        padding: 2rem;
+        background: var(--surface-light);
+        border-radius: var(--border-radius);
+        border: 1px dashed var(--border-color);
+    }
+
+    .no-guild-selected a {
+        color: var(--primary-color);
+        text-decoration: none;
+    }
+
+    .no-guild-selected a:hover {
+        text-decoration: underline;
     }
 `;
 document.head.appendChild(style);

@@ -30,6 +30,7 @@ public class TestWebServer {
         // Mock API endpoints
         server.createContext("/api/user", new MockUserHandler());
         server.createContext("/api/guilds", new MockGuildsHandler());
+        server.createContext("/api/statistics", new MockStatisticsHandler());
         server.createContext("/auth/login", new MockLoginHandler());
         server.createContext("/auth/logout", new MockLogoutHandler());
     }
@@ -119,6 +120,65 @@ public class TestWebServer {
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(response.getBytes());
             }
+        }
+    }
+
+    private class MockStatisticsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String query = exchange.getRequestURI().getQuery();
+            String guildId = "unknown";
+            if (query != null && query.startsWith("guildId=")) {
+                guildId = query.substring(8);
+            }
+            
+            String guildName;
+            if ("guild1".equals(guildId)) {
+                guildName = "Test Server #1";
+            } else if ("guild2".equals(guildId)) {
+                guildName = "Awesome Community";
+            } else if ("guild3".equals(guildId)) {
+                guildName = "Gaming Hub";
+            } else {
+                guildName = "Unknown Server";
+            }
+            
+            // Simulate realistic statistics data
+            String todayStats = "**Statistics for " + java.time.LocalDate.now() + ":**\\n" +
+                "🔸 Warnings Issued: 3\\n" +
+                "🦶 Kicks Performed: 1\\n" +
+                "🔨 Bans Performed: 0\\n" +
+                "🎫 Tickets Created: 5\\n" +
+                "✅ Tickets Closed: 4\\n" +
+                "🤖 Automod Actions: 12";
+                
+            String weeklyStats = "**Weekly Statistics (Last 7 Days):**\\n" +
+                "🔸 Total Warnings: 18\\n" +
+                "🦶 Total Kicks: 7\\n" +
+                "🔨 Total Bans: 2\\n" +
+                "🎫 Total Tickets Created: 25\\n" +
+                "✅ Total Tickets Closed: 23\\n" +
+                "🤖 Total Automod Actions: 89\\n\\n" +
+                "**Daily Breakdown:**\\n" +
+                "2024-08-31: 3 warnings, 1 kick\\n" +
+                "2024-08-30: 2 warnings, 2 kicks\\n" +
+                "2024-08-29: 4 warnings, 1 ban\\n" +
+                "2024-08-28: 3 warnings, 3 kicks\\n" +
+                "2024-08-27: 2 warnings, 0 kicks\\n" +
+                "2024-08-26: 2 warnings, 0 kicks\\n" +
+                "2024-08-25: 2 warnings, 1 ban";
+            
+            String response = String.format("{\"today\":\"%s\",\"weekly\":\"%s\"}", 
+                escapeJson(todayStats), escapeJson(weeklyStats));
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length());
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
+        }
+        
+        private String escapeJson(String str) {
+            return str.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
         }
     }
 
