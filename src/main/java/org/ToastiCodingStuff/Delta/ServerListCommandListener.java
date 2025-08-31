@@ -94,11 +94,20 @@ public class ServerListCommandListener extends ListenerAdapter {
                 statistics = handler.getWeeklyStatistics(targetGuildId);
                 break;
             case "date":
-                String dateString = event.getOption("date").getAsString();
-                if (dateString == null) {
-                    event.reply("❌ Date parameter is required when using 'date' statistics type.").setEphemeral(true).queue();
+                if (event.getOption("date") == null) {
+                    event.reply("❌ Date parameter is required when using 'date' statistics type. Please provide a date in YYYY-MM-DD format.").setEphemeral(true).queue();
                     return;
                 }
+                String dateString = event.getOption("date").getAsString();
+                
+                // Validate date format
+                try {
+                    java.time.LocalDate.parse(dateString);
+                } catch (java.time.format.DateTimeParseException e) {
+                    event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+                    return;
+                }
+                
                 statistics = handler.getStatisticsForDate(targetGuildId, dateString);
                 break;
             default:
