@@ -292,8 +292,7 @@ public class TicketCommandListener extends ListenerAdapter {
             event.replyEmbeds(embed.build()).queue();
             
             // Archive channel after 5 seconds
-            channel.getManager().setName("closed-" + channel.getName()).queue();
-            channel.delete().reason("Ticket closed").queueAfter(60, java.util.concurrent.TimeUnit.SECONDS);
+            channel.delete().reason("Ticket closed").queue();
             
         } else {
             event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();

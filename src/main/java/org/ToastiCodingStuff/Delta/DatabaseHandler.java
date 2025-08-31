@@ -42,10 +42,10 @@ public class DatabaseHandler {
     private void initializeTables() {
         try {
             // Check if tables already exist, if so break the method
-            if (tablesAlreadyExist()) {
+            /*if (tablesAlreadyExist()) {
                 System.out.println("Database tables already exist, skipping initialization.");
                 return;
-            }
+            }*/
             
             // Enable foreign keys
             Statement stmt = connection.createStatement();

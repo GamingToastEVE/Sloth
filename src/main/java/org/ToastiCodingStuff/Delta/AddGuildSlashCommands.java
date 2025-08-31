@@ -79,7 +79,7 @@ public class AddGuildSlashCommands {
                                 .addChoice("High", "HIGH")
                                 .addChoice("Urgent", "URGENT")),
                 Commands.slash("ticket-info", "Get information about the current ticket"),
-                Commands.slash("ticket-transcript", "Generate a transcript of the current ticket // not possible due to discord not allowing message reading")
+                Commands.slash("ticket-transcript", "Generate a transcript of the current ticket")
         ).queue();
     }
 
