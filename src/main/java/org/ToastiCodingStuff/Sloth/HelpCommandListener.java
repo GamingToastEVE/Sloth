@@ -52,7 +52,6 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference\n" +
                                 "📜 **Legal** - Terms of Service and Privacy Policy")
-                        .addField("📂 **Source Code**", "https://github.com/GamingToastEVE/Delta", false)
                         .setColor(Color.BLUE)
                         .setFooter("Use the buttons below to navigate");
 
@@ -220,6 +219,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "For questions about Terms of Service or Privacy Policy:\n" +
                                 "• Discord: **gamingtoasti**\n" +
                                 "• Support Server: https://discord.gg/dQT53fD8M5", false)
+                        .addField("📂 **Source Code**", "https://github.com/GamingToastEVE/Delta", false)
                         .setColor(Color.GRAY)
                         .setFooter("Last updated: 30.8.25 • Navigate using buttons below");
 
