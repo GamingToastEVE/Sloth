@@ -5,6 +5,8 @@ build/
 !**/src/test/**/build/
 *.class
 server.db
+test.db
+.env
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
