@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Delta Bot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-robot me-2"></i>Delta Bot Dashboard
+            </span>
+            <div class="d-flex align-items-center">
+                <img th:if="${user.getAttribute('avatar')}" 
+                     th:src="'https://cdn.discordapp.com/avatars/' + ${user.getAttribute('id')} + '/' + ${user.getAttribute('avatar')} + '.png'" 
+                     width="32" height="32" class="rounded-circle me-2">
+                <span th:text="${user.getAttribute('username')} + '#' + ${user.getAttribute('discriminator')}">User</span>
+                <a href="/logout" class="btn btn-outline-light btn-sm ms-3">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2>Welcome to your Dashboard!</h2>
+                <p class="text-muted">Manage your Discord servers with Delta Bot</p>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-4 mb-4">
+                <div class="card bg-secondary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-bar text-success fa-3x mb-3"></i>
+                        <h5 class="card-title">Statistics</h5>
+                        <p class="card-text">View detailed statistics about your server activity</p>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Guild ID" id="statsGuildId">
+                            <button class="btn btn-success" type="button" onclick="viewStats()">View</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card bg-secondary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-ticket-alt text-info fa-3x mb-3"></i>
+                        <h5 class="card-title">Tickets</h5>
+                        <p class="card-text">Manage support tickets and user requests</p>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Guild ID" id="ticketsGuildId">
+                            <button class="btn btn-info" type="button" onclick="viewTickets()">View</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card bg-secondary h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-cogs text-warning fa-3x mb-3"></i>
+                        <h5 class="card-title">Settings</h5>
+                        <p class="card-text">Configure bot settings for your servers</p>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Guild ID" id="settingsGuildId">
+                            <button class="btn btn-warning" type="button" onclick="viewSettings()">Configure</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>How to find your Guild ID:</strong>
+                    In Discord, right-click on your server name and select "Copy Server ID" (Developer Mode must be enabled in Discord settings)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function viewStats() {
+            const guildId = document.getElementById('statsGuildId').value;
+            if (guildId) {
+                window.location.href = '/statistics/' + guildId;
+            } else {
+                alert('Please enter a Guild ID');
+            }
+        }
+
+        function viewTickets() {
+            const guildId = document.getElementById('ticketsGuildId').value;
+            if (guildId) {
+                window.location.href = '/tickets/' + guildId;
+            } else {
+                alert('Please enter a Guild ID');
+            }
+        }
+
+        function viewSettings() {
+            const guildId = document.getElementById('settingsGuildId').value;
+            if (guildId) {
+                window.location.href = '/settings/' + guildId;
+            } else {
+                alert('Please enter a Guild ID');
+            }
+        }
+    </script>
+</body>
+</html>
