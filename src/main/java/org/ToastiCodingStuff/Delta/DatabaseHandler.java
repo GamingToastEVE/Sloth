@@ -1,7 +1,9 @@
 package org.ToastiCodingStuff.Delta;
 
+import java.awt.Color;
 import java.io.PrintStream;
 import java.sql.*;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
@@ -1528,27 +1530,37 @@ public class DatabaseHandler {
                 TextChannel logChannel = guild.getTextChannelById(logChannelId);
                 if (logChannel != null) {
                     String emoji;
+                    Color embedColor;
                     switch (actionType) {
-                        case "WARN": emoji = "⚠️"; break;
-                        case "KICK": emoji = "🦶"; break;
-                        case "BAN": emoji = "🔨"; break;
-                        case "UNBAN": emoji = "🔓"; break;
-                        case "PURGE": emoji = "🧹"; break;
-                        case "SLOWMODE": emoji = "🐌"; break;
-                        case "UNTIMEOUT": emoji = "⏰"; break;
-                        case "TICKET_CREATED": emoji = "🎫"; break;
-                        case "TICKET_CLOSED": emoji = "🔒"; break;
+                        case "WARN": emoji = "⚠️"; embedColor = Color.YELLOW; break;
+                        case "KICK": emoji = "🦶"; embedColor = Color.ORANGE; break;
+                        case "BAN": emoji = "🔨"; embedColor = Color.RED; break;
+                        case "UNBAN": emoji = "🔓"; embedColor = Color.GREEN; break;
+                        case "PURGE": emoji = "🧹"; embedColor = Color.YELLOW; break;
+                        case "SLOWMODE": emoji = "🐌"; embedColor = Color.BLUE; break;
+                        case "UNTIMEOUT": emoji = "⏰"; embedColor = Color.GREEN; break;
+                        case "TICKET_CREATED": emoji = "🎫"; embedColor = Color.CYAN; break;
+                        case "TICKET_CLOSED": emoji = "🔒"; embedColor = Color.GRAY; break;
                         default:
                             if (actionType.startsWith("TIMEOUT")) {
                                 emoji = "⏱️";
+                                embedColor = Color.ORANGE;
                             } else {
                                 emoji = "⚖️"; // Default moderation emoji
+                                embedColor = Color.GRAY;
                             }
                             break;
                     }
-                    String logMessage = String.format("%s **%s** | %s %s\n**Moderator:** %s\n**Reason:** %s",
-                            emoji, actionType, emoji, targetName, moderatorName, reason);
-                    logChannel.sendMessage(logMessage).queue();
+                    
+                    EmbedBuilder embed = new EmbedBuilder()
+                            .setTitle(emoji + " " + actionType)
+                            .setDescription(emoji + " " + targetName)
+                            .addField("Moderator", moderatorName, true)
+                            .addField("Reason", reason, true)
+                            .setColor(embedColor)
+                            .setTimestamp(java.time.Instant.now());
+                    
+                    logChannel.sendMessageEmbeds(embed.build()).queue();
                 }
             }
         }
