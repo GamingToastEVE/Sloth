@@ -21,6 +21,8 @@ public class Delta {
         api.addEventListener(new LogChannelSlashCommandListener(handler));
         api.addEventListener(new WarnCommandListener(handler));
         api.addEventListener(new TicketCommandListener(handler));
+        api.addEventListener(new StatisticsCommandListener(handler));
+        api.addEventListener(new BanCommand(handler));
         api.addEventListener(new SystemManagementCommandListener());
         api.addEventListener(new GuildEventListener(handler));
         
@@ -43,5 +45,6 @@ public class Delta {
         adder.addlogChannelCommands();
         adder.addWarnCommands();
         adder.addTicketCommands();
+        adder.addStatisticsCommands();
     }
 }

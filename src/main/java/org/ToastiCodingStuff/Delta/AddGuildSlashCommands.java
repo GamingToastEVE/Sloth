@@ -63,4 +63,13 @@ public class AddGuildSlashCommands {
                         .addOptions(systemOption)
         ).queue();
     }
+
+    public void addStatisticsCommands() {
+        guild.updateCommands().addCommands(
+                Commands.slash("stats-today", "View today's server moderation statistics"),
+                Commands.slash("stats-week", "View this week's server moderation statistics"),
+                Commands.slash("stats-date", "View server statistics for a specific date")
+                        .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true)
+        ).queue();
+    }
 }
