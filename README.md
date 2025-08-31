@@ -20,7 +20,7 @@ Delta offers several modular systems that can be independently activated per ser
 ### 🎫 Ticket System
 - Create support ticket channels
 - Assign tickets to staff members
-- Generate ticket transcripts
+- Generate ticket transcripts (not possible until discord approves message content intent)
 - Customizable ticket categories and priorities
 
 ### 📝 Log Channel System
