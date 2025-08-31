@@ -1283,6 +1283,55 @@ public class DatabaseHandler {
         }
     }
 
+    /**
+     * Update ticket priority
+     */
+    public boolean updateTicketPriority(int ticketId, String priority) {
+        try {
+            String updatePriority = "UPDATE tickets SET priority = ? WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updatePriority);
+            stmt.setString(1, priority);
+            stmt.setInt(2, ticketId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket priority: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get tickets by guild with channel ID and priority for sorting
+     */
+    public java.util.List<java.util.Map<String, String>> getTicketsByGuildWithPriority(String guildId) {
+        java.util.List<java.util.Map<String, String>> tickets = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT channel_id, priority FROM tickets WHERE guild_id = ? AND status IN ('OPEN', 'IN_PROGRESS') ORDER BY " +
+                    "CASE priority " +
+                    "WHEN 'URGENT' THEN 1 " +
+                    "WHEN 'HIGH' THEN 2 " +
+                    "WHEN 'MEDIUM' THEN 3 " +
+                    "WHEN 'LOW' THEN 4 " +
+                    "ELSE 5 END";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                java.util.Map<String, String> ticket = new java.util.HashMap<>();
+                ticket.put("channel_id", String.valueOf(rs.getLong("channel_id")));
+                ticket.put("priority", rs.getString("priority"));
+                tickets.add(ticket);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting tickets by guild: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return tickets;
+    }
+
     // Statistics management methods
 
     /**

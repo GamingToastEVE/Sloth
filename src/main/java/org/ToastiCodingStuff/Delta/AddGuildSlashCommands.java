@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Delta;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
 public class AddGuildSlashCommands {
     private final Guild guild;
@@ -71,6 +72,12 @@ public class AddGuildSlashCommands {
                         .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
                 Commands.slash("assign-ticket", "Assign current ticket to a staff member")
                         .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
+                Commands.slash("set-ticket-priority", "Change the priority of the current ticket")
+                        .addOptions(new OptionData(OptionType.STRING, "priority", "Priority level", true)
+                                .addChoice("Low", "LOW")
+                                .addChoice("Medium", "MEDIUM")
+                                .addChoice("High", "HIGH")
+                                .addChoice("Urgent", "URGENT")),
                 Commands.slash("ticket-info", "Get information about the current ticket"),
                 Commands.slash("ticket-transcript", "Generate a transcript of the current ticket // not possible due to discord not allowing message reading")
         ).queue();

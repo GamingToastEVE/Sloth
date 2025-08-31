@@ -44,6 +44,9 @@ public class TicketCommandListener extends ListenerAdapter {
             case "assign-ticket":
                 handleAssignTicket(event, guildId);
                 break;
+            case "set-ticket-priority":
+                handleSetTicketPriority(event, guildId);
+                break;
             case "ticket-info":
                 handleTicketInfo(event, guildId);
                 break;
@@ -241,6 +244,9 @@ public class TicketCommandListener extends ListenerAdapter {
                                 .setActionRow(closeButton)
                                 .queue();
 
+                        // Sort channels by priority after creating new ticket
+                        sortTicketChannelsByPriority(event.getGuild(), guildId);
+
                         event.reply("✅ Ticket created successfully! " + channel.getAsMention()).setEphemeral(true).queue();
                     } else {
                         channel.delete().queue();
@@ -368,6 +374,126 @@ public class TicketCommandListener extends ListenerAdapter {
             event.replyEmbeds(embed.build()).queue();
         } else {
             event.reply("❌ Failed to assign ticket.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleSetTicketPriority(SlashCommandInteractionEvent event, String guildId) {
+        TextChannel channel = event.getChannel().asTextChannel();
+        String ticketInfo = handler.getTicketByChannelId(channel.getId());
+        
+        if (ticketInfo == null) {
+            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            return;
+        }
+
+        // Check if user has permission to change priority (support role or manage channels)
+        String supportRoleId = handler.getTicketRole(guildId);
+        boolean hasPermission = false;
+        
+        if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
+                .anyMatch(role -> role.getId().equals(supportRoleId))) {
+            hasPermission = true;
+        } else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
+            hasPermission = true;
+        }
+
+        if (!hasPermission) {
+            event.reply("❌ You don't have permission to change ticket priorities.").setEphemeral(true).queue();
+            return;
+        }
+
+        String newPriority = Objects.requireNonNull(event.getOption("priority")).getAsString();
+        
+        // Extract ticket ID from ticketInfo
+        String[] parts = ticketInfo.split(" \\| ");
+        int ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
+        
+        boolean success = handler.updateTicketPriority(ticketId, newPriority);
+        
+        if (success) {
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle("🔄 Priority Updated")
+                    .setDescription("Ticket priority has been changed to **" + newPriority + "**")
+                    .addField("Updated by", event.getUser().getAsMention(), true)
+                    .addField("New Priority", newPriority, true)
+                    .setColor(getPriorityColor(newPriority))
+                    .setTimestamp(java.time.Instant.now());
+
+            event.replyEmbeds(embed.build()).queue();
+            
+            // Sort channels by priority after updating
+            sortTicketChannelsByPriority(event.getGuild(), guildId);
+        } else {
+            event.reply("❌ Failed to update ticket priority.").setEphemeral(true).queue();
+        }
+    }
+
+    private void sortTicketChannelsByPriority(Guild guild, String guildId) {
+        try {
+            String categoryId = handler.getTicketCategory(guildId);
+            if (categoryId == null) return;
+            
+            Category ticketCategory = guild.getCategoryById(categoryId);
+            if (ticketCategory == null) return;
+            
+            // Get all ticket channels with their priorities
+            java.util.List<java.util.Map<String, String>> ticketsWithPriority = handler.getTicketsByGuildWithPriority(guildId);
+            if (ticketsWithPriority.isEmpty()) return;
+            
+            // Create a map for quick priority lookup
+            java.util.Map<String, String> channelToPriority = new java.util.HashMap<>();
+            for (java.util.Map<String, String> ticket : ticketsWithPriority) {
+                channelToPriority.put(ticket.get("channel_id"), ticket.get("priority"));
+            }
+            
+            // Get all text channels in the category and sort them
+            java.util.List<TextChannel> allChannels = ticketCategory.getTextChannels();
+            java.util.List<TextChannel> ticketChannels = new java.util.ArrayList<>();
+            java.util.List<TextChannel> nonTicketChannels = new java.util.ArrayList<>();
+            
+            // Separate ticket channels from other channels
+            for (TextChannel textChannel : allChannels) {
+                if (channelToPriority.containsKey(textChannel.getId())) {
+                    ticketChannels.add(textChannel);
+                } else {
+                    nonTicketChannels.add(textChannel);
+                }
+            }
+            
+            // Sort ticket channels by priority
+            ticketChannels.sort((ch1, ch2) -> {
+                String priority1 = channelToPriority.get(ch1.getId());
+                String priority2 = channelToPriority.get(ch2.getId());
+                return getPriorityOrder(priority1) - getPriorityOrder(priority2);
+            });
+            
+            // Update channel positions - ticket channels first (by priority), then other channels
+            int position = 0;
+            for (TextChannel channel : ticketChannels) {
+                if (channel.getPosition() != position) {
+                    channel.getManager().setPosition(position).queue();
+                }
+                position++;
+            }
+            for (TextChannel channel : nonTicketChannels) {
+                if (channel.getPosition() != position) {
+                    channel.getManager().setPosition(position).queue();
+                }
+                position++;
+            }
+        } catch (Exception e) {
+            System.err.println("Error sorting ticket channels: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private int getPriorityOrder(String priority) {
+        switch (priority) {
+            case "URGENT": return 1;
+            case "HIGH": return 2;
+            case "MEDIUM": return 3;
+            case "LOW": return 4;
+            default: return 5;
         }
     }
 
