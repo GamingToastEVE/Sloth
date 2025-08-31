@@ -23,7 +23,7 @@ public class Delta {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
-        api.addEventListener(new SystemManagementCommandListener());
+        api.addEventListener(new SystemManagementCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
         
         // Register global system management command
@@ -41,12 +41,43 @@ public class Delta {
         // Sync all current guilds to database
         handler.syncGuilds(api.getGuilds());
         
-        Guild guild = api.getGuildById("1169699077986988112");
-        AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
-        adder.addLogChannelCommands();
-        adder.addWarnCommands();
-        adder.addTicketCommands();
-        adder.addModerationCommands();
-        adder.addStatisticsCommands();
+        // Automatically activate systems for all guilds based on database
+        activateStoredSystems(handler, api.getGuilds());
+    }
+    
+    /**
+     * Activate systems for all guilds based on what's stored in the database
+     */
+    private static void activateStoredSystems(DatabaseHandler handler, java.util.List<Guild> guilds) {
+        for (Guild guild : guilds) {
+            java.util.List<String> activatedSystems = handler.getActivatedSystems(guild.getId());
+            if (!activatedSystems.isEmpty()) {
+                AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
+                System.out.println("Activating stored systems for guild " + guild.getName() + " (ID: " + guild.getId() + "):");
+                
+                for (String systemType : activatedSystems) {
+                    System.out.println("  - Activating " + systemType + " system");
+                    switch (systemType) {
+                        case "log-channel":
+                            adder.addLogChannelCommands();
+                            break;
+                        case "warn-system":
+                            adder.addWarnCommands();
+                            break;
+                        case "ticket-system":
+                            adder.addTicketCommands();
+                            break;
+                        case "moderation-system":
+                            adder.addModerationCommands();
+                            break;
+                    }
+                }
+            }
+            
+            // Always add statistics commands (they are not part of the system management)
+            AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
+            adder.addStatisticsCommands();
+        }
+        System.out.println("Finished activating stored systems for all guilds");
     }
 }
