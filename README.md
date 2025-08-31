@@ -1,6 +1,6 @@
-# Delta Discord Bot
+# Sloth Discord Bot
 
-Delta is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
 
 ## Features
 
@@ -33,19 +33,6 @@ Delta offers several modular systems that can be independently activated per ser
 - User engagement metrics
 - Command usage tracking
 
-## Requirements
-
-- Java 11 or higher
-- Discord Bot Token
-- SQLite database (automatically created)
-
-## Dependencies
-
-The bot uses the following key dependencies:
-- **JDA (Java Discord API)** v5.0.0-beta.24 - Discord API wrapper
-- **SQLite JDBC** v3.46.0.0 - Database connectivity
-- **Dotenv Java** v3.0.0 - Environment variable management
-
 ## Setup
 
 ### 1. Clone the Repository
@@ -70,26 +57,9 @@ TOKEN=your_discord_bot_token_here
 ./gradlew run
 ```
 
-## Discord Bot Setup
-
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application and bot
-3. Copy the bot token and add it to your `.env` file
-4. Enable the following bot permissions:
-   - Send Messages
-   - Read Message History
-   - Embed Links
-   - Manage Channels
-   - Manage Roles
-   - Use Slash Commands
-   - View Channels
-5. Enable the following privileged gateway intents:
-   - Message Content Intent
-   - Server Members Intent
-
 ## Usage
 
-Delta uses a modular system approach where server administrators can activate only the systems they need.
+Sloth uses a modular system approach where server administrators can activate only the systems they need.
 
 ### System Management
 
@@ -186,7 +156,7 @@ Delta/
 
 ## License
 
-This project is developed by ToastiCodingStuff. Please refer to the Terms of Service for usage guidelines.
+This project is developed by gamingtoasti. Please refer to the Terms of Service for usage guidelines.
 
 ## Support
 
