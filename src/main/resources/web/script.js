@@ -11,6 +11,7 @@ class DeltaDashboard {
     async init() {
         this.setupNavigation();
         this.setupAuth();
+        this.checkForErrors();
         await this.checkAuthStatus();
         console.log('Delta Dashboard initialized');
     }
@@ -36,14 +37,32 @@ class DeltaDashboard {
 
         if (loginBtn) {
             loginBtn.addEventListener('click', () => {
+                console.log('Initiating Discord login...');
                 window.location.href = '/auth/login';
             });
         }
 
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
+                console.log('Logging out...');
                 window.location.href = '/auth/logout';
             });
+        }
+    }
+    
+    checkForErrors() {
+        // Check for error parameter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        
+        if (error) {
+            console.error('Login error:', error);
+            this.showNotification('Login failed: ' + error, 'error');
+            
+            // Clear error from URL without refreshing page
+            const url = new URL(window.location);
+            url.searchParams.delete('error');
+            window.history.replaceState({}, '', url);
         }
     }
 
