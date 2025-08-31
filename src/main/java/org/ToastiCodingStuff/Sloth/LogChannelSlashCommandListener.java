@@ -1,4 +1,4 @@
-package org.ToastiCodingStuff.Delta;
+package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;

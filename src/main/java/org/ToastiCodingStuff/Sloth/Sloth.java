@@ -1,4 +1,4 @@
-package org.ToastiCodingStuff.Delta;
+package org.ToastiCodingStuff.Sloth;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.JDA;
@@ -9,7 +9,7 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
-public class Delta {
+public class Sloth {
     public static void main(String[] args) throws Exception {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
@@ -37,7 +37,7 @@ public class Delta {
         api.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")
                         .addOptions(systemOption),
-                Commands.slash("help", "Show help and documentation for Delta bot")
+                Commands.slash("help", "Show help and documentation for Sloth bot")
         ).queue();
         
         // Sync all current guilds to database

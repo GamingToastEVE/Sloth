@@ -1,4 +1,4 @@
-package org.ToastiCodingStuff.Delta;
+package org.ToastiCodingStuff.Sloth;
 
 import java.awt.Color;
 import java.io.PrintStream;
