@@ -12,7 +12,7 @@ public class AddGuildSlashCommands {
         this.guild = guild;
     }
 
-    public void addlogChannelCommands () {
+    public void addLogChannelCommands () {
         guild.updateCommands().addCommands(
                 Commands.slash("set-log-channel", "Sets the log channel.")
                         .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true),

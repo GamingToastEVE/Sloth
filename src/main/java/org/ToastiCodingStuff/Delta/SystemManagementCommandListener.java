@@ -27,7 +27,7 @@ public class SystemManagementCommandListener extends ListenerAdapter {
 
         switch (systemType) {
             case "log-channel":
-                adder.addlogChannelCommands();
+                adder.addLogChannelCommands();
                 event.reply("✅ Log channel commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "warn-system":

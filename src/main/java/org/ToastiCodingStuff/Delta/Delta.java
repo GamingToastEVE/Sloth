@@ -42,7 +42,7 @@ public class Delta {
         
         Guild guild = api.getGuildById("1169699077986988112");
         AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
-        adder.addlogChannelCommands();
+        adder.addLogChannelCommands();
         adder.addWarnCommands();
         adder.addTicketCommands();
         adder.addStatisticsCommands();
