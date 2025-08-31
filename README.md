@@ -61,6 +61,16 @@ TOKEN=your_discord_bot_token_here
 
 Sloth uses a modular system approach where server administrators can activate only the systems they need.
 
+### Getting Help
+
+Use the `/help` command to access Delta's interactive help system. The help system provides:
+- 🏠 **Overview** - Learn about Delta's features and capabilities
+- ⚙️ **Systems** - Browse all available modular systems
+- 📋 **Setup** - Step-by-step configuration guides  
+- 📖 **Commands** - Complete command reference
+
+Navigate between help sections using the interactive buttons.
+
 ### System Management
 
 Use the `/add-system` command to activate different systems on your server:
