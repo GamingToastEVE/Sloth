@@ -42,7 +42,22 @@ public class AddGuildSlashCommands {
                         .addOption(OptionType.STRING, "reason", "Reason for the kick", false),
                 Commands.slash("ban", "Ban a user from the server")
                         .addOption(OptionType.USER, "user", "User to ban", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the ban", false)
+                        .addOption(OptionType.STRING, "reason", "Reason for the ban", false),
+                Commands.slash("unban", "Unban a user from the server")
+                        .addOption(OptionType.STRING, "userid", "User ID to unban", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for the unban", false),
+                Commands.slash("timeout", "Timeout a user for a specified duration")
+                        .addOption(OptionType.USER, "user", "User to timeout", true)
+                        .addOption(OptionType.INTEGER, "minutes", "Duration in minutes (max 40320 = 28 days)", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for the timeout", false),
+                Commands.slash("untimeout", "Remove timeout from a user")
+                        .addOption(OptionType.USER, "user", "User to remove timeout from", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for removing timeout", false),
+                Commands.slash("purge", "Delete multiple messages from the channel")
+                        .addOption(OptionType.INTEGER, "amount", "Number of messages to delete (1-100)", true)
+                        .addOption(OptionType.USER, "user", "Only delete messages from this user", false),
+                Commands.slash("slowmode", "Set slowmode for the current channel")
+                        .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true)
         ).queue();
     }
 
