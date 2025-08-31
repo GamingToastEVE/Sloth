@@ -613,18 +613,26 @@ public class DatabaseHandler {
                 PreparedStatement setWarnSettings2 = connection.prepareStatement(setWarnSettings1);
                 setWarnSettings2.setInt(1, maxWarns);
                 setWarnSettings2.setInt(2, minutesMuted);
-                setWarnSettings2.setString(3, roleID);
+                if (roleID != null) {
+                    setWarnSettings2.setString(3, roleID);
+                } else {
+                    setWarnSettings2.setNull(3, java.sql.Types.VARCHAR);
+                }
                 setWarnSettings2.setInt(4, warnTimeHours);
-                setWarnSettings2.setString(5, guildID); // Fixed: added guildID parameter
+                setWarnSettings2.setString(5, guildID);
                 setWarnSettings2.execute();
                 return;
             }
             String setWarnSettings3 = "INSERT INTO warn_system_settings(guild_id, max_warns, minutes_muted, role_id, warn_time_hours) VALUES(?,?,?,?,?)";
             PreparedStatement setWarnSettings4 = connection.prepareStatement(setWarnSettings3);
-            setWarnSettings4.setString(1, guildID); // Fixed: added guildID parameter
+            setWarnSettings4.setString(1, guildID);
             setWarnSettings4.setInt(2, maxWarns);
             setWarnSettings4.setInt(3, minutesMuted);
-            setWarnSettings4.setString(4, roleID);
+            if (roleID != null) {
+                setWarnSettings4.setString(4, roleID);
+            } else {
+                setWarnSettings4.setNull(4, java.sql.Types.VARCHAR);
+            }
             setWarnSettings4.setInt(5, warnTimeHours);
             setWarnSettings4.execute();
         } catch (SQLException e) {
@@ -640,6 +648,22 @@ public class DatabaseHandler {
             checkIfUserIsInGuildTableStatement.setString(2, userID);
             ResultSet rs = checkIfUserIsInGuildTableStatement.executeQuery();
             return rs.next(); // returns true if there's at least one result
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public int getActiveWarningsCount(String guildID, String userID) {
+        try {
+            String query = "SELECT COUNT(*) as count FROM warnings WHERE guild_id=? AND user_id=? AND active=1 AND (expires_at IS NULL OR expires_at > datetime('now'))";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildID);
+            stmt.setString(2, userID);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("count");
+            }
+            return 0;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

@@ -1,10 +1,12 @@
 package org.ToastiCodingStuff.Delta;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -70,9 +72,45 @@ public class WarnCommandListener extends ListenerAdapter {
         int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt);
 
         if (warningId > 0) {
+            // Check if user has reached max warnings and apply timeout if needed
+            int activeWarnings = handler.getActiveWarningsCount(guildId, userId);
+            String timeoutMessage = "";
+            
+            if (handler.hasWarnSystemSettings(guildId)) {
+                int maxWarns = handler.getMaxWarns(guildId);
+                int timeoutMinutes = handler.getTimeMuted(guildId);
+                
+                if (activeWarnings >= maxWarns) {
+                    // Check timeout permissions
+                    if (event.getGuild().getSelfMember().hasPermission(Permission.MODERATE_MEMBERS) &&
+                        event.getGuild().getSelfMember().canInteract(targetMember)) {
+                        
+                        // Apply Discord timeout
+                        Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
+                        targetMember.timeoutFor(timeoutDuration)
+                            .reason("Maximum warnings reached (" + activeWarnings + "/" + maxWarns + ")")
+                            .queue(
+                                success -> {
+                                    // Log timeout action
+                                    String timeoutExpiresAt = LocalDateTime.now().plusMinutes(timeoutMinutes)
+                                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                                    handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT", 
+                                        "Maximum warnings reached", timeoutDuration.toString(), timeoutExpiresAt);
+                                },
+                                error -> {
+                                    // Handle timeout failure silently - warning was still issued
+                                }
+                            );
+                        timeoutMessage = "\n⏱️ **User has been timed out for " + timeoutMinutes + " minutes** (reached " + activeWarnings + "/" + maxWarns + " warnings)";
+                    } else {
+                        timeoutMessage = "\n⚠️ **Warning:** User has reached maximum warnings (" + activeWarnings + "/" + maxWarns + ") but I cannot timeout them due to permissions";
+                    }
+                }
+            }
+            
             event.reply("Warning issued to " + targetMember.getAsMention() + " for: " + reason +
                     "\nWarning ID: " + warningId +
-                    (expiresAt != null ? "\nExpires: " + expiresAt : "")).queue();
+                    (expiresAt != null ? "\nExpires: " + expiresAt : "") + timeoutMessage).queue();
 
             // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
@@ -90,18 +128,22 @@ public class WarnCommandListener extends ListenerAdapter {
 
     private void handleSetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
         int maxWarns = event.getOption("max_warns").getAsInt();
-        int minutesMuted = event.getOption("minutes_muted").getAsInt();
-        Role muteRole = event.getOption("mute_role").getAsRole();
+        int timeoutMinutes = event.getOption("timeout_minutes").getAsInt();
         int warnTimeHours = event.getOption("warn_time_hours") != null ?
                 event.getOption("warn_time_hours").getAsInt() : 24;
 
-        // Use existing setWarnSettings method (already updated to use proper parameters)
-        handler.setWarnSettings(guildId, maxWarns, minutesMuted, muteRole.getId(), warnTimeHours);
+        // Validate timeout duration (max 28 days = 40320 minutes)
+        if (timeoutMinutes < 1 || timeoutMinutes > 40320) {
+            event.reply("❌ Timeout duration must be between 1 and 40320 minutes (28 days).").setEphemeral(true).queue();
+            return;
+        }
+
+        // Use existing setWarnSettings method but pass null for roleID since we don't use mute roles anymore
+        handler.setWarnSettings(guildId, maxWarns, timeoutMinutes, null, warnTimeHours);
 
         event.reply("Warn settings updated successfully!\n" +
                 "Max Warns: " + maxWarns + "\n" +
-                "Mute Duration: " + minutesMuted + " minutes\n" +
-                "Mute Role: " + muteRole.getAsMention() + "\n" +
+                "Timeout Duration: " + timeoutMinutes + " minutes\n" +
                 "Warning Expiry: " + warnTimeHours + " hours").queue();
     }
 
@@ -113,21 +155,13 @@ public class WarnCommandListener extends ListenerAdapter {
 
         // Use existing getter methods
         int maxWarns = handler.getMaxWarns(guildId);
-        int timeMuted = handler.getTimeMuted(guildId);
-        String roleId = handler.getWarnRoleID(guildId);
+        int timeoutMinutes = handler.getTimeMuted(guildId);
         int warnTimeHours = handler.getWarnTimeHours(guildId);
-
-        if (roleId == null) {
-            event.reply("Mute role not set in the warn settings. Please update the settings.").setEphemeral(true).queue();
-            return;
-        }
-        Role muteRole = event.getGuild().getRoleById(roleId);
-        String roleMention = muteRole != null ? muteRole.getAsMention() : "Role not found";
 
         event.reply("**Current Warn Settings:**\n" +
                 "Max Warns: " + maxWarns + "\n" +
-                "Mute Duration: " + timeMuted + " minutes\n" +
-                "Mute Role: " + roleMention + "\n" +
-                "Warning Expiry: " + warnTimeHours + " hours").queue();
+                "Timeout Duration: " + timeoutMinutes + " minutes\n" +
+                "Warning Expiry: " + warnTimeHours + " hours\n\n" +
+                "ℹ️ When users reach max warnings, they will be automatically timed out using Discord's built-in timeout feature.").queue();
     }
 }
