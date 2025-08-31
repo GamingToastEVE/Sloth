@@ -1,9 +1,18 @@
 # Sloth Discord Bot
 
-Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively. **Now with a modern web dashboard for easy configuration and monitoring!**
 
 ## Features
 
+### 🌐 Web Dashboard
+- **Modern Interface**: Clean, responsive web UI with dark theme optimized for Discord aesthetics
+- **Real-time Statistics**: View today's and weekly server activity metrics including warnings, bans, tickets, and auto-mod actions
+- **Ticket Management**: Monitor open/closed tickets, response times, and ticket priorities
+- **Moderation Overview**: Track recent moderation actions and automated responses
+- **Live Data Integration**: Dashboard connects to the same SQLite database used by the Discord bot
+- **Accessible on Port 8080**: The web dashboard runs alongside the Discord bot on http://localhost:8080
+
+### 🤖 Discord Bot Features
 Delta offers several modular systems that can be independently activated per server:
 
 ### 🛡️ Moderation System
@@ -57,11 +66,28 @@ TOKEN=your_discord_bot_token_here
 ./gradlew run
 ```
 
+**🎉 The bot will now start with both Discord functionality AND a web dashboard available at http://localhost:8080**
+
 ## Usage
 
 Sloth uses a modular system approach where server administrators can activate only the systems they need.
 
-### System Management
+### 🌐 Web Dashboard Access
+
+Once the bot is running, you can access the modern web dashboard at:
+```
+http://localhost:8080
+```
+
+The dashboard provides:
+- **Overview**: Quick access to all bot systems and features
+- **Statistics**: Real-time and historical data about server activity
+- **Tickets**: Monitor and manage support tickets
+- **Moderation**: Review recent moderation actions and metrics
+
+### 🤖 Discord Bot Commands
+
+#### System Management
 
 Use the `/add-system` command to activate different systems on your server:
 
@@ -114,8 +140,10 @@ Delta automatically creates and manages an SQLite database (`server.db`) that st
 ```
 Delta/
 ├── src/main/java/org/ToastiCodingStuff/Delta/
-│   ├── Delta.java                          # Main bot class
+│   ├── Delta.java                          # Main bot class (now includes web server)
 │   ├── DatabaseHandler.java                # Database operations
+│   ├── WebServer.java                       # HTTP server for web dashboard
+│   ├── StandaloneWebServer.java            # Standalone web server for testing
 │   ├── AddGuildSlashCommands.java          # Command registration
 │   ├── SystemManagementCommandListener.java # System activation
 │   ├── TicketCommandListener.java          # Ticket system
@@ -124,6 +152,10 @@ Delta/
 │   ├── LogChannelSlashCommandListener.java # Logging system
 │   ├── StatisticsCommandListener.java      # Statistics tracking
 │   └── GuildEventListener.java             # Guild event handling
+├── src/main/resources/web/                  # Web dashboard files
+│   ├── index.html                          # Main dashboard HTML
+│   ├── style.css                           # Modern CSS styling
+│   └── script.js                           # JavaScript functionality
 ├── build.gradle.kts                        # Build configuration
 ├── .env                                     # Environment variables (create this)
 └── README.md                               # This file
