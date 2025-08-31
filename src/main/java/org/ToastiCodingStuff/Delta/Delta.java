@@ -13,16 +13,6 @@ public class Delta {
     public static void main(String[] args) throws Exception {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
-        
-        // Start web dashboard server
-        int webPort = 8080;
-        try {
-            WebServer webServer = new WebServer(webPort, handler);
-            webServer.start();
-        } catch (Exception e) {
-            System.err.println("Failed to start web server: " + e.getMessage());
-        }
-        
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
                 .build();
