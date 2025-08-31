@@ -35,6 +35,17 @@ public class AddGuildSlashCommands {
         ).queue();
     }
 
+    public void addModerationCommands() {
+        guild.updateCommands().addCommands(
+                Commands.slash("kick", "Kick a user from the server")
+                        .addOption(OptionType.USER, "user", "User to kick", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for the kick", false),
+                Commands.slash("ban", "Ban a user from the server")
+                        .addOption(OptionType.USER, "user", "User to ban", true)
+                        .addOption(OptionType.STRING, "reason", "Reason for the ban", false)
+        ).queue();
+    }
+
     public void addTicketCommands() {
         guild.updateCommands().addCommands(
                 Commands.slash("ticket-setup", "Configure the ticket system for this server")
@@ -56,7 +67,8 @@ public class AddGuildSlashCommands {
         OptionData systemOption = new OptionData(OptionType.STRING, "system", "Which system to add", true)
                 .addChoice("Log Channel System", "log-channel")
                 .addChoice("Warning System", "warn-system")
-                .addChoice("Ticket System", "ticket-system");
+                .addChoice("Ticket System", "ticket-system")
+                .addChoice("Moderation System", "moderation-system");
 
         guild.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")

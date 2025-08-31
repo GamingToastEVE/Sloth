@@ -38,8 +38,12 @@ public class SystemManagementCommandListener extends ListenerAdapter {
                 adder.addTicketCommands();
                 event.reply("✅ Ticket system commands have been added to this server!").setEphemeral(true).queue();
                 break;
+            case "moderation-system":
+                adder.addModerationCommands();
+                event.reply("✅ Moderation system commands have been added to this server!").setEphemeral(true).queue();
+                break;
             default:
-                event.reply("❌ Invalid system type. Available systems: `Log Channel System`, `Warning System`, `Ticket System`").setEphemeral(true).queue();
+                event.reply("❌ Invalid system type. Available systems: `Log Channel System`, `Warning System`, `Ticket System`, `Moderation System`").setEphemeral(true).queue();
                 break;
         }
     }

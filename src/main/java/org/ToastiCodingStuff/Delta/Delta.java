@@ -22,7 +22,7 @@ public class Delta {
         api.addEventListener(new WarnCommandListener(handler));
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
-        api.addEventListener(new BanCommand(handler));
+        api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new SystemManagementCommandListener());
         api.addEventListener(new GuildEventListener(handler));
         
@@ -30,7 +30,8 @@ public class Delta {
         OptionData systemOption = new OptionData(OptionType.STRING, "system", "Which system to add", true)
                 .addChoice("Log Channel System", "log-channel")
                 .addChoice("Warning System", "warn-system")
-                .addChoice("Ticket System", "ticket-system");
+                .addChoice("Ticket System", "ticket-system")
+                .addChoice("Moderation System", "moderation-system");
 
         api.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")
@@ -45,6 +46,7 @@ public class Delta {
         adder.addLogChannelCommands();
         adder.addWarnCommands();
         adder.addTicketCommands();
+        adder.addModerationCommands();
         adder.addStatisticsCommands();
     }
 }
