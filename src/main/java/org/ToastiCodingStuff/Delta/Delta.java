@@ -34,6 +34,7 @@ public class Delta {
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new SystemManagementCommandListener(handler));
+        api.addEventListener(new ServerListCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
         
         // Register global system management command
@@ -45,7 +46,15 @@ public class Delta {
 
         api.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")
-                        .addOptions(systemOption)
+                        .addOptions(systemOption),
+                Commands.slash("guild-list", "Show servers where you can moderate and view statistics"),
+                Commands.slash("guild-stats", "View statistics for a specific server")
+                        .addOption(OptionType.STRING, "guild_id", "Server ID to view statistics for", true)
+                        .addOptions(new OptionData(OptionType.STRING, "type", "Type of statistics to view", true)
+                                .addChoice("Today", "today")
+                                .addChoice("This Week", "week")
+                                .addChoice("Specific Date", "date"))
+                        .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (required for 'date' type)", false)
         ).queue();
         
         // Sync all current guilds to database
