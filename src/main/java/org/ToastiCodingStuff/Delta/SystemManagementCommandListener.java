@@ -7,6 +7,12 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public class SystemManagementCommandListener extends ListenerAdapter {
 
+    private final DatabaseHandler databaseHandler;
+
+    public SystemManagementCommandListener(DatabaseHandler databaseHandler) {
+        this.databaseHandler = databaseHandler;
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("add-system")) {
@@ -23,23 +29,28 @@ public class SystemManagementCommandListener extends ListenerAdapter {
 
         String systemType = event.getOption("system").getAsString();
         Guild guild = event.getGuild();
+        String guildId = guild.getId();
         AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
 
         switch (systemType) {
             case "log-channel":
                 adder.addLogChannelCommands();
+                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Log channel commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "warn-system":
                 adder.addWarnCommands();
+                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Warning system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "ticket-system":
                 adder.addTicketCommands();
+                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Ticket system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "moderation-system":
                 adder.addModerationCommands();
+                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Moderation system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             default:

@@ -62,6 +62,7 @@ public class DatabaseHandler {
             createStatisticsTable();
             createTemporaryDataTable();
             createGuildsTable();
+            createGuildSystemsTable();
             
             // Create legacy tables for backward compatibility
             createLegacyTables();
@@ -397,6 +398,36 @@ public class DatabaseHandler {
         // Create indexes
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_temporary_data_expires ON temporary_data(expires_at)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_temporary_data_guild_user_type ON temporary_data(guild_id, user_id, data_type)");
+    }
+
+    /**
+     * Create guild_systems table
+     */
+    private void createGuildSystemsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS guild_systems (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "guild_id INTEGER NOT NULL, " +
+            "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system')), " +
+            "active INTEGER DEFAULT 1, " +
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
+            "UNIQUE(guild_id, system_type)" +
+            ")";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+        
+        // Create indexes
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)");
+        
+        // Create trigger for updated_at
+        String trigger = "CREATE TRIGGER IF NOT EXISTS update_guild_systems_updated_at " +
+            "AFTER UPDATE ON guild_systems " +
+            "FOR EACH ROW " +
+            "BEGIN " +
+                "UPDATE guild_systems SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+            "END";
+        stmt.execute(trigger);
     }
 
     /**
@@ -828,6 +859,89 @@ public class DatabaseHandler {
         } catch (SQLException e) {
             System.err.println("Error syncing guilds: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Activate a system for a guild
+     */
+    public boolean activateGuildSystem(String guildId, String systemType) {
+        try {
+            String activateSystem = "INSERT OR REPLACE INTO guild_systems (guild_id, system_type, active, updated_at) " +
+                "VALUES (?, ?, 1, CURRENT_TIMESTAMP)";
+            PreparedStatement stmt = connection.prepareStatement(activateSystem);
+            stmt.setString(1, guildId);
+            stmt.setString(2, systemType);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error activating guild system: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Deactivate a system for a guild
+     */
+    public boolean deactivateGuildSystem(String guildId, String systemType) {
+        try {
+            String deactivateSystem = "UPDATE guild_systems SET active = 0, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE guild_id = ? AND system_type = ?";
+            PreparedStatement stmt = connection.prepareStatement(deactivateSystem);
+            stmt.setString(1, guildId);
+            stmt.setString(2, systemType);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deactivating guild system: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get all activated systems for a guild
+     */
+    public java.util.List<String> getActivatedSystems(String guildId) {
+        java.util.List<String> activatedSystems = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT system_type FROM guild_systems WHERE guild_id = ? AND active = 1";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                activatedSystems.add(rs.getString("system_type"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting activated systems: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return activatedSystems;
+    }
+
+    /**
+     * Check if a system is activated for a guild
+     */
+    public boolean isSystemActivated(String guildId, String systemType) {
+        try {
+            String query = "SELECT active FROM guild_systems WHERE guild_id = ? AND system_type = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, systemType);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt("active") == 1;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.err.println("Error checking if system is activated: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 
