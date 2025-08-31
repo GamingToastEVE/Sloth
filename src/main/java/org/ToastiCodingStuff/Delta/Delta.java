@@ -24,6 +24,7 @@ public class Delta {
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new SystemManagementCommandListener(handler));
+        api.addEventListener(new HelpCommandListener());
         api.addEventListener(new GuildEventListener(handler));
         
         // Register global system management command
@@ -35,7 +36,8 @@ public class Delta {
 
         api.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")
-                        .addOptions(systemOption)
+                        .addOptions(systemOption),
+                Commands.slash("help", "Show help and documentation for Delta bot")
         ).queue();
         
         // Sync all current guilds to database
