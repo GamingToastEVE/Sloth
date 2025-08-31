@@ -2,6 +2,7 @@
 :root {
     --primary-color: #5865f2;
     --primary-dark: #4752c4;
+    --primary-hover: #4752c4;
     --secondary-color: #57f287;
     --background-color: #2c2f33;
     --surface-color: #36393f;
@@ -9,6 +10,7 @@
     --text-primary: #ffffff;
     --text-secondary: #b9bbbe;
     --text-muted: #72767d;
+    --text-color: #ffffff;
     --border-color: #4f545c;
     --success-color: #57f287;
     --warning-color: #fee75c;
@@ -16,6 +18,8 @@
     --shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     --border-radius: 8px;
     --transition: all 0.2s ease-in-out;
+    --card-bg: #36393f;
+    --bg-secondary: #40444b;
 }
 
 /* Reset and Base Styles */
@@ -51,7 +55,7 @@ body {
 .header .container {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 2rem;
     padding: 1rem 20px;
 }
 
@@ -65,6 +69,48 @@ body {
 .nav {
     display: flex;
     gap: 2rem;
+    flex: 1;
+}
+
+.user-section {
+    margin-left: auto;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-color);
+}
+
+.login-btn, .logout-btn {
+    padding: 0.5rem 1rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.login-btn:hover {
+    background: var(--primary-hover);
+}
+
+.logout-btn {
+    background: var(--danger-color);
+}
+
+.logout-btn:hover {
+    background: #c53030;
 }
 
 .nav-link {

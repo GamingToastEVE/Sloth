@@ -1,5 +1,10 @@
 package org.ToastiCodingStuff.Delta;
 
+import io.github.cdimascio.dotenv.Dotenv;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+
 /**
  * Standalone web server for testing the dashboard
  */
@@ -9,8 +14,15 @@ public class StandaloneWebServer {
             // Create a test database handler
             DatabaseHandler handler = new DatabaseHandler();
             
+            // Initialize JDA for Discord integration
+            Dotenv dotenv = Dotenv.load();
+            JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
+                    .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
+                    .build();
+            api.awaitReady();
+            
             // Start web server on port 8080
-            WebServer webServer = new WebServer(8080, handler);
+            WebServer webServer = new WebServer(8080, handler, api);
             webServer.start();
             
             System.out.println("Standalone web server started successfully!");
@@ -21,6 +33,7 @@ public class StandaloneWebServer {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("\nShutting down web server...");
                 webServer.stop();
+                api.shutdownNow();
             }));
             
             // Keep the server running indefinitely

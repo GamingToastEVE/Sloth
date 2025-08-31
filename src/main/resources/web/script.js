@@ -3,12 +3,15 @@
 class DeltaDashboard {
     constructor() {
         this.currentSection = 'overview';
+        this.user = null;
+        this.guilds = [];
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupNavigation();
-        this.loadStatistics();
+        this.setupAuth();
+        await this.checkAuthStatus();
         console.log('Delta Dashboard initialized');
     }
 
@@ -25,6 +28,113 @@ class DeltaDashboard {
                 link.classList.add('active');
             });
         });
+    }
+
+    setupAuth() {
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                window.location.href = '/auth/login';
+            });
+        }
+
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                window.location.href = '/auth/logout';
+            });
+        }
+    }
+
+    async checkAuthStatus() {
+        try {
+            const response = await fetch('/api/user');
+            if (response.ok) {
+                this.user = await response.json();
+                this.showUserInfo();
+                await this.loadGuilds();
+            } else {
+                this.showLoginButton();
+            }
+        } catch (error) {
+            console.error('Error checking auth status:', error);
+            this.showLoginButton();
+        }
+    }
+
+    showUserInfo() {
+        const userInfo = document.getElementById('userInfo');
+        const loginSection = document.getElementById('loginSection');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+
+        if (userInfo && loginSection && this.user) {
+            // Set user avatar
+            if (userAvatar && this.user.avatar) {
+                userAvatar.src = this.user.avatar;
+                userAvatar.style.display = 'block';
+            }
+
+            // Set username
+            if (userName) {
+                userName.textContent = this.user.username;
+            }
+
+            // Show user info, hide login button
+            userInfo.style.display = 'flex';
+            loginSection.style.display = 'none';
+        }
+    }
+
+    showLoginButton() {
+        const userInfo = document.getElementById('userInfo');
+        const loginSection = document.getElementById('loginSection');
+
+        if (userInfo && loginSection) {
+            userInfo.style.display = 'none';
+            loginSection.style.display = 'block';
+        }
+    }
+
+    async loadGuilds() {
+        try {
+            const response = await fetch('/api/guilds');
+            if (response.ok) {
+                const data = await response.json();
+                this.guilds = data.guilds || [];
+                this.updateGuildsList();
+            } else if (response.status === 401) {
+                this.showLoginButton();
+            }
+        } catch (error) {
+            console.error('Error loading guilds:', error);
+            this.showNotification('Failed to load guilds', 'error');
+        }
+    }
+
+    updateGuildsList() {
+        // Update the overview section to show actual guilds
+        const overviewSection = document.getElementById('overview');
+        if (overviewSection && this.guilds.length > 0) {
+            let guildsList = '<h3>Your Moderated Servers</h3><div class="guilds-list">';
+            this.guilds.forEach(guild => {
+                const iconUrl = guild.icon || '/default-guild-icon.png';
+                guildsList += `
+                    <div class="guild-item" data-guild-id="${guild.id}">
+                        <img class="guild-icon" src="${iconUrl}" alt="${guild.name}" />
+                        <span class="guild-name">${guild.name}</span>
+                    </div>
+                `;
+            });
+            guildsList += '</div>';
+            
+            // Insert after the cards
+            const cards = overviewSection.querySelector('.cards');
+            if (cards && !overviewSection.querySelector('.guilds-list')) {
+                cards.insertAdjacentHTML('afterend', guildsList);
+            }
+        }
     }
 
     showSection(sectionId) {
@@ -58,8 +168,11 @@ class DeltaDashboard {
             todayElement.innerHTML = '<div class="loading">Loading today\'s statistics...</div>';
             weeklyElement.innerHTML = '<div class="loading">Loading weekly statistics...</div>';
 
+            // Use first available guild or demo
+            const guildId = this.guilds.length > 0 ? this.guilds[0].id : 'demo';
+            
             // Fetch statistics from API
-            const response = await fetch('/api/statistics?guildId=demo');
+            const response = await fetch(`/api/statistics?guildId=${guildId}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -213,6 +326,81 @@ style.textContent = `
     
     .notification {
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .user-section {
+        margin-left: auto;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+    }
+
+    .login-btn, .logout-btn {
+        padding: 0.5rem 1rem;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .login-btn:hover, .logout-btn:hover {
+        background: var(--primary-hover);
+    }
+
+    .logout-btn {
+        background: var(--danger-color);
+        font-size: 0.9rem;
+    }
+
+    .logout-btn:hover {
+        background: #c53030;
+    }
+
+    .guilds-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .guild-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: var(--card-bg);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .guild-item:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+
+    .guild-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--bg-secondary);
+    }
+
+    .guild-name {
+        font-weight: 500;
+        color: var(--text-color);
     }
 `;
 document.head.appendChild(style);

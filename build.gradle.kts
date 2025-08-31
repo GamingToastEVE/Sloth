@@ -17,6 +17,8 @@ dependencies {
     implementation("net.dv8tion:JDA:$jdaVersion")
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.17.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
 }
 
 tasks.withType<JavaCompile> {
