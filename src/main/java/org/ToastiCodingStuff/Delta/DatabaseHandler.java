@@ -49,8 +49,7 @@ public class DatabaseHandler {
             // Enable foreign keys
             Statement stmt = connection.createStatement();
             stmt.execute("PRAGMA foreign_keys = ON;");
-            
-            createGuildsTable();
+
             createUsersTable();
             createWarningsTable();
             createModerationActionsTable();
@@ -62,6 +61,7 @@ public class DatabaseHandler {
             createBotLogsTable();
             createStatisticsTable();
             createTemporaryDataTable();
+            createGuildsTable();
             
             // Create legacy tables for backward compatibility
             createLegacyTables();

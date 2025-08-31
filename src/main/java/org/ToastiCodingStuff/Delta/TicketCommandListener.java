@@ -17,6 +17,7 @@ import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 
 import java.awt.*;
 import java.util.EnumSet;
+import java.util.Objects;
 
 public class TicketCommandListener extends ListenerAdapter {
 
@@ -134,6 +135,10 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleCreateTicketButton(ButtonInteractionEvent event) {
+        if (!Objects.equals(event.getButton().getId(), "create_ticket")) {
+            return;
+        }
+
         String guildId = event.getGuild().getId();
         
         if (!handler.isTicketSystem(guildId)) {
@@ -151,16 +156,16 @@ public class TicketCommandListener extends ListenerAdapter {
                 .setRequiredRange(10, 1000)
                 .build();
 
-        TextInput priorityInput = TextInput.create("priority", "Priority Level", TextInputStyle.SHORT)
+        /*TextInput priorityInput = TextInput.create("priority", "Priority Level", TextInputStyle.SHORT)
                 .setPlaceholder("LOW, MEDIUM, HIGH, or URGENT")
                 .setValue("MEDIUM")
                 .setRequiredRange(3, 6)
                 .build();
-
+        */
         Modal modal = Modal.create("ticket_creation_modal", "Create New Ticket")
                 .addActionRow(subjectInput)
                 .addActionRow(descriptionInput)
-                .addActionRow(priorityInput)
+                //.addActionRow(priorityInput)
                 .build();
 
         event.replyModal(modal).queue();
@@ -171,7 +176,7 @@ public class TicketCommandListener extends ListenerAdapter {
         String userId = event.getUser().getId();
         String subject = event.getValue("subject").getAsString();
         String description = event.getValue("description").getAsString();
-        String priorityInput = event.getValue("priority").getAsString().toUpperCase();
+        String priorityInput = "MEDIUM";     //event.getValue("priority").getAsString().toUpperCase();
 
         // Validate priority
         final String priority = priorityInput.matches("LOW|MEDIUM|HIGH|URGENT") ? priorityInput : "MEDIUM";
@@ -215,7 +220,7 @@ public class TicketCommandListener extends ListenerAdapter {
                                 .setTitle("🎫 Ticket #" + ticketId + " - " + subject)
                                 .setDescription("**Description:**\n" + description)
                                 .addField("👤 Created by", event.getUser().getAsMention(), true)
-                                .addField("📈 Priority", priority, true)
+                                //.addField("📈 Priority", priority, true)
                                 .addField("📅 Created", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
                                 .setColor(getPriorityColor(priority))
                                 .setFooter("Ticket ID: " + ticketId);
@@ -264,7 +269,8 @@ public class TicketCommandListener extends ListenerAdapter {
             event.replyEmbeds(embed.build()).queue();
             
             // Archive channel after 5 seconds
-            channel.getManager().setName("closed-" + channel.getName()).queue();
+            //channel.getManager().setName("closed-" + channel.getName()).queue();
+            channel.delete().reason("Ticket closed").queue();
             
         } else {
             event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
@@ -272,6 +278,10 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleCloseTicketConfirm(ButtonInteractionEvent event) {
+        if (!Objects.equals(event.getButton().getId(), "close_ticket_confirm")) {
+            return;
+        }
+
         TextChannel channel = event.getChannel().asTextChannel();
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
