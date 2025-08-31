@@ -79,6 +79,10 @@ public class WarnCommandListener extends ListenerAdapter {
             
             // Update statistics for warnings issued
             handler.incrementWarningsIssued(guildId);
+            
+            // Send audit log entry to log channel
+            handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(), 
+                    event.getMember().getEffectiveName(), reason);
         } else {
             event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
         }

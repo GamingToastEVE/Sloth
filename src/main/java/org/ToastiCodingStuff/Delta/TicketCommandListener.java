@@ -221,6 +221,11 @@ public class TicketCommandListener extends ListenerAdapter {
                         // Update statistics for tickets created
                         handler.incrementTicketsCreated(guildId);
                         
+                        // Send audit log entry for ticket creation
+                        handler.sendAuditLogEntry(event.getGuild(), "TICKET_CREATED", 
+                                "Ticket #" + ticketId + " - " + subject, 
+                                event.getUser().getEffectiveName(), "Priority: " + priority);
+                        
                         // Send welcome message in ticket channel
                         EmbedBuilder welcomeEmbed = new EmbedBuilder()
                                 .setTitle("🎫 Ticket #" + ticketId + " - " + subject)
@@ -268,6 +273,11 @@ public class TicketCommandListener extends ListenerAdapter {
             // Update statistics for tickets closed
             handler.incrementTicketsClosed(guildId);
             
+            // Send audit log entry for ticket closure
+            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 
+                    "Ticket #" + ticketId, 
+                    event.getUser().getEffectiveName(), reason);
+            
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")
                     .setDescription("This ticket has been closed by " + event.getUser().getAsMention())
@@ -309,6 +319,11 @@ public class TicketCommandListener extends ListenerAdapter {
             // Update statistics for tickets closed
             String guildId = event.getGuild().getId();
             handler.incrementTicketsClosed(guildId);
+            
+            // Send audit log entry for ticket closure via button
+            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 
+                    "Ticket #" + ticketId, 
+                    event.getUser().getEffectiveName(), "Closed via button");
             
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")
