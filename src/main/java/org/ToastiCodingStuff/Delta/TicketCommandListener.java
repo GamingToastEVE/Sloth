@@ -47,6 +47,9 @@ public class TicketCommandListener extends ListenerAdapter {
             case "ticket-info":
                 handleTicketInfo(event, guildId);
                 break;
+            case "ticket-transcript":
+                handleTicketTranscript(event, guildId);
+                break;
         }
     }
 
@@ -361,6 +364,107 @@ public class TicketCommandListener extends ListenerAdapter {
                 .setTimestamp(java.time.Instant.now());
 
         event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+    }
+
+    private void handleTicketTranscript(SlashCommandInteractionEvent event, String guildId) {
+        TextChannel channel = event.getChannel().asTextChannel();
+        String ticketInfo = handler.getTicketByChannelId(channel.getId());
+        
+        if (ticketInfo == null) {
+            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            return;
+        }
+
+        // Check if transcripts are enabled for this guild
+        if (!handler.areTranscriptsEnabled(guildId)) {
+            event.reply("❌ Transcripts are disabled for this server.").setEphemeral(true).queue();
+            return;
+        }
+
+        // Check if user has permission (ticket creator, assigned staff, or support role)
+        String supportRoleId = handler.getTicketRole(guildId);
+        boolean hasPermission = false;
+        
+        // Extract ticket info
+        String[] parts = ticketInfo.split(" \\| ");
+        String ticketIdStr = parts[0].substring(4); // Remove "ID: " prefix
+        String ticketUserIdStr = parts[1].substring(8, parts[1].length() - 1); // Extract user ID from <@...>
+        
+        // Check if user is ticket creator
+        if (event.getUser().getId().equals(ticketUserIdStr)) {
+            hasPermission = true;
+        }
+        // Check if user has support role
+        else if (supportRoleId != null && event.getMember().getRoles().stream()
+                .anyMatch(role -> role.getId().equals(supportRoleId))) {
+            hasPermission = true;
+        }
+        // Check if user has manage channels permission
+        else if (event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {
+            hasPermission = true;
+        }
+
+        if (!hasPermission) {
+            event.reply("❌ You don't have permission to generate transcripts for this ticket.").setEphemeral(true).queue();
+            return;
+        }
+
+        event.deferReply(true).queue(); // Defer reply as this might take time
+        
+        // Generate transcript from channel history
+        channel.getHistory().retrievePast(100).queue(messages -> {
+            StringBuilder transcript = new StringBuilder();
+            transcript.append("=== TICKET TRANSCRIPT ===\n");
+            transcript.append("Ticket ID: ").append(ticketIdStr).append("\n");
+            transcript.append("Channel: #").append(channel.getName()).append("\n");
+            transcript.append("Generated: ").append(new java.util.Date()).append("\n");
+            transcript.append("=========================\n\n");
+            
+            // Sort messages chronologically (oldest first)
+            messages.sort((m1, m2) -> m1.getTimeCreated().compareTo(m2.getTimeCreated()));
+            
+            for (Message msg : messages) {
+                transcript.append("[").append(msg.getTimeCreated()).append("] ");
+                transcript.append(msg.getAuthor().getEffectiveName()).append(": ");
+                transcript.append(msg.getContentDisplay()).append("\n");
+                
+                // Add attachment info if present
+                if (!msg.getAttachments().isEmpty()) {
+                    for (Message.Attachment attachment : msg.getAttachments()) {
+                        transcript.append("    [Attachment: ").append(attachment.getFileName())
+                                 .append(" (").append(attachment.getUrl()).append(")]\n");
+                    }
+                }
+                transcript.append("\n");
+            }
+            
+            // Send transcript as a file if it's too long, otherwise as embed
+            String transcriptText = transcript.toString();
+            if (transcriptText.length() > 4000) {
+                // Create temporary file and send as attachment
+                try {
+                    java.io.File tempFile = java.io.File.createTempFile("ticket-transcript-" + ticketIdStr, ".txt");
+                    java.nio.file.Files.write(tempFile.toPath(), transcriptText.getBytes());
+                    
+                    event.getHook().sendMessage("📄 Ticket transcript generated:")
+                            .addFiles(net.dv8tion.jda.api.utils.FileUpload.fromData(tempFile, "ticket-" + ticketIdStr + "-transcript.txt"))
+                            .queue(success -> tempFile.delete()); // Clean up temp file
+                } catch (Exception e) {
+                    event.getHook().sendMessage("❌ Failed to generate transcript file.").queue();
+                }
+            } else {
+                // Send as embed if short enough
+                EmbedBuilder embed = new EmbedBuilder()
+                        .setTitle("📄 Ticket Transcript #" + ticketIdStr)
+                        .setDescription("```\n" + transcriptText + "```")
+                        .setColor(Color.BLUE)
+                        .setTimestamp(java.time.Instant.now());
+                
+                event.getHook().sendMessageEmbeds(embed.build()).queue();
+            }
+        }, error -> {
+            event.getHook().sendMessage("❌ Failed to retrieve channel history for transcript.").queue();
+        });
     }
 
     private Color getPriorityColor(String priority) {
