@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Delta;
 import java.io.PrintStream;
 import java.sql.*;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 public class DatabaseHandler {
 
@@ -1434,6 +1435,49 @@ public class DatabaseHandler {
             System.err.println("Error getting weekly statistics: " + e.getMessage());
             e.printStackTrace();
             return "Error retrieving weekly statistics.";
+        }
+    }
+
+    /**
+     * Send an audit log entry to the configured log channel
+     * @param guild The guild where the action occurred
+     * @param actionType The type of action (e.g., "WARN", "KICK", "BAN", etc.)
+     * @param targetName The name/identifier of the target
+     * @param moderatorName The name of the moderator who performed the action
+     * @param reason The reason for the action
+     */
+    public void sendAuditLogEntry(Guild guild, String actionType, String targetName, String moderatorName, String reason) {
+        String guildId = guild.getId();
+        
+        if (hasLogChannel(guildId)) {
+            String logChannelId = getLogChannelID(guildId);
+            if (!logChannelId.equals("Couldnt find a Log Channel") && !logChannelId.equals("Error")) {
+                TextChannel logChannel = guild.getTextChannelById(logChannelId);
+                if (logChannel != null) {
+                    String emoji;
+                    switch (actionType) {
+                        case "WARN": emoji = "⚠️"; break;
+                        case "KICK": emoji = "🦶"; break;
+                        case "BAN": emoji = "🔨"; break;
+                        case "UNBAN": emoji = "🔓"; break;
+                        case "PURGE": emoji = "🧹"; break;
+                        case "SLOWMODE": emoji = "🐌"; break;
+                        case "UNTIMEOUT": emoji = "⏰"; break;
+                        case "TICKET_CREATED": emoji = "🎫"; break;
+                        case "TICKET_CLOSED": emoji = "🔒"; break;
+                        default:
+                            if (actionType.startsWith("TIMEOUT")) {
+                                emoji = "⏱️";
+                            } else {
+                                emoji = "⚖️"; // Default moderation emoji
+                            }
+                            break;
+                    }
+                    String logMessage = String.format("%s **%s** | %s %s\n**Moderator:** %s\n**Reason:** %s",
+                            emoji, actionType, emoji, targetName, moderatorName, reason);
+                    logChannel.sendMessage(logMessage).queue();
+                }
+            }
         }
     }
 }
