@@ -1,6 +1,6 @@
 # Sloth Discord Bot
 
-Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively. It also features a web dashboard with Discord Single Sign-On for remote server management.
 
 ## Features
 
@@ -33,6 +33,13 @@ Delta offers several modular systems that can be independently activated per ser
 - User engagement metrics
 - Command usage tracking
 
+### 🌐 Web Dashboard (NEW!)
+- **Discord Single Sign-On** - Secure authentication via Discord OAuth2
+- **Statistics Viewing** - View detailed server statistics through web interface
+- **Ticket Management** - Browse and manage support tickets online
+- **Server Configuration** - Configure bot settings through user-friendly web forms
+- **Real-time Data** - Access to live bot data and settings
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -42,10 +49,20 @@ cd Delta
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the root directory with your Discord bot token:
+Create a `.env` file in the root directory with your Discord bot token and OAuth2 credentials:
 ```env
 TOKEN=your_discord_bot_token_here
+
+# For web dashboard functionality
+DISCORD_CLIENT_ID=your_discord_application_client_id
+DISCORD_CLIENT_SECRET=your_discord_application_client_secret
 ```
+
+To set up Discord OAuth2:
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application or use existing one
+3. Copy the Client ID and Client Secret
+4. In OAuth2 settings, add redirect URI: `http://localhost:8080/login/oauth2/code/discord`
 
 ### 3. Build the Project
 ```bash
@@ -57,11 +74,15 @@ TOKEN=your_discord_bot_token_here
 ./gradlew run
 ```
 
+The application will start both:
+- Discord bot (connects to Discord)
+- Web dashboard (available at http://localhost:8080)
+
 ## Usage
 
 Sloth uses a modular system approach where server administrators can activate only the systems they need.
 
-### System Management
+### Discord Bot Usage
 
 Use the `/add-system` command to activate different systems on your server:
 
@@ -71,6 +92,22 @@ Use the `/add-system` command to activate different systems on your server:
 /add-system system:Ticket System
 /add-system system:Moderation System
 ```
+
+### Web Dashboard Usage
+
+1. **Access the Dashboard**: Navigate to `http://localhost:8080` in your browser
+2. **Login**: Click "Login with Discord" to authenticate via Discord OAuth2
+3. **Select Server**: Enter your Discord server's Guild ID to manage it
+4. **Manage Server**: Use the web interface to:
+   - View detailed statistics (today, weekly, or custom date ranges)
+   - Browse and manage support tickets
+   - Configure ticket system settings
+   - Adjust warning system parameters
+
+**Finding Your Guild ID**: 
+In Discord, enable Developer Mode in settings, then right-click your server name and select "Copy Server ID"
+
+### System Management
 
 ### Available Systems
 
