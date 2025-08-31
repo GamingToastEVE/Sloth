@@ -218,6 +218,9 @@ public class TicketCommandListener extends ListenerAdapter {
                     int ticketId = handler.createTicket(guildId, userId, channel.getId(), "general", subject, priority);
                     
                     if (ticketId > 0) {
+                        // Update statistics for tickets created
+                        handler.incrementTicketsCreated(guildId);
+                        
                         // Send welcome message in ticket channel
                         EmbedBuilder welcomeEmbed = new EmbedBuilder()
                                 .setTitle("🎫 Ticket #" + ticketId + " - " + subject)
@@ -262,6 +265,9 @@ public class TicketCommandListener extends ListenerAdapter {
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), reason);
         
         if (success) {
+            // Update statistics for tickets closed
+            handler.incrementTicketsClosed(guildId);
+            
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")
                     .setDescription("This ticket has been closed by " + event.getUser().getAsMention())
@@ -300,6 +306,10 @@ public class TicketCommandListener extends ListenerAdapter {
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), "Closed via button");
         
         if (success) {
+            // Update statistics for tickets closed
+            String guildId = event.getGuild().getId();
+            handler.incrementTicketsClosed(guildId);
+            
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")
                     .setDescription("This ticket has been closed by " + event.getUser().getAsMention())

@@ -6,8 +6,10 @@ import java.util.concurrent.TimeUnit;
 
 public class BanCommand extends ListenerAdapter {
 
-    public BanCommand() {
-        // Constructor can be used for initialization if needed
+    private final DatabaseHandler handler;
+
+    public BanCommand(DatabaseHandler handler) {
+        this.handler = handler;
     }
 
     @Override
@@ -17,8 +19,12 @@ public class BanCommand extends ListenerAdapter {
                 if (event.getOption("user") != null) {
                     net.dv8tion.jda.api.entities.Member member = event.getOption("user").getAsMember();
                     if (member != null) {
+                        String guildId = event.getGuild().getId();
                         member.ban(0, TimeUnit.SECONDS).queue(); // 0 means no delete messages
                         event.reply("Banned " + member.getEffectiveName()).queue();
+                        
+                        // Update statistics for bans performed
+                        handler.incrementBansPerformed(guildId);
                     } else {
                         event.reply("User not found.").setEphemeral(true).queue();
                     }

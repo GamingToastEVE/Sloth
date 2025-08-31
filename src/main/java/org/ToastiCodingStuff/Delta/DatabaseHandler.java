@@ -1143,4 +1143,183 @@ public class DatabaseHandler {
             return false;
         }
     }
+
+    // Statistics management methods
+
+    /**
+     * Get current date in YYYY-MM-DD format for statistics
+     */
+    private String getCurrentDate() {
+        return java.time.LocalDate.now().toString();
+    }
+
+    /**
+     * Update statistics for a guild and specific action type
+     */
+    private void updateStatistics(String guildId, String actionType, int increment) {
+        try {
+            String currentDate = getCurrentDate();
+            
+            // First, try to update existing record
+            String updateQuery = "UPDATE statistics SET " + actionType + " = " + actionType + " + ? WHERE guild_id = ? AND date = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setInt(1, increment);
+            updateStmt.setString(2, guildId);
+            updateStmt.setString(3, currentDate);
+            
+            int rowsUpdated = updateStmt.executeUpdate();
+            
+            // If no existing record, insert new one
+            if (rowsUpdated == 0) {
+                String insertQuery = "INSERT INTO statistics (guild_id, date, " + actionType + ") VALUES (?, ?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, guildId);
+                insertStmt.setString(2, currentDate);
+                insertStmt.setInt(3, increment);
+                insertStmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error updating statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Increment warnings issued count for a guild
+     */
+    public void incrementWarningsIssued(String guildId) {
+        updateStatistics(guildId, "warnings_issued", 1);
+    }
+
+    /**
+     * Increment bans performed count for a guild
+     */
+    public void incrementBansPerformed(String guildId) {
+        updateStatistics(guildId, "bans_performed", 1);
+    }
+
+    /**
+     * Increment kicks performed count for a guild
+     */
+    public void incrementKicksPerformed(String guildId) {
+        updateStatistics(guildId, "kicks_performed", 1);
+    }
+
+    /**
+     * Increment tickets created count for a guild
+     */
+    public void incrementTicketsCreated(String guildId) {
+        updateStatistics(guildId, "tickets_created", 1);
+    }
+
+    /**
+     * Increment tickets closed count for a guild
+     */
+    public void incrementTicketsClosed(String guildId) {
+        updateStatistics(guildId, "tickets_closed", 1);
+    }
+
+    /**
+     * Increment automod actions count for a guild
+     */
+    public void incrementAutomodActions(String guildId) {
+        updateStatistics(guildId, "automod_actions", 1);
+    }
+
+    /**
+     * Get statistics for a guild for a specific date
+     */
+    public String getStatisticsForDate(String guildId, String date) {
+        try {
+            String query = "SELECT warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed, automod_actions " +
+                    "FROM statistics WHERE guild_id = ? AND date = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, date);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                StringBuilder result = new StringBuilder();
+                result.append("**Statistics for ").append(date).append(":**\n");
+                result.append("🔸 Warnings Issued: ").append(rs.getInt("warnings_issued")).append("\n");
+                result.append("🦶 Kicks Performed: ").append(rs.getInt("kicks_performed")).append("\n");
+                result.append("🔨 Bans Performed: ").append(rs.getInt("bans_performed")).append("\n");
+                result.append("🎫 Tickets Created: ").append(rs.getInt("tickets_created")).append("\n");
+                result.append("✅ Tickets Closed: ").append(rs.getInt("tickets_closed")).append("\n");
+                result.append("🤖 Automod Actions: ").append(rs.getInt("automod_actions"));
+                return result.toString();
+            } else {
+                return "No statistics found for " + date + ".";
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting statistics: " + e.getMessage());
+            e.printStackTrace();
+            return "Error retrieving statistics.";
+        }
+    }
+
+    /**
+     * Get statistics for a guild for today
+     */
+    public String getTodaysStatistics(String guildId) {
+        return getStatisticsForDate(guildId, getCurrentDate());
+    }
+
+    /**
+     * Get statistics for a guild for the last 7 days
+     */
+    public String getWeeklyStatistics(String guildId) {
+        try {
+            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed, automod_actions " +
+                    "FROM statistics WHERE guild_id = ? AND date >= date('now', '-7 days') ORDER BY date DESC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            StringBuilder result = new StringBuilder();
+            result.append("**Weekly Statistics (Last 7 Days):**\n");
+            
+            int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTicketsCreated = 0, totalTicketsClosed = 0, totalAutomod = 0;
+            boolean hasData = false;
+            
+            while (rs.next()) {
+                hasData = true;
+                String date = rs.getString("date");
+                int warnings = rs.getInt("warnings_issued");
+                int kicks = rs.getInt("kicks_performed");
+                int bans = rs.getInt("bans_performed");
+                int ticketsCreated = rs.getInt("tickets_created");
+                int ticketsClosed = rs.getInt("tickets_closed");
+                int automod = rs.getInt("automod_actions");
+                
+                totalWarnings += warnings;
+                totalKicks += kicks;
+                totalBans += bans;
+                totalTicketsCreated += ticketsCreated;
+                totalTicketsClosed += ticketsClosed;
+                totalAutomod += automod;
+                
+                result.append("\n**").append(date).append(":**\n");
+                result.append("🔸 ").append(warnings).append(" | 🦶 ").append(kicks).append(" | 🔨 ").append(bans);
+                result.append(" | 🎫 ").append(ticketsCreated).append(" | ✅ ").append(ticketsClosed).append(" | 🤖 ").append(automod);
+            }
+            
+            if (hasData) {
+                result.append("\n\n**Weekly Totals:**\n");
+                result.append("🔸 Warnings: ").append(totalWarnings).append("\n");
+                result.append("🦶 Kicks: ").append(totalKicks).append("\n");
+                result.append("🔨 Bans: ").append(totalBans).append("\n");
+                result.append("🎫 Tickets Created: ").append(totalTicketsCreated).append("\n");
+                result.append("✅ Tickets Closed: ").append(totalTicketsClosed).append("\n");
+                result.append("🤖 Automod Actions: ").append(totalAutomod);
+                return result.toString();
+            } else {
+                return "No statistics found for the last 7 days.";
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting weekly statistics: " + e.getMessage());
+            e.printStackTrace();
+            return "Error retrieving weekly statistics.";
+        }
+    }
 }

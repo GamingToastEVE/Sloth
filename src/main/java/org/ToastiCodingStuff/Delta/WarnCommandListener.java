@@ -76,6 +76,9 @@ public class WarnCommandListener extends ListenerAdapter {
 
             // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
+            
+            // Update statistics for warnings issued
+            handler.incrementWarningsIssued(guildId);
         } else {
             event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
         }
