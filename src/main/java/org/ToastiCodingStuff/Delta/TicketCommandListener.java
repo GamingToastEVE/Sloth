@@ -9,13 +9,13 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.text.TextInput;
 import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 
 import java.awt.*;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Objects;
 
@@ -29,7 +29,7 @@ public class TicketCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        String guildId = event.getGuild().getId();
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
 
         switch (event.getName()) {
             case "ticket-setup":
@@ -75,15 +75,15 @@ public class TicketCommandListener extends ListenerAdapter {
 
     private void handleTicketSetup(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has admin permissions
-        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.ADMINISTRATOR)) {
             event.reply("❌ You need Administrator permissions to set up the ticket system.").setEphemeral(true).queue();
             return;
         }
 
-        Category category = event.getOption("category").getAsChannel().asCategory();
-        TextChannel channel = event.getOption("channel").getAsChannel().asTextChannel();
-        Role supportRole = event.getOption("support_role") != null ? event.getOption("support_role").getAsRole() : null;
-        boolean transcriptEnabled = event.getOption("transcript_enabled") != null ? event.getOption("transcript_enabled").getAsBoolean() : true;
+        Category category = Objects.requireNonNull(event.getOption("category")).getAsChannel().asCategory();
+        TextChannel channel = Objects.requireNonNull(event.getOption("channel")).getAsChannel().asTextChannel();
+        Role supportRole = event.getOption("support_role") != null ? Objects.requireNonNull(event.getOption("support_role")).getAsRole() : null;
+        boolean transcriptEnabled = event.getOption("transcript_enabled") == null || Objects.requireNonNull(event.getOption("transcript_enabled")).getAsBoolean();
 
         String supportRoleId = supportRole != null ? supportRole.getId() : null;
         
@@ -107,7 +107,7 @@ public class TicketCommandListener extends ListenerAdapter {
 
     private void handleTicketPanel(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has manage channels permission
-        if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {
+        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
             event.reply("❌ You need Manage Channels permission to create a ticket panel.").setEphemeral(true).queue();
             return;
         }
@@ -132,9 +132,7 @@ public class TicketCommandListener extends ListenerAdapter {
 
         event.getChannel().sendMessageEmbeds(embed.build())
                 .setActionRow(createTicketButton)
-                .queue(message -> {
-                    event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue();
-                });
+                .queue(message -> event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue());
     }
 
     private void handleCreateTicketButton(ButtonInteractionEvent event) {
@@ -142,7 +140,7 @@ public class TicketCommandListener extends ListenerAdapter {
             return;
         }
 
-        String guildId = event.getGuild().getId();
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
         
         if (!handler.isTicketSystem(guildId)) {
             event.reply("❌ Ticket system is not configured for this server.").setEphemeral(true).queue();
@@ -175,10 +173,10 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleTicketCreationModal(ModalInteractionEvent event) {
-        String guildId = event.getGuild().getId();
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
         String userId = event.getUser().getId();
-        String subject = event.getValue("subject").getAsString();
-        String description = event.getValue("description").getAsString();
+        String subject = Objects.requireNonNull(event.getValue("subject")).getAsString();
+        String description = Objects.requireNonNull(event.getValue("description")).getAsString();
         String priorityInput = "MEDIUM";     //event.getValue("priority").getAsString().toUpperCase();
 
         // Validate priority
@@ -201,7 +199,7 @@ public class TicketCommandListener extends ListenerAdapter {
         
         ticketCategory.createTextChannel(channelName)
                 .addPermissionOverride(event.getGuild().getPublicRole(), null, EnumSet.of(Permission.VIEW_CHANNEL))
-                .addPermissionOverride(event.getMember(), EnumSet.of(Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_HISTORY), null)
+                .addPermissionOverride(Objects.requireNonNull(event.getMember()), EnumSet.of(Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_HISTORY), null)
                 .queue(channel -> {
                     // Add support role permissions if configured
                     String supportRoleId = handler.getTicketRole(guildId);
@@ -261,7 +259,7 @@ public class TicketCommandListener extends ListenerAdapter {
             return;
         }
 
-        String reason = event.getOption("reason") != null ? event.getOption("reason").getAsString() : "No reason provided";
+        String reason = event.getOption("reason") != null ? Objects.requireNonNull(event.getOption("reason")).getAsString() : "No reason provided";
         
         // Close ticket in database (extract ticket ID from ticketInfo)
         String[] parts = ticketInfo.split(" \\| ");
@@ -274,7 +272,7 @@ public class TicketCommandListener extends ListenerAdapter {
             handler.incrementTicketsClosed(guildId);
             
             // Send audit log entry for ticket closure
-            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 
+            handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
                     "Ticket #" + ticketId, 
                     event.getUser().getEffectiveName(), reason);
             
@@ -317,7 +315,7 @@ public class TicketCommandListener extends ListenerAdapter {
         
         if (success) {
             // Update statistics for tickets closed
-            String guildId = event.getGuild().getId();
+            String guildId = Objects.requireNonNull(event.getGuild()).getId();
             handler.incrementTicketsClosed(guildId);
             
             // Send audit log entry for ticket closure via button
@@ -347,7 +345,7 @@ public class TicketCommandListener extends ListenerAdapter {
             return;
         }
 
-        Member staffMember = event.getOption("staff").getAsMember();
+        Member staffMember = Objects.requireNonNull(event.getOption("staff")).getAsMember();
         if (staffMember == null) {
             event.reply("❌ Staff member not found.").setEphemeral(true).queue();
             return;
@@ -425,12 +423,12 @@ public class TicketCommandListener extends ListenerAdapter {
             hasPermission = true;
         }
         // Check if user has support role
-        else if (supportRoleId != null && event.getMember().getRoles().stream()
+        else if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
                 .anyMatch(role -> role.getId().equals(supportRoleId))) {
             hasPermission = true;
         }
         // Check if user has manage channels permission
-        else if (event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {
+        else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
             hasPermission = true;
         }
 
@@ -451,7 +449,7 @@ public class TicketCommandListener extends ListenerAdapter {
             transcript.append("=========================\n\n");
             
             // Sort messages chronologically (oldest first)
-            messages.sort((m1, m2) -> m1.getTimeCreated().compareTo(m2.getTimeCreated()));
+            messages.sort(Comparator.comparing(ISnowflake::getTimeCreated));
             
             for (Message msg : messages) {
                 transcript.append("[").append(msg.getTimeCreated()).append("] ");
@@ -492,9 +490,7 @@ public class TicketCommandListener extends ListenerAdapter {
                 
                 event.getHook().sendMessageEmbeds(embed.build()).queue();
             }
-        }, error -> {
-            event.getHook().sendMessage("❌ Failed to retrieve channel history for transcript.").queue();
-        });
+        }, error -> event.getHook().sendMessage("❌ Failed to retrieve channel history for transcript.").queue());
     }
 
     private Color getPriorityColor(String priority) {
