@@ -47,7 +47,8 @@ public class AddGuildSlashCommands {
                         .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
                 Commands.slash("assign-ticket", "Assign current ticket to a staff member")
                         .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
-                Commands.slash("ticket-info", "Get information about the current ticket")
+                Commands.slash("ticket-info", "Get information about the current ticket"),
+                Commands.slash("ticket-transcript", "Generate a transcript of the current ticket")
         ).queue();
     }
 

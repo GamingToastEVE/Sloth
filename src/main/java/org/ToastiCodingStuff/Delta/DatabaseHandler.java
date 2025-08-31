@@ -1121,4 +1121,26 @@ public class DatabaseHandler {
             return false;
         }
     }
+
+    /**
+     * Check if transcripts are enabled for a guild
+     */
+    public boolean areTranscriptsEnabled(String guildId) {
+        try {
+            String query = "SELECT ticket_transcript FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                int transcriptEnabled = rs.getInt("ticket_transcript");
+                return !rs.wasNull() && transcriptEnabled == 1;
+            }
+            return false; // Default to false if no settings found
+        } catch (SQLException e) {
+            System.err.println("Error checking transcript settings: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
