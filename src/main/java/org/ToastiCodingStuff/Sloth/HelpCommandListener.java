@@ -52,6 +52,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference\n" +
                                 "📜 **Legal** - Terms of Service and Privacy Policy")
+                        .addField("📂 **Source Code**", "https://github.com/GamingToastEVE/Delta", false)
                         .setColor(Color.BLUE)
                         .setFooter("Use the buttons below to navigate");
 
