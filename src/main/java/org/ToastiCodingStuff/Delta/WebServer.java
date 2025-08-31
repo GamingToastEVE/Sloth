@@ -49,6 +49,9 @@ public class WebServer {
         this.clientSecret = dotenv.get("DISCORD_CLIENT_SECRET");
         this.redirectUri = dotenv.get("DISCORD_REDIRECT_URI", "http://localhost:8080/auth/callback");
         
+        // Validate OAuth2 configuration and provide helpful feedback
+        validateOAuth2Configuration();
+        
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         setupRoutes();
         server.setExecutor(Executors.newFixedThreadPool(4));
@@ -78,6 +81,40 @@ public class WebServer {
         server.stop(0);
     }
     
+    /**
+     * Validate OAuth2 configuration and provide helpful feedback
+     */
+    private void validateOAuth2Configuration() {
+        System.out.println("=== Discord OAuth2 Configuration Check ===");
+        
+        if (clientId == null || clientId.trim().isEmpty()) {
+            System.err.println("❌ DISCORD_CLIENT_ID is not set in .env file");
+            System.err.println("   → Please add your Discord application's Client ID to .env");
+            System.err.println("   → Get it from: https://discord.com/developers/applications");
+        } else {
+            System.out.println("✅ DISCORD_CLIENT_ID is configured");
+        }
+        
+        if (clientSecret == null || clientSecret.trim().isEmpty()) {
+            System.err.println("❌ DISCORD_CLIENT_SECRET is not set in .env file");
+            System.err.println("   → Please add your Discord application's Client Secret to .env");
+            System.err.println("   → Get it from: https://discord.com/developers/applications");
+        } else {
+            System.out.println("✅ DISCORD_CLIENT_SECRET is configured");
+        }
+        
+        System.out.println("📋 Redirect URI: " + redirectUri);
+        System.out.println("   → Make sure this matches your Discord application's redirect URI");
+        
+        if (clientId == null || clientSecret == null || clientId.trim().isEmpty() || clientSecret.trim().isEmpty()) {
+            System.err.println("\n⚠️  Discord OAuth2 login will not work without proper configuration!");
+            System.err.println("   → Copy .env.example to .env and fill in your Discord application credentials");
+        } else {
+            System.out.println("\n✅ Discord OAuth2 appears to be properly configured");
+        }
+        System.out.println("===========================================");
+    }
+    
     // Utility method for JSON escaping
     private String escapeJson(String str) {
         if (str == null) return "";
@@ -86,6 +123,62 @@ public class WebServer {
                   .replace("\r", "\\r")
                   .replace("\t", "\\t")
                   .replace("\\", "\\\\");
+    }
+    
+    /**
+     * Create an HTML error page for better user experience
+     */
+    private String createErrorPage(String title, String message, String description, String helpUrl) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html>")
+            .append("<html lang=\"en\">")
+            .append("<head>")
+            .append("<meta charset=\"UTF-8\">")
+            .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">")
+            .append("<title>").append(escapeHtml(title)).append(" - Delta Bot</title>")
+            .append("<style>")
+            .append("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 2rem; background: #f7fafc; color: #2d3748; }")
+            .append(".container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }")
+            .append("h1 { color: #e53e3e; margin: 0 0 1rem 0; font-size: 1.5rem; }")
+            .append("p { line-height: 1.6; margin: 1rem 0; }")
+            .append(".description { background: #f7fafc; padding: 1rem; border-radius: 6px; margin: 1rem 0; }")
+            .append(".help-link { color: #3182ce; text-decoration: none; }")
+            .append(".help-link:hover { text-decoration: underline; }")
+            .append(".back-button { display: inline-block; background: #3182ce; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; margin-top: 1rem; }")
+            .append(".back-button:hover { background: #2c5aa0; }")
+            .append("</style>")
+            .append("</head>")
+            .append("<body>")
+            .append("<div class=\"container\">")
+            .append("<h1>").append(escapeHtml(title)).append("</h1>")
+            .append("<p>").append(escapeHtml(message)).append("</p>");
+        
+        if (description != null) {
+            html.append("<div class=\"description\">").append(escapeHtml(description)).append("</div>");
+        }
+        
+        if (helpUrl != null) {
+            html.append("<p>For more information, visit: <a href=\"").append(escapeHtml(helpUrl)).append("\" class=\"help-link\" target=\"_blank\">").append(escapeHtml(helpUrl)).append("</a></p>");
+        }
+        
+        html.append("<a href=\"/\" class=\"back-button\">Return to Dashboard</a>")
+            .append("</div>")
+            .append("</body>")
+            .append("</html>");
+        
+        return html.toString();
+    }
+    
+    /**
+     * Escape HTML special characters
+     */
+    private String escapeHtml(String str) {
+        if (str == null) return "";
+        return str.replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace("\"", "&quot;")
+                  .replace("'", "&#39;");
     }
 
     // Handler for static files
@@ -104,8 +197,15 @@ public class WebServer {
             InputStream resourceStream = getClass().getResourceAsStream(resourcePath);
             
             if (resourceStream == null) {
+                System.out.println("Resource not found: " + resourcePath);
+                
                 // Return 404 for missing files
-                String response = "404 Not Found";
+                String response = createErrorPage("File Not Found", 
+                    "The requested resource was not found on this server.",
+                    "Path: " + path,
+                    null);
+                    
+                exchange.getResponseHeaders().set("Content-Type", "text/html");
                 exchange.sendResponseHeaders(404, response.length());
                 try (OutputStream os = exchange.getResponseBody()) {
                     os.write(response.getBytes());
@@ -261,8 +361,15 @@ public class WebServer {
     private class LoginHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if (clientId == null || clientSecret == null) {
-                String response = "OAuth2 not configured. Please set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in .env";
+            if (clientId == null || clientSecret == null || clientId.trim().isEmpty() || clientSecret.trim().isEmpty()) {
+                System.err.println("Login attempt failed: OAuth2 not properly configured");
+                
+                String response = createErrorPage("OAuth2 Not Configured", 
+                    "Discord login is not properly configured on this server.",
+                    "Please contact the server administrator to configure DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in the .env file.",
+                    "Configuration Help: https://discord.com/developers/applications");
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html");
                 exchange.sendResponseHeaders(500, response.length());
                 try (OutputStream os = exchange.getResponseBody()) {
                     os.write(response.getBytes());
@@ -270,23 +377,42 @@ public class WebServer {
                 return;
             }
             
-            // Generate state for CSRF protection
-            String state = UUID.randomUUID().toString();
-            
-            // Build Discord OAuth2 URL
-            String discordUrl = "https://discord.com/oauth2/authorize" +
-                "?client_id=" + clientId +
-                "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8) +
-                "&response_type=code" +
-                "&scope=" + URLEncoder.encode("identify guilds", StandardCharsets.UTF_8) +
-                "&state=" + state;
-            
-            // Store state for verification
-            sessions.put("state_" + state, new UserSession("", "", "", "", ""));
-            
-            // Redirect to Discord
-            exchange.getResponseHeaders().set("Location", discordUrl);
-            exchange.sendResponseHeaders(302, 0);
+            try {
+                // Generate state for CSRF protection
+                String state = UUID.randomUUID().toString();
+                
+                // Build Discord OAuth2 URL
+                String discordUrl = "https://discord.com/oauth2/authorize" +
+                    "?client_id=" + clientId +
+                    "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8) +
+                    "&response_type=code" +
+                    "&scope=" + URLEncoder.encode("identify guilds", StandardCharsets.UTF_8) +
+                    "&state=" + state;
+                
+                // Store state for verification
+                sessions.put("state_" + state, new UserSession("", "", "", "", ""));
+                
+                System.out.println("Redirecting user to Discord OAuth2: " + discordUrl);
+                
+                // Redirect to Discord
+                exchange.getResponseHeaders().set("Location", discordUrl);
+                exchange.sendResponseHeaders(302, 0);
+                
+            } catch (Exception e) {
+                System.err.println("Error during login initiation: " + e.getMessage());
+                e.printStackTrace();
+                
+                String response = createErrorPage("Login Error", 
+                    "An unexpected error occurred while initiating Discord login.",
+                    "Please try again later or contact the server administrator.",
+                    null);
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html");
+                exchange.sendResponseHeaders(500, response.length());
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response.getBytes());
+                }
+            }
         }
     }
     
@@ -294,40 +420,61 @@ public class WebServer {
     private class CallbackHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            System.out.println("OAuth2 callback received: " + exchange.getRequestURI());
+            
             String query = exchange.getRequestURI().getQuery();
             if (query == null) {
-                exchange.sendResponseHeaders(400, 0);
+                System.err.println("OAuth2 callback failed: No query parameters received");
+                sendErrorRedirect(exchange, "No authorization code received from Discord");
                 return;
             }
             
             Map<String, String> params = parseQuery(query);
             String code = params.get("code");
             String state = params.get("state");
+            String error = params.get("error");
+            
+            // Check if Discord returned an error
+            if (error != null) {
+                String errorDescription = params.get("error_description");
+                System.err.println("Discord OAuth2 error: " + error + 
+                    (errorDescription != null ? " - " + errorDescription : ""));
+                sendErrorRedirect(exchange, "Discord authorization failed: " + error);
+                return;
+            }
             
             if (code == null || state == null) {
-                exchange.sendResponseHeaders(400, 0);
+                System.err.println("OAuth2 callback failed: Missing code or state parameter");
+                sendErrorRedirect(exchange, "Invalid authorization response from Discord");
                 return;
             }
             
             // Verify state
             if (!sessions.containsKey("state_" + state)) {
-                exchange.sendResponseHeaders(400, 0);
+                System.err.println("OAuth2 callback failed: Invalid or expired state parameter: " + state);
+                sendErrorRedirect(exchange, "Invalid or expired authorization request");
                 return;
             }
             sessions.remove("state_" + state);
             
             try {
+                System.out.println("Exchanging authorization code for access token");
+                
                 // Exchange code for access token
                 String accessToken = exchangeCodeForToken(code);
                 if (accessToken == null) {
-                    exchange.sendResponseHeaders(500, 0);
+                    System.err.println("OAuth2 callback failed: Could not exchange code for access token");
+                    sendErrorRedirect(exchange, "Failed to obtain access token from Discord");
                     return;
                 }
+                
+                System.out.println("Access token obtained, retrieving user info");
                 
                 // Get user info
                 UserSession userSession = getUserInfo(accessToken);
                 if (userSession == null) {
-                    exchange.sendResponseHeaders(500, 0);
+                    System.err.println("OAuth2 callback failed: Could not retrieve user info from Discord");
+                    sendErrorRedirect(exchange, "Failed to retrieve user information from Discord");
                     return;
                 }
                 
@@ -335,15 +482,25 @@ public class WebServer {
                 String sessionToken = UUID.randomUUID().toString();
                 sessions.put(sessionToken, userSession);
                 
+                System.out.println("User logged in successfully: " + userSession.username + " (ID: " + userSession.userId + ")");
+                
                 // Set session cookie and redirect
                 exchange.getResponseHeaders().set("Set-Cookie", "session=" + sessionToken + "; HttpOnly; Path=/");
                 exchange.getResponseHeaders().set("Location", "/");
                 exchange.sendResponseHeaders(302, 0);
                 
             } catch (Exception e) {
+                System.err.println("OAuth2 callback error: " + e.getMessage());
                 e.printStackTrace();
-                exchange.sendResponseHeaders(500, 0);
+                sendErrorRedirect(exchange, "An unexpected error occurred during login");
             }
+        }
+        
+        private void sendErrorRedirect(HttpExchange exchange, String errorMessage) throws IOException {
+            // Redirect to home page with error parameter
+            String redirectUrl = "/?error=" + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Location", redirectUrl);
+            exchange.sendResponseHeaders(302, 0);
         }
     }
     
@@ -409,7 +566,21 @@ public class WebServer {
             os.write(data.getBytes());
         }
         
-        if (conn.getResponseCode() != 200) {
+        int responseCode = conn.getResponseCode();
+        System.out.println("Token exchange response code: " + responseCode);
+        
+        if (responseCode != 200) {
+            // Read error response for debugging
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                System.err.println("Token exchange failed with response: " + errorResponse.toString());
+            } catch (Exception e) {
+                System.err.println("Could not read error response: " + e.getMessage());
+            }
             return null;
         }
         
@@ -421,7 +592,12 @@ public class WebServer {
             }
             
             JsonNode json = objectMapper.readTree(response.toString());
-            return json.get("access_token").asText();
+            String accessToken = json.get("access_token").asText();
+            System.out.println("Successfully obtained access token");
+            return accessToken;
+        } catch (Exception e) {
+            System.err.println("Error parsing token response: " + e.getMessage());
+            return null;
         }
     }
     
@@ -430,7 +606,21 @@ public class WebServer {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + accessToken);
         
-        if (conn.getResponseCode() != 200) {
+        int responseCode = conn.getResponseCode();
+        System.out.println("User info request response code: " + responseCode);
+        
+        if (responseCode != 200) {
+            // Read error response for debugging
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                System.err.println("User info request failed with response: " + errorResponse.toString());
+            } catch (Exception e) {
+                System.err.println("Could not read error response: " + e.getMessage());
+            }
             return null;
         }
         
@@ -449,7 +639,12 @@ public class WebServer {
             String avatarUrl = avatar != null ? 
                 "https://cdn.discordapp.com/avatars/" + id + "/" + avatar + ".png" : null;
                 
+            System.out.println("Successfully retrieved user info for: " + username);
             return new UserSession(id, username, discriminator, avatarUrl, accessToken);
+            
+        } catch (Exception e) {
+            System.err.println("Error parsing user info response: " + e.getMessage());
+            return null;
         }
     }
     
