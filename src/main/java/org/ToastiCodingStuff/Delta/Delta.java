@@ -14,19 +14,19 @@ public class Delta {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
         
-        // Start web dashboard server
-        int webPort = 8080;
-        try {
-            WebServer webServer = new WebServer(webPort, handler);
-            webServer.start();
-        } catch (Exception e) {
-            System.err.println("Failed to start web server: " + e.getMessage());
-        }
-        
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
+        
+        // Start web dashboard server after JDA is ready
+        int webPort = Integer.parseInt(dotenv.get("WEB_PORT", "8080"));
+        try {
+            WebServer webServer = new WebServer(webPort, handler, api);
+            webServer.start();
+        } catch (Exception e) {
+            System.err.println("Failed to start web server: " + e.getMessage());
+        }
 
         api.addEventListener(new LogChannelSlashCommandListener(handler));
         api.addEventListener(new WarnCommandListener(handler));
