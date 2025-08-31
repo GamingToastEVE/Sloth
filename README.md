@@ -92,7 +92,13 @@ Use the `/add-system` command to activate different systems on your server:
 - `/ticket-transcript` - Generate ticket transcript
 
 #### Moderation System
-- Various moderation commands for server management
+- `/kick` - Kick a user from the server
+- `/ban` - Ban a user from the server
+- `/unban` - Unban a user from the server
+- `/timeout` - Timeout a user for a specified duration
+- `/untimeout` - Remove timeout from a user
+- `/purge` - Delete multiple messages from the channel
+- `/slowmode` - Set slowmode for the current channel
 
 ## Database
 
