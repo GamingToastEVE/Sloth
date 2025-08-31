@@ -27,9 +27,8 @@ public class AddGuildSlashCommands {
                         .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
                         .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
                 Commands.slash("set-warn-settings", "Configure warning system settings")
-                        .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before action", true)
-                        .addOption(OptionType.INTEGER, "minutes_muted", "Minutes to mute user when reaching max warns", true)
-                        .addOption(OptionType.ROLE, "mute_role", "Role to assign when muting", true)
+                        .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
+                        .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
                         .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
                 Commands.slash("get-warn-settings", "View current warning system settings")
         ).queue();
