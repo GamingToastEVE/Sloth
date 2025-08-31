@@ -50,7 +50,8 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "🏠 **Overview** - Learn about Sloth's features\n" +
                                 "⚙️ **Systems** - Available modular systems\n" +
                                 "📋 **Setup** - How to configure systems\n" +
-                                "📖 **Commands** - Complete command reference")
+                                "📖 **Commands** - Complete command reference\n" +
+                                "📜 **Legal** - Terms of Service and Privacy Policy")
                         .setColor(Color.BLUE)
                         .setFooter("Use the buttons below to navigate");
 
@@ -58,7 +59,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
@@ -82,7 +84,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
@@ -116,7 +119,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
@@ -146,7 +150,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
@@ -186,7 +191,43 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_legal", "📜 Legal")
+                );
+                break;
+
+            case "legal":
+                embed.setTitle("📜 Legal Information")
+                        .setDescription("Important legal documents and policies for using Sloth Bot:\n\n")
+                        .addField("**📋 Terms of Service**", 
+                                "By using Sloth Bot, you agree to our Terms of Service.\n" +
+                                "**Key Points:**\n" +
+                                "• Must be 16+ to use (Discord ToS compliance)\n" +
+                                "• Use in accordance with Discord Guidelines\n" +
+                                "• No misuse, harassment, or exploitation\n" +
+                                "• Service provided \"as is\" without guarantees\n" +
+                                "\n📄 **Full document:** `Terms of Service.md` in repository", false)
+                        .addField("**🔒 Privacy Policy**", 
+                                "We respect your privacy and follow GDPR compliance.\n" +
+                                "**What we collect:**\n" +
+                                "• Discord user/server IDs (necessary for functionality)\n" +
+                                "• Command interactions and parameters\n" +
+                                "• Technical logs for stability and security\n" +
+                                "\n**Your rights:** Access, rectification, erasure, data portability\n" +
+                                "\n📄 **Full document:** `privacy policy.md` in repository", false)
+                        .addField("**📞 Contact Information**", 
+                                "For questions about Terms of Service or Privacy Policy:\n" +
+                                "• Discord: **gamingtoasti**\n" +
+                                "• Support Server: https://discord.gg/dQT53fD8M5", false)
+                        .setColor(Color.GRAY)
+                        .setFooter("Last updated: 30.8.25 • Navigate using buttons below");
+
+                actionRow = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home"),
+                        Button.primary("help_overview", "🏠 Overview"),
+                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_commands", "📖 Commands")
                 );
                 break;
 
