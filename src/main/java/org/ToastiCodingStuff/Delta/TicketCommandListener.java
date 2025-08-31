@@ -272,8 +272,8 @@ public class TicketCommandListener extends ListenerAdapter {
             event.replyEmbeds(embed.build()).queue();
             
             // Archive channel after 5 seconds
-            //channel.getManager().setName("closed-" + channel.getName()).queue();
-            channel.delete().reason("Ticket closed").queue();
+            channel.getManager().setName("closed-" + channel.getName()).queue();
+            channel.delete().reason("Ticket closed").queueAfter(60, java.util.concurrent.TimeUnit.SECONDS);
             
         } else {
             event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
@@ -367,6 +367,11 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleTicketTranscript(SlashCommandInteractionEvent event, String guildId) {
+        //check if bot has message content intent
+        if (!event.getJDA().getGatewayIntents().contains(net.dv8tion.jda.api.requests.GatewayIntent.MESSAGE_CONTENT)) {
+            event.reply("❌ Bot does not have Message Content Intent enabled. Cannot generate transcripts.").setEphemeral(true).queue();
+            return;
+        }
         TextChannel channel = event.getChannel().asTextChannel();
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         

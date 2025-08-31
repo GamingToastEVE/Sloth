@@ -1060,7 +1060,7 @@ public class DatabaseHandler {
      */
     public String getTicketByChannelId(String channelId) {
         try {
-            String query = "SELECT id, user_id, category, subject, status, priority, assigned_to, created_at FROM tickets WHERE channel_id = ? AND status != 'CLOSED'";
+            String query = "SELECT id, user_id, category, subject, status, priority, assigned_to, created_at FROM tickets WHERE channel_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setLong(1, Long.parseLong(channelId));
             ResultSet rs = stmt.executeQuery();

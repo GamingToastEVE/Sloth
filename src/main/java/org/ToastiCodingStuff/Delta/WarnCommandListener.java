@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 public class WarnCommandListener extends ListenerAdapter {
 
@@ -109,6 +110,10 @@ public class WarnCommandListener extends ListenerAdapter {
         String roleId = handler.getWarnRoleID(guildId);
         int warnTimeHours = handler.getWarnTimeHours(guildId);
 
+        if (roleId == null) {
+            event.reply("Mute role not set in the warn settings. Please update the settings.").setEphemeral(true).queue();
+            return;
+        }
         Role muteRole = event.getGuild().getRoleById(roleId);
         String roleMention = muteRole != null ? muteRole.getAsMention() : "Role not found";
 
