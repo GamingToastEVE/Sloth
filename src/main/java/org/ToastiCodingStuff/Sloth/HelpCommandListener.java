@@ -51,7 +51,8 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "⚙️ **Systems** - Available modular systems\n" +
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference\n" +
-                                "📜 **Legal** - Terms of Service and Privacy Policy")
+                                "📜 **Legal** - Terms of Service and Privacy Policy\n" +
+                                "Note: this bot is completely reworked and settings from the old version will not carry over.")
                         .setColor(Color.BLUE)
                         .setFooter("Use the buttons below to navigate");
 
