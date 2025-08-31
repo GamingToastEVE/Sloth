@@ -135,7 +135,11 @@ public class TicketCommandListener extends ListenerAdapter {
 
         event.getChannel().sendMessageEmbeds(embed.build())
                 .setActionRow(createTicketButton)
-                .queue(message -> event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue());
+                .queue(message -> {
+                    event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue();
+                    // Sort channels to ensure ticket panel channel stays on top
+                    sortTicketChannelsByPriority(event.getGuild(), guildId);
+                });
     }
 
     private void handleCreateTicketButton(ButtonInteractionEvent event) {
@@ -435,9 +439,11 @@ public class TicketCommandListener extends ListenerAdapter {
             Category ticketCategory = guild.getCategoryById(categoryId);
             if (ticketCategory == null) return;
             
+            // Get the ticket panel channel ID
+            String ticketPanelChannelId = handler.getTicketChannel(guildId);
+            
             // Get all ticket channels with their priorities
             java.util.List<java.util.Map<String, String>> ticketsWithPriority = handler.getTicketsByGuildWithPriority(guildId);
-            if (ticketsWithPriority.isEmpty()) return;
             
             // Create a map for quick priority lookup
             java.util.Map<String, String> channelToPriority = new java.util.HashMap<>();
@@ -447,12 +453,15 @@ public class TicketCommandListener extends ListenerAdapter {
             
             // Get all text channels in the category and sort them
             java.util.List<TextChannel> allChannels = ticketCategory.getTextChannels();
+            TextChannel ticketPanelChannel = null;
             java.util.List<TextChannel> ticketChannels = new java.util.ArrayList<>();
             java.util.List<TextChannel> nonTicketChannels = new java.util.ArrayList<>();
             
-            // Separate ticket channels from other channels
+            // Separate channels into three groups: ticket panel, ticket channels, other channels
             for (TextChannel textChannel : allChannels) {
-                if (channelToPriority.containsKey(textChannel.getId())) {
+                if (ticketPanelChannelId != null && textChannel.getId().equals(ticketPanelChannelId)) {
+                    ticketPanelChannel = textChannel;
+                } else if (channelToPriority.containsKey(textChannel.getId())) {
                     ticketChannels.add(textChannel);
                 } else {
                     nonTicketChannels.add(textChannel);
@@ -466,14 +475,24 @@ public class TicketCommandListener extends ListenerAdapter {
                 return getPriorityOrder(priority1) - getPriorityOrder(priority2);
             });
             
-            // Update channel positions - ticket channels first (by priority), then other channels
+            // Update channel positions - ticket panel first, then ticket channels (by priority), then other channels
             int position = 0;
+            
+            // Place ticket panel channel at position 0 (top)
+            if (ticketPanelChannel != null && ticketPanelChannel.getPosition() != position) {
+                ticketPanelChannel.getManager().setPosition(position).queue();
+                position++;
+            }
+            
+            // Place ticket channels sorted by priority
             for (TextChannel channel : ticketChannels) {
                 if (channel.getPosition() != position) {
                     channel.getManager().setPosition(position).queue();
                 }
                 position++;
             }
+            
+            // Place other non-ticket channels
             for (TextChannel channel : nonTicketChannels) {
                 if (channel.getPosition() != position) {
                     channel.getManager().setPosition(position).queue();
