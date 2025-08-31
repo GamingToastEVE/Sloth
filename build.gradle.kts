@@ -3,7 +3,7 @@ plugins {
     java
 }
 
-application.mainClass = "org.ToastiCodingStuff.Delta.Delta" //
+application.mainClass = "org.ToastiCodingStuff.Sloth.Sloth" //
 group = "org.ToastiCodingStuff"
 version = "1.0"
 

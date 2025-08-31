@@ -1,4 +1,4 @@
-package org.ToastiCodingStuff.Delta;
+package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -44,10 +44,10 @@ public class HelpCommandListener extends ListenerAdapter {
 
         switch (page) {
             case "home":
-                embed.setTitle("🤖 Delta Bot - Help & Wiki")
-                        .setDescription("Welcome to Delta! I'm a comprehensive Discord moderation and management bot.\n\n" +
+                embed.setTitle("🤖 Sloth Bot - Help & Wiki")
+                        .setDescription("Welcome to Sloth! I'm a comprehensive Discord moderation and management bot.\n\n" +
                                 "**Available Help Sections:**\n" +
-                                "🏠 **Overview** - Learn about Delta's features\n" +
+                                "🏠 **Overview** - Learn about Sloth's features\n" +
                                 "⚙️ **Systems** - Available modular systems\n" +
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference")
@@ -63,8 +63,8 @@ public class HelpCommandListener extends ListenerAdapter {
                 break;
 
             case "overview":
-                embed.setTitle("🏠 Delta Bot - Overview")
-                        .setDescription("Delta is designed to help server administrators manage their communities effectively.\n\n" +
+                embed.setTitle("🏠 Sloth Bot - Overview")
+                        .setDescription("Sloth is designed to help server administrators manage their communities effectively.\n\n" +
                                 "**Key Features:**\n" +
                                 "• **Modular Design** - Only activate the systems you need\n" +
                                 "• **Comprehensive Logging** - Track all server activities\n" +
@@ -88,7 +88,7 @@ public class HelpCommandListener extends ListenerAdapter {
 
             case "systems":
                 embed.setTitle("⚙️ Available Systems")
-                        .setDescription("Delta offers several modular systems that can be independently activated:\n\n")
+                        .setDescription("Sloth offers several modular systems that can be independently activated:\n\n")
                         .addField("🛡️ **Moderation System**", 
                                 "• Kick, ban, timeout users\n" +
                                 "• Message purging and slowmode\n" +
@@ -122,7 +122,7 @@ public class HelpCommandListener extends ListenerAdapter {
 
             case "setup":
                 embed.setTitle("📋 System Setup Guide")
-                        .setDescription("Follow these steps to configure Delta for your server:\n\n")
+                        .setDescription("Follow these steps to configure Sloth for your server:\n\n")
                         .addField("**Step 1: Activate Systems**", 
                                 "Use `/add-system` to activate the systems you want:\n" +
                                 "• Choose from: Log Channel, Warning, Ticket, Moderation\n" +

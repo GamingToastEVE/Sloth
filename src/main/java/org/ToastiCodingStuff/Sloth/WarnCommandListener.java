@@ -1,4 +1,4 @@
-package org.ToastiCodingStuff.Delta;
+package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;

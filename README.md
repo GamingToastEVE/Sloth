@@ -4,7 +4,7 @@ Sloth is a comprehensive Discord moderation and management bot that provides mul
 
 ## Features
 
-Delta offers several modular systems that can be independently activated per server:
+Sloth offers several modular systems that can be independently activated per server:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
@@ -63,8 +63,8 @@ Sloth uses a modular system approach where server administrators can activate on
 
 ### Getting Help
 
-Use the `/help` command to access Delta's interactive help system. The help system provides:
-- 🏠 **Overview** - Learn about Delta's features and capabilities
+Use the `/help` command to access Sloth's interactive help system. The help system provides:
+- 🏠 **Overview** - Learn about Sloth's features and capabilities
 - ⚙️ **Systems** - Browse all available modular systems
 - 📋 **Setup** - Step-by-step configuration guides  
 - 📖 **Commands** - Complete command reference
@@ -112,7 +112,7 @@ Use the `/add-system` command to activate different systems on your server:
 
 ## Database
 
-Delta automatically creates and manages an SQLite database (`server.db`) that stores:
+Sloth automatically creates and manages an SQLite database (`server.db`) that stores:
 - Guild configurations
 - User warnings and moderation history
 - Ticket information and transcripts
@@ -122,9 +122,9 @@ Delta automatically creates and manages an SQLite database (`server.db`) that st
 ## File Structure
 
 ```
-Delta/
-├── src/main/java/org/ToastiCodingStuff/Delta/
-│   ├── Delta.java                          # Main bot class
+Sloth/
+├── src/main/java/org/ToastiCodingStuff/Sloth/
+│   ├── Sloth.java                          # Main bot class
 │   ├── DatabaseHandler.java                # Database operations
 │   ├── AddGuildSlashCommands.java          # Command registration
 │   ├── SystemManagementCommandListener.java # System activation
