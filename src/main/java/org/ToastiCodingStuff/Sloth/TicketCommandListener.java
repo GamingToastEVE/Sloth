@@ -223,6 +223,10 @@ public class TicketCommandListener extends ListenerAdapter {
                     int ticketId = handler.createTicket(guildId, userId, channel.getId(), "general", subject, priority);
                     
                     if (ticketId > 0) {
+                        // Update channel name to include ticket ID
+                        String newChannelName = "ticket-" + ticketId + "-" + event.getUser().getName().toLowerCase().replaceAll("[^a-z0-9]", "");
+                        channel.getManager().setName(newChannelName).queue();
+                        
                         // Update statistics for tickets created
                         handler.incrementTicketsCreated(guildId);
                         
