@@ -53,13 +53,8 @@ public class SystemManagementCommandListener extends ListenerAdapter {
                 databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Moderation system commands have been added to this server!").setEphemeral(true).queue();
                 break;
-            case "automod-system":
-                adder.addAutomodCommands();
-                databaseHandler.activateGuildSystem(guildId, systemType);
-                event.reply("✅ Automod system commands have been added to this server!").setEphemeral(true).queue();
-                break;
             default:
-                event.reply("❌ Invalid system type. Available systems: `Log Channel System`, `Warning System`, `Ticket System`, `Moderation System`, `Automod System`").setEphemeral(true).queue();
+                event.reply("❌ Invalid system type. Available systems: `Log Channel System`, `Warning System`, `Ticket System`, `Moderation System`").setEphemeral(true).queue();
                 break;
         }
     }
