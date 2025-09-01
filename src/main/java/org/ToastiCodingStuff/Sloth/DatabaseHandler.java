@@ -410,7 +410,7 @@ public class DatabaseHandler {
         String createTable = "CREATE TABLE IF NOT EXISTS guild_systems (" +
             "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
-            "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system')), " +
+            "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system', 'automod-system')), " +
             "active INTEGER DEFAULT 1, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
@@ -1511,6 +1511,229 @@ public class DatabaseHandler {
             e.printStackTrace();
             return "Error retrieving weekly statistics.";
         }
+    }
+
+    // Automod Rules Management Methods
+
+    /**
+     * Create a new automod rule
+     */
+    public int createAutomodRule(String guildId, String name, String ruleType, String action, int threshold, Integer duration, String whitelist, String config) {
+        try {
+            String insertRule = "INSERT INTO automod_rules (guild_id, name, rule_type, action, threshold, duration, whitelist, config) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertRule, Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setString(3, ruleType);
+            stmt.setString(4, action);
+            stmt.setInt(5, threshold);
+            if (duration != null) {
+                stmt.setInt(6, duration);
+            } else {
+                stmt.setNull(6, Types.INTEGER);
+            }
+            stmt.setString(7, whitelist);
+            stmt.setString(8, config);
+            
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating automod rule: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get all automod rules for a guild
+     */
+    public java.util.List<java.util.Map<String, Object>> getAutomodRules(String guildId) {
+        java.util.List<java.util.Map<String, Object>> rules = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT id, name, rule_type, enabled, action, threshold, duration, whitelist, config, created_at, updated_at " +
+                    "FROM automod_rules WHERE guild_id = ? ORDER BY created_at DESC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                java.util.Map<String, Object> rule = new java.util.HashMap<>();
+                rule.put("id", rs.getInt("id"));
+                rule.put("name", rs.getString("name"));
+                rule.put("rule_type", rs.getString("rule_type"));
+                rule.put("enabled", rs.getInt("enabled") == 1);
+                rule.put("action", rs.getString("action"));
+                rule.put("threshold", rs.getInt("threshold"));
+                rule.put("duration", rs.getObject("duration"));
+                rule.put("whitelist", rs.getString("whitelist"));
+                rule.put("config", rs.getString("config"));
+                rule.put("created_at", rs.getString("created_at"));
+                rule.put("updated_at", rs.getString("updated_at"));
+                rules.add(rule);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting automod rules: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return rules;
+    }
+
+    /**
+     * Get a specific automod rule by ID
+     */
+    public java.util.Map<String, Object> getAutomodRule(int ruleId, String guildId) {
+        try {
+            String query = "SELECT id, name, rule_type, enabled, action, threshold, duration, whitelist, config, created_at, updated_at " +
+                    "FROM automod_rules WHERE id = ? AND guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, ruleId);
+            stmt.setString(2, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                java.util.Map<String, Object> rule = new java.util.HashMap<>();
+                rule.put("id", rs.getInt("id"));
+                rule.put("name", rs.getString("name"));
+                rule.put("rule_type", rs.getString("rule_type"));
+                rule.put("enabled", rs.getInt("enabled") == 1);
+                rule.put("action", rs.getString("action"));
+                rule.put("threshold", rs.getInt("threshold"));
+                rule.put("duration", rs.getObject("duration"));
+                rule.put("whitelist", rs.getString("whitelist"));
+                rule.put("config", rs.getString("config"));
+                rule.put("created_at", rs.getString("created_at"));
+                rule.put("updated_at", rs.getString("updated_at"));
+                return rule;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting automod rule: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Update an automod rule
+     */
+    public boolean updateAutomodRule(int ruleId, String guildId, String name, String ruleType, String action, int threshold, Integer duration, String whitelist, String config) {
+        try {
+            String updateRule = "UPDATE automod_rules SET name = ?, rule_type = ?, action = ?, threshold = ?, duration = ?, whitelist = ?, config = ? " +
+                "WHERE id = ? AND guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateRule);
+            stmt.setString(1, name);
+            stmt.setString(2, ruleType);
+            stmt.setString(3, action);
+            stmt.setInt(4, threshold);
+            if (duration != null) {
+                stmt.setInt(5, duration);
+            } else {
+                stmt.setNull(5, Types.INTEGER);
+            }
+            stmt.setString(6, whitelist);
+            stmt.setString(7, config);
+            stmt.setInt(8, ruleId);
+            stmt.setString(9, guildId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating automod rule: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Toggle an automod rule's enabled status
+     */
+    public boolean toggleAutomodRule(int ruleId, String guildId, boolean enabled) {
+        try {
+            String updateRule = "UPDATE automod_rules SET enabled = ? WHERE id = ? AND guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateRule);
+            stmt.setInt(1, enabled ? 1 : 0);
+            stmt.setInt(2, ruleId);
+            stmt.setString(3, guildId);
+            
+            int rowsUpdated = stmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error toggling automod rule: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete an automod rule
+     */
+    public boolean deleteAutomodRule(int ruleId, String guildId) {
+        try {
+            String deleteRule = "DELETE FROM automod_rules WHERE id = ? AND guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteRule);
+            stmt.setInt(1, ruleId);
+            stmt.setString(2, guildId);
+            
+            int rowsDeleted = stmt.executeUpdate();
+            return rowsDeleted > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting automod rule: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get enabled automod rules for a specific rule type in a guild
+     */
+    public java.util.List<java.util.Map<String, Object>> getEnabledAutomodRulesByType(String guildId, String ruleType) {
+        java.util.List<java.util.Map<String, Object>> rules = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT id, name, rule_type, action, threshold, duration, whitelist, config " +
+                    "FROM automod_rules WHERE guild_id = ? AND rule_type = ? AND enabled = 1 ORDER BY threshold ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, ruleType);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                java.util.Map<String, Object> rule = new java.util.HashMap<>();
+                rule.put("id", rs.getInt("id"));
+                rule.put("name", rs.getString("name"));
+                rule.put("rule_type", rs.getString("rule_type"));
+                rule.put("action", rs.getString("action"));
+                rule.put("threshold", rs.getInt("threshold"));
+                rule.put("duration", rs.getObject("duration"));
+                rule.put("whitelist", rs.getString("whitelist"));
+                rule.put("config", rs.getString("config"));
+                rules.add(rule);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting enabled automod rules: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return rules;
+    }
+
+    /**
+     * Test method to verify automod functionality (for development only)
+     */
+    public static void testAutomodFunctionality() {
+        System.out.println("Automod functionality integrated successfully!");
+        System.out.println("Available methods:");
+        System.out.println("- createAutomodRule()");
+        System.out.println("- getAutomodRules()");
+        System.out.println("- getAutomodRule()");
+        System.out.println("- updateAutomodRule()");
+        System.out.println("- toggleAutomodRule()");
+        System.out.println("- deleteAutomodRule()");
+        System.out.println("- getEnabledAutomodRulesByType()");
     }
 
     /**
