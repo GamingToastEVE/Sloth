@@ -96,6 +96,58 @@ public class AddGuildSlashCommands {
         ).queue();
     }*/
 
+    public void addAutomodCommands() {
+        guild.updateCommands().addCommands(
+                Commands.slash("automod-create", "Create a new automod rule")
+                        .addOption(OptionType.STRING, "name", "Name for the automod rule", true)
+                        .addOptions(new OptionData(OptionType.STRING, "rule_type", "Type of automod rule", true)
+                                .addChoice("Spam Detection", "SPAM")
+                                .addChoice("All Caps", "CAPS")
+                                .addChoice("Link Blocking", "LINKS")
+                                .addChoice("Invite Blocking", "INVITE")
+                                .addChoice("Bad Words", "BADWORDS")
+                                .addChoice("Mention Spam", "MENTION_SPAM"))
+                        .addOptions(new OptionData(OptionType.STRING, "action", "Action to take when rule is triggered", true)
+                                .addChoice("Warn", "WARN")
+                                .addChoice("Mute", "MUTE")
+                                .addChoice("Kick", "KICK")
+                                .addChoice("Ban", "BAN")
+                                .addChoice("Delete Message", "DELETE"))
+                        .addOption(OptionType.INTEGER, "threshold", "How many violations before action is taken", false)
+                        .addOption(OptionType.INTEGER, "duration", "Duration in minutes (for mute/ban actions)", false)
+                        .addOption(OptionType.STRING, "whitelist", "Comma-separated list of whitelisted channels/roles", false)
+                        .addOption(OptionType.STRING, "config", "Additional configuration (JSON format)", false),
+                Commands.slash("automod-list", "List all automod rules for this server"),
+                Commands.slash("automod-view", "View details of a specific automod rule")
+                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule", true),
+                Commands.slash("automod-edit", "Edit an existing automod rule")
+                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule to edit", true)
+                        .addOption(OptionType.STRING, "name", "New name for the rule", false)
+                        .addOptions(new OptionData(OptionType.STRING, "rule_type", "New type of automod rule", false)
+                                .addChoice("Spam Detection", "SPAM")
+                                .addChoice("All Caps", "CAPS")
+                                .addChoice("Link Blocking", "LINKS")
+                                .addChoice("Invite Blocking", "INVITE")
+                                .addChoice("Bad Words", "BADWORDS")
+                                .addChoice("Mention Spam", "MENTION_SPAM"))
+                        .addOptions(new OptionData(OptionType.STRING, "action", "New action to take", false)
+                                .addChoice("Warn", "WARN")
+                                .addChoice("Mute", "MUTE")
+                                .addChoice("Kick", "KICK")
+                                .addChoice("Ban", "BAN")
+                                .addChoice("Delete Message", "DELETE"))
+                        .addOption(OptionType.INTEGER, "threshold", "New threshold", false)
+                        .addOption(OptionType.INTEGER, "duration", "New duration in minutes", false)
+                        .addOption(OptionType.STRING, "whitelist", "New whitelist", false)
+                        .addOption(OptionType.STRING, "config", "New configuration", false),
+                Commands.slash("automod-toggle", "Enable or disable an automod rule")
+                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule", true)
+                        .addOption(OptionType.BOOLEAN, "enabled", "Whether the rule should be enabled", true),
+                Commands.slash("automod-delete", "Delete an automod rule")
+                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule to delete", true)
+        ).queue();
+    }
+
     public void addStatisticsCommands() {
         guild.updateCommands().addCommands(
                 Commands.slash("stats-today", "View today's server moderation statistics"),

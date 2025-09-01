@@ -27,6 +27,7 @@ public class Sloth {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
+        api.addEventListener(new AutomodCommandListener(handler));
         api.addEventListener(new SystemManagementCommandListener(handler));
         api.addEventListener(new HelpCommandListener());
         api.addEventListener(new GuildEventListener(handler));
@@ -36,7 +37,8 @@ public class Sloth {
                 .addChoice("Log Channel System", "log-channel")
                 .addChoice("Warning System", "warn-system")
                 .addChoice("Ticket System", "ticket-system")
-                .addChoice("Moderation System", "moderation-system");
+                .addChoice("Moderation System", "moderation-system")
+                .addChoice("Automod System", "automod-system");
 
         api.updateCommands().addCommands(
                 Commands.slash("add-system", "Add commands for a specific system")
@@ -75,6 +77,9 @@ public class Sloth {
                             break;
                         case "moderation-system":
                             adder.addModerationCommands();
+                            break;
+                        case "automod-system":
+                            adder.addAutomodCommands();
                             break;
                     }
                 }
