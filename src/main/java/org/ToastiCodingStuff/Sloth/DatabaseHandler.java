@@ -1722,11 +1722,676 @@ public class DatabaseHandler {
     }
 
     /**
+     * Get all enabled automod rules for a guild
+     */
+    public java.util.List<java.util.Map<String, Object>> getAllEnabledAutomodRules(String guildId) {
+        java.util.List<java.util.Map<String, Object>> rules = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT id, name, rule_type, action, threshold, duration, whitelist, config " +
+                    "FROM automod_rules WHERE guild_id = ? AND enabled = 1 ORDER BY rule_type, threshold ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                java.util.Map<String, Object> rule = new java.util.HashMap<>();
+                rule.put("id", rs.getInt("id"));
+                rule.put("name", rs.getString("name"));
+                rule.put("rule_type", rs.getString("rule_type"));
+                rule.put("action", rs.getString("action"));
+                rule.put("threshold", rs.getInt("threshold"));
+                rule.put("duration", rs.getObject("duration"));
+                rule.put("whitelist", rs.getString("whitelist"));
+                rule.put("config", rs.getString("config"));
+                rules.add(rule);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting all enabled automod rules: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return rules;
+    }
+
+    /**
+     * Check if a user or role is whitelisted for a specific rule
+     */
+    public boolean isWhitelisted(String whitelist, String userId, java.util.List<String> userRoles) {
+        if (whitelist == null || whitelist.trim().isEmpty()) {
+            return false;
+        }
+        
+        String[] whitelistEntries = whitelist.split(",");
+        for (String entry : whitelistEntries) {
+            String trimmedEntry = entry.trim();
+            if (trimmedEntry.equals(userId)) {
+                return true;
+            }
+            // Check if any of the user's roles are whitelisted
+            for (String roleId : userRoles) {
+                if (trimmedEntry.equals(roleId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Process message content for spam detection
+     */
+    public boolean isSpamViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        // Default spam detection logic
+        String content = messageContent.toLowerCase().trim();
+        
+        // Check for excessive repeated characters
+        if (content.matches(".*(.)\\1{4,}.*")) {
+            return true;
+        }
+        
+        // Check for excessive caps (handled by CAPS rule type)
+        // Check for repeated words
+        String[] words = content.split("\\s+");
+        java.util.Map<String, Integer> wordCount = new java.util.HashMap<>();
+        for (String word : words) {
+            if (word.length() > 2) {
+                wordCount.put(word, wordCount.getOrDefault(word, 0) + 1);
+                if (wordCount.get(word) >= 5) {
+                    return true;
+                }
+            }
+        }
+        
+        // Check for excessive emojis
+        int emojiCount = 0;
+        for (int i = 0; i < content.length(); i++) {
+            char ch = content.charAt(i);
+            if (ch >= 0x1F600 && ch <= 0x1F64F || // Emoticons
+                ch >= 0x1F300 && ch <= 0x1F5FF || // Misc Symbols
+                ch >= 0x1F680 && ch <= 0x1F6FF || // Transport
+                ch >= 0x2600 && ch <= 0x26FF) {   // Misc symbols
+                emojiCount++;
+            }
+        }
+        if (emojiCount > 10) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Process message content for caps detection
+     */
+    public boolean isCapsViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        String content = messageContent.trim();
+        if (content.length() < 5) {
+            return false; // Too short to be considered caps spam
+        }
+        
+        int upperCount = 0;
+        int letterCount = 0;
+        
+        for (char ch : content.toCharArray()) {
+            if (Character.isLetter(ch)) {
+                letterCount++;
+                if (Character.isUpperCase(ch)) {
+                    upperCount++;
+                }
+            }
+        }
+        
+        if (letterCount == 0) {
+            return false;
+        }
+        
+        // Default threshold of 70% caps
+        double capsPercentage = (double) upperCount / letterCount;
+        return capsPercentage >= 0.7;
+    }
+
+    /**
+     * Process message content for link detection
+     */
+    public boolean isLinkViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        String content = messageContent.toLowerCase();
+        
+        // Check for URLs
+        if (content.matches(".*(https?://|www\\.|ftp://|[a-z0-9-]+\\.(com|org|net|io|me|co|edu|gov)).*")) {
+            return true;
+        }
+        
+        // Check for discord invites specifically
+        if (content.matches(".*(discord\\.gg/|discordapp\\.com/invite/).*")) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Process message content for Discord invite detection
+     */
+    public boolean isInviteViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        String content = messageContent.toLowerCase();
+        
+        // Check for various Discord invite formats
+        return content.matches(".*(discord\\.gg/|discordapp\\.com/invite/|discord\\.com/invite/).*");
+    }
+
+    /**
+     * Process message content for bad words detection
+     */
+    public boolean isBadWordsViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        // Default bad words list (can be customized via config)
+        String[] defaultBadWords = {
+            "badword1", "badword2", "badword3" // Placeholder - replace with actual bad words if needed
+        };
+        
+        String content = messageContent.toLowerCase();
+        
+        // Check config for custom bad words
+        if (config != null && !config.trim().isEmpty()) {
+            String[] customWords = config.split(",");
+            for (String word : customWords) {
+                if (content.contains(word.trim().toLowerCase())) {
+                    return true;
+                }
+            }
+        } else {
+            // Use default list
+            for (String word : defaultBadWords) {
+                if (content.contains(word)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Process message for mention spam detection
+     */
+    public boolean isMentionSpamViolation(String messageContent, String config) {
+        if (messageContent == null || messageContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        // Count mentions (@user, @role, @everyone, @here)
+        int mentionCount = 0;
+        
+        // Count user mentions
+        mentionCount += (messageContent.split("<@!?\\d+>").length - 1);
+        
+        // Count role mentions
+        mentionCount += (messageContent.split("<@&\\d+>").length - 1);
+        
+        // Count @everyone and @here
+        if (messageContent.contains("@everyone")) mentionCount++;
+        if (messageContent.contains("@here")) mentionCount++;
+        
+        // Default threshold of 5 mentions
+        return mentionCount >= 5;
+    }
+
+    /**
+     * Store user violation for tracking purposes
+     */
+    public void recordUserViolation(String guildId, String userId, String ruleType, int ruleId, String messageContent) {
+        try {
+            String insertViolation = "INSERT INTO temporary_data (guild_id, user_id, data_type, data, expires_at) " +
+                "VALUES (?, ?, ?, ?, datetime('now', '+1 day'))";
+            PreparedStatement stmt = connection.prepareStatement(insertViolation);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, "AUTOMOD_VIOLATION_" + ruleType);
+            stmt.setString(4, "ruleId:" + ruleId + ",content:" + messageContent.substring(0, Math.min(messageContent.length(), 100)));
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error recording user violation: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get user violation count for a specific rule type within the last day
+     */
+    public int getUserViolationCount(String guildId, String userId, String ruleType) {
+        try {
+            String query = "SELECT COUNT(*) as count FROM temporary_data " +
+                    "WHERE guild_id = ? AND user_id = ? AND data_type = ? AND expires_at > datetime('now')";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, "AUTOMOD_VIOLATION_" + ruleType);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt("count");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting user violation count: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Process a message through automod rules and return action to take
+     * @param guildId The guild ID where the message was sent
+     * @param userId The user ID who sent the message
+     * @param userRoles List of role IDs the user has
+     * @param messageContent The content of the message to check
+     * @return Map containing action details or null if no action needed
+     */
+    public java.util.Map<String, Object> processMessageAutomod(String guildId, String userId, java.util.List<String> userRoles, String messageContent) {
+        // Get all enabled automod rules for the guild
+        java.util.List<java.util.Map<String, Object>> rules = getAllEnabledAutomodRules(guildId);
+        
+        for (java.util.Map<String, Object> rule : rules) {
+            String ruleType = (String) rule.get("rule_type");
+            String whitelist = (String) rule.get("whitelist");
+            String config = (String) rule.get("config");
+            int ruleId = (Integer) rule.get("id");
+            int threshold = (Integer) rule.get("threshold");
+            
+            // Check if user is whitelisted
+            if (isWhitelisted(whitelist, userId, userRoles)) {
+                continue; // Skip this rule for whitelisted users
+            }
+            
+            boolean violationDetected = false;
+            
+            // Check for violation based on rule type
+            switch (ruleType) {
+                case "SPAM":
+                    violationDetected = isSpamViolation(messageContent, config);
+                    break;
+                case "CAPS":
+                    violationDetected = isCapsViolation(messageContent, config);
+                    break;
+                case "LINKS":
+                    violationDetected = isLinkViolation(messageContent, config);
+                    break;
+                case "INVITE":
+                    violationDetected = isInviteViolation(messageContent, config);
+                    break;
+                case "BADWORDS":
+                    violationDetected = isBadWordsViolation(messageContent, config);
+                    break;
+                case "MENTION_SPAM":
+                    violationDetected = isMentionSpamViolation(messageContent, config);
+                    break;
+            }
+            
+            if (violationDetected) {
+                // Record the violation
+                recordUserViolation(guildId, userId, ruleType, ruleId, messageContent);
+                
+                // Get user's violation count for this rule type
+                int violationCount = getUserViolationCount(guildId, userId, ruleType);
+                
+                // Check if threshold is met
+                if (violationCount >= threshold) {
+                    // Prepare action result
+                    java.util.Map<String, Object> actionResult = new java.util.HashMap<>();
+                    actionResult.put("rule", rule);
+                    actionResult.put("violation_type", ruleType);
+                    actionResult.put("violation_count", violationCount);
+                    actionResult.put("action", rule.get("action"));
+                    actionResult.put("duration", rule.get("duration"));
+                    actionResult.put("rule_name", rule.get("name"));
+                    
+                    // Increment automod actions statistics
+                    incrementAutomodActions(guildId);
+                    
+                    return actionResult;
+                }
+                
+                // If threshold not met but violation detected, still return info for logging
+                java.util.Map<String, Object> warningResult = new java.util.HashMap<>();
+                warningResult.put("rule", rule);
+                warningResult.put("violation_type", ruleType);
+                warningResult.put("violation_count", violationCount);
+                warningResult.put("action", "LOG_ONLY");
+                warningResult.put("rule_name", rule.get("name"));
+                warningResult.put("threshold_not_met", true);
+                
+                return warningResult;
+            }
+        }
+        
+        return null; // No violations detected
+    }
+
+    /**
+     * Execute automod action based on processed result
+     * @param guild The guild where the action should be taken
+     * @param userId The user ID to take action on
+     * @param actionResult The result from processMessageAutomod
+     * @return success status
+     */
+    public boolean executeAutomodAction(net.dv8tion.jda.api.entities.Guild guild, String userId, java.util.Map<String, Object> actionResult) {
+        try {
+            String action = (String) actionResult.get("action");
+            String ruleType = (String) actionResult.get("violation_type");
+            String ruleName = (String) actionResult.get("rule_name");
+            Integer duration = (Integer) actionResult.get("duration");
+            String guildId = guild.getId();
+            
+            // Skip execution if it's just a log entry
+            if ("LOG_ONLY".equals(action)) {
+                return true;
+            }
+            
+            net.dv8tion.jda.api.entities.Member member = guild.getMemberById(userId);
+            if (member == null) {
+                return false;
+            }
+            
+            String reason = "Automod: " + ruleName + " (" + ruleType + " violation)";
+            
+            switch (action) {
+                case "WARN":
+                    // Create a warning
+                    int warningId = insertWarning(guildId, userId, guild.getSelfMember().getId(), reason, "MEDIUM", null);
+                    if (warningId > 0) {
+                        incrementWarningsIssued(guildId);
+                        sendAuditLogEntry(guild, "WARN", member.getEffectiveName(), "Automod", reason);
+                        return true;
+                    }
+                    break;
+                    
+                case "DELETE":
+                    // Message deletion is handled by the message listener
+                    return true;
+                    
+                case "MUTE":
+                    // Timeout the user (Discord's timeout feature)
+                    if (duration != null && duration > 0) {
+                        member.timeoutFor(java.time.Duration.ofMinutes(duration)).reason(reason).queue();
+                        insertModerationAction(guildId, userId, guild.getSelfMember().getId(), "TEMP_MUTE", reason, duration, null);
+                        sendAuditLogEntry(guild, "TIMEOUT " + duration + "m", member.getEffectiveName(), "Automod", reason);
+                        return true;
+                    }
+                    break;
+                    
+                case "KICK":
+                    member.kick().reason(reason).queue();
+                    insertModerationAction(guildId, userId, guild.getSelfMember().getId(), "KICK", reason, null, null);
+                    incrementKicksPerformed(guildId);
+                    sendAuditLogEntry(guild, "KICK", member.getEffectiveName(), "Automod", reason);
+                    return true;
+                    
+                case "BAN":
+                    if (duration != null && duration > 0) {
+                        // Temporary ban - we'll use the moderation_actions table to track this
+                        member.ban(0, java.util.concurrent.TimeUnit.SECONDS).reason(reason).queue();
+                        String expiresAt = java.time.LocalDateTime.now().plusMinutes(duration).toString();
+                        insertModerationAction(guildId, userId, guild.getSelfMember().getId(), "TEMP_BAN", reason, duration, expiresAt);
+                        sendAuditLogEntry(guild, "BAN " + duration + "m", member.getEffectiveName(), "Automod", reason);
+                    } else {
+                        // Permanent ban
+                        member.ban(0, java.util.concurrent.TimeUnit.SECONDS).reason(reason).queue();
+                        insertModerationAction(guildId, userId, guild.getSelfMember().getId(), "BAN", reason, null, null);
+                        sendAuditLogEntry(guild, "BAN", member.getEffectiveName(), "Automod", reason);
+                    }
+                    incrementBansPerformed(guildId);
+                    return true;
+            }
+        } catch (Exception e) {
+            System.err.println("Error executing automod action: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return false;
+    }
+
+    /**
+     * Clean up expired automod violations and temporary bans
+     */
+    public void cleanupExpiredAutomodData() {
+        try {
+            // Clean up expired violation records
+            String cleanupViolations = "DELETE FROM temporary_data WHERE expires_at <= datetime('now')";
+            PreparedStatement stmt = connection.prepareStatement(cleanupViolations);
+            int deletedViolations = stmt.executeUpdate();
+            
+            if (deletedViolations > 0) {
+                System.out.println("Cleaned up " + deletedViolations + " expired automod violation records");
+            }
+            
+            // Note: Discord doesn't have a built-in temporary ban system, so temp bans would need
+            // to be handled by a separate scheduled task that unbans users when their time is up
+            
+        } catch (SQLException e) {
+            System.err.println("Error cleaning up expired automod data: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get automod statistics for a guild
+     */
+    public java.util.Map<String, Object> getAutomodStatistics(String guildId, int days) {
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        
+        try {
+            // Get violation counts by type
+            String violationQuery = "SELECT " +
+                    "SUBSTR(data_type, 19) as violation_type, COUNT(*) as count " +
+                    "FROM temporary_data " +
+                    "WHERE guild_id = ? AND data_type LIKE 'AUTOMOD_VIOLATION_%' " +
+                    "AND created_at >= datetime('now', '-" + days + " days') " +
+                    "GROUP BY violation_type";
+            
+            PreparedStatement stmt = connection.prepareStatement(violationQuery);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            java.util.Map<String, Integer> violations = new java.util.HashMap<>();
+            int totalViolations = 0;
+            
+            while (rs.next()) {
+                String violationType = rs.getString("violation_type");
+                int count = rs.getInt("count");
+                violations.put(violationType, count);
+                totalViolations += count;
+            }
+            
+            stats.put("violations_by_type", violations);
+            stats.put("total_violations", totalViolations);
+            
+            // Get total automod actions from statistics table
+            String actionsQuery = "SELECT SUM(automod_actions) as total_actions " +
+                    "FROM statistics " +
+                    "WHERE guild_id = ? AND date >= date('now', '-" + days + " days')";
+            stmt = connection.prepareStatement(actionsQuery);
+            stmt.setString(1, guildId);
+            rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                stats.put("total_actions", rs.getInt("total_actions"));
+            } else {
+                stats.put("total_actions", 0);
+            }
+            
+            // Get number of active rules
+            String rulesQuery = "SELECT COUNT(*) as active_rules FROM automod_rules WHERE guild_id = ? AND enabled = 1";
+            stmt = connection.prepareStatement(rulesQuery);
+            stmt.setString(1, guildId);
+            rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                stats.put("active_rules", rs.getInt("active_rules"));
+            } else {
+                stats.put("active_rules", 0);
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting automod statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return stats;
+    }
+
+    /**
+     * Get top violators for automod rules in the last N days
+     */
+    public java.util.List<java.util.Map<String, Object>> getTopAutomodViolators(String guildId, int days, int limit) {
+        java.util.List<java.util.Map<String, Object>> violators = new java.util.ArrayList<>();
+        
+        try {
+            String query = "SELECT user_id, " +
+                    "SUBSTR(data_type, 19) as violation_type, " +
+                    "COUNT(*) as violation_count " +
+                    "FROM temporary_data " +
+                    "WHERE guild_id = ? AND data_type LIKE 'AUTOMOD_VIOLATION_%' " +
+                    "AND created_at >= datetime('now', '-" + days + " days') " +
+                    "GROUP BY user_id, violation_type " +
+                    "ORDER BY violation_count DESC " +
+                    "LIMIT ?";
+            
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setInt(2, limit);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                java.util.Map<String, Object> violator = new java.util.HashMap<>();
+                violator.put("user_id", rs.getString("user_id"));
+                violator.put("violation_type", rs.getString("violation_type"));
+                violator.put("violation_count", rs.getInt("violation_count"));
+                violators.add(violator);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting top automod violators: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return violators;
+    }
+
+    /**
+     * Clear all violations for a specific user (useful for pardoning)
+     */
+    public boolean clearUserViolations(String guildId, String userId) {
+        try {
+            String deleteQuery = "DELETE FROM temporary_data " +
+                    "WHERE guild_id = ? AND user_id = ? AND data_type LIKE 'AUTOMOD_VIOLATION_%'";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            
+            int deletedRows = stmt.executeUpdate();
+            return deletedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("Error clearing user violations: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get automod rule effectiveness (rules that trigger actions vs just log)
+     */
+    public java.util.Map<String, Object> getAutomodRuleEffectiveness(String guildId, int days) {
+        java.util.Map<String, Object> effectiveness = new java.util.HashMap<>();
+        
+        try {
+            // Get rules and their configurations
+            java.util.List<java.util.Map<String, Object>> rules = getAutomodRules(guildId);
+            
+            for (java.util.Map<String, Object> rule : rules) {
+                String ruleType = (String) rule.get("rule_type");
+                int threshold = (Integer) rule.get("threshold");
+                boolean enabled = (Boolean) rule.get("enabled");
+                
+                if (!enabled) continue;
+                
+                // Count violations for this rule type
+                String violationQuery = "SELECT COUNT(*) as total_violations " +
+                        "FROM temporary_data " +
+                        "WHERE guild_id = ? AND data_type = ? " +
+                        "AND created_at >= datetime('now', '-" + days + " days')";
+                
+                PreparedStatement stmt = connection.prepareStatement(violationQuery);
+                stmt.setString(1, guildId);
+                stmt.setString(2, "AUTOMOD_VIOLATION_" + ruleType);
+                ResultSet rs = stmt.executeQuery();
+                
+                int totalViolations = 0;
+                if (rs.next()) {
+                    totalViolations = rs.getInt("total_violations");
+                }
+                
+                // Estimate actions taken (violations that would exceed threshold)
+                int estimatedActions = Math.max(0, totalViolations - threshold + 1);
+                
+                java.util.Map<String, Object> ruleStats = new java.util.HashMap<>();
+                ruleStats.put("rule_name", rule.get("name"));
+                ruleStats.put("total_violations", totalViolations);
+                ruleStats.put("threshold", threshold);
+                ruleStats.put("estimated_actions", estimatedActions);
+                ruleStats.put("effectiveness_ratio", totalViolations > 0 ? (double) estimatedActions / totalViolations : 0.0);
+                
+                effectiveness.put(ruleType, ruleStats);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting automod rule effectiveness: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return effectiveness;
+    }
+
+    /**
+     * Bulk enable/disable automod rules by type
+     */
+    public int bulkToggleAutomodRules(String guildId, String ruleType, boolean enabled) {
+        try {
+            String query = "UPDATE automod_rules SET enabled = ? WHERE guild_id = ? AND rule_type = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, enabled ? 1 : 0);
+            stmt.setString(2, guildId);
+            stmt.setString(3, ruleType);
+            
+            return stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error bulk toggling automod rules: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
      * Test method to verify automod functionality (for development only)
      */
     public static void testAutomodFunctionality() {
         System.out.println("Automod functionality integrated successfully!");
         System.out.println("Available methods:");
+        System.out.println("=== CRUD Operations ===");
         System.out.println("- createAutomodRule()");
         System.out.println("- getAutomodRules()");
         System.out.println("- getAutomodRule()");
@@ -1734,6 +2399,29 @@ public class DatabaseHandler {
         System.out.println("- toggleAutomodRule()");
         System.out.println("- deleteAutomodRule()");
         System.out.println("- getEnabledAutomodRulesByType()");
+        System.out.println("- getAllEnabledAutomodRules() [NEW]");
+        System.out.println("=== Message Processing ===");
+        System.out.println("- processMessageAutomod() [NEW]");
+        System.out.println("- executeAutomodAction() [NEW]");
+        System.out.println("- isWhitelisted() [NEW]");
+        System.out.println("=== Rule Type Handlers ===");
+        System.out.println("- isSpamViolation() [NEW]");
+        System.out.println("- isCapsViolation() [NEW]");
+        System.out.println("- isLinkViolation() [NEW]");
+        System.out.println("- isInviteViolation() [NEW]");
+        System.out.println("- isBadWordsViolation() [NEW]");
+        System.out.println("- isMentionSpamViolation() [NEW]");
+        System.out.println("=== Violation Tracking ===");
+        System.out.println("- recordUserViolation() [NEW]");
+        System.out.println("- getUserViolationCount() [NEW]");
+        System.out.println("- clearUserViolations() [NEW]");
+        System.out.println("=== Analytics & Statistics ===");
+        System.out.println("- getAutomodStatistics() [NEW]");
+        System.out.println("- getTopAutomodViolators() [NEW]");
+        System.out.println("- getAutomodRuleEffectiveness() [NEW]");
+        System.out.println("=== Maintenance ===");
+        System.out.println("- cleanupExpiredAutomodData() [NEW]");
+        System.out.println("- bulkToggleAutomodRules() [NEW]");
     }
 
     /**

@@ -40,6 +40,15 @@ public class AutomodCommandListener extends ListenerAdapter {
             case "automod-delete":
                 handleDeleteRule(event);
                 break;
+            case "automod-stats":
+                handleAutomodStats(event);
+                break;
+            case "automod-clear-violations":
+                handleClearViolations(event);
+                break;
+            case "automod-top-violators":
+                handleTopViolators(event);
+                break;
         }
     }
     
@@ -284,5 +293,134 @@ public class AutomodCommandListener extends ListenerAdapter {
         } else {
             event.reply("❌ Failed to delete automod rule. Please try again.").setEphemeral(true).queue();
         }
+    }
+    
+    private void handleAutomodStats(SlashCommandInteractionEvent event) {
+        // Check permissions
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("❌ You need Manage Server permissions to view automod statistics.").setEphemeral(true).queue();
+            return;
+        }
+        
+        String guildId = event.getGuild().getId();
+        
+        // Get days parameter (default to 7 days)
+        OptionMapping daysOption = event.getOption("days");
+        int days = daysOption != null ? daysOption.getAsInt() : 7;
+        
+        // Ensure days is between 1 and 30
+        days = Math.max(1, Math.min(30, days));
+        
+        Map<String, Object> stats = databaseHandler.getAutomodStatistics(guildId, days);
+        
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📊 Automod Statistics")
+                .setDescription("Statistics for the last **" + days + "** day(s)")
+                .setColor(Color.BLUE)
+                .setTimestamp(Instant.now());
+        
+        // Add general stats
+        embed.addField("Active Rules", String.valueOf(stats.get("active_rules")), true);
+        embed.addField("Total Actions", String.valueOf(stats.get("total_actions")), true);
+        embed.addField("Total Violations", String.valueOf(stats.get("total_violations")), true);
+        
+        // Add violation breakdown
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> violationsByType = (Map<String, Integer>) stats.get("violations_by_type");
+        
+        if (violationsByType != null && !violationsByType.isEmpty()) {
+            StringBuilder violationBreakdown = new StringBuilder();
+            violationsByType.forEach((type, count) -> {
+                String emoji = getEmojiForViolationType(type);
+                violationBreakdown.append(emoji).append(" **").append(type).append("**: ").append(count).append("\n");
+            });
+            
+            embed.addField("Violations by Type", violationBreakdown.toString(), false);
+        }
+        
+        // Add footer with cleanup info
+        embed.setFooter("💡 Violation records are automatically cleaned up after 24 hours");
+        
+        event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+    }
+    
+    private String getEmojiForViolationType(String violationType) {
+        switch (violationType.toUpperCase()) {
+            case "SPAM": return "🔁";
+            case "CAPS": return "🔠";
+            case "LINKS": return "🔗";
+            case "INVITE": return "📨";
+            case "BADWORDS": return "🤬";
+            case "MENTION_SPAM": return "📢";
+            default: return "⚠️";
+        }
+    }
+    
+    private void handleClearViolations(SlashCommandInteractionEvent event) {
+        // Check permissions
+        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+            event.reply("❌ You need Administrator permissions to clear violations.").setEphemeral(true).queue();
+            return;
+        }
+        
+        String guildId = event.getGuild().getId();
+        String userId = event.getOption("user").getAsUser().getId();
+        
+        boolean success = databaseHandler.clearUserViolations(guildId, userId);
+        
+        if (success) {
+            event.reply("✅ Successfully cleared all automod violations for <@" + userId + ">.").setEphemeral(true).queue();
+        } else {
+            event.reply("❌ No violations found for that user or failed to clear violations.").setEphemeral(true).queue();
+        }
+    }
+    
+    private void handleTopViolators(SlashCommandInteractionEvent event) {
+        // Check permissions
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("❌ You need Manage Server permissions to view violation reports.").setEphemeral(true).queue();
+            return;
+        }
+        
+        String guildId = event.getGuild().getId();
+        
+        OptionMapping daysOption = event.getOption("days");
+        int days = daysOption != null ? daysOption.getAsInt() : 7;
+        days = Math.max(1, Math.min(30, days));
+        
+        OptionMapping limitOption = event.getOption("limit");
+        int limit = limitOption != null ? limitOption.getAsInt() : 10;
+        limit = Math.max(1, Math.min(20, limit));
+        
+        List<Map<String, Object>> violators = databaseHandler.getTopAutomodViolators(guildId, days, limit);
+        
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("🚫 Top Automod Violators")
+                .setDescription("Top " + limit + " violation records in the last " + days + " day(s)")
+                .setColor(Color.ORANGE)
+                .setTimestamp(Instant.now());
+        
+        if (violators.isEmpty()) {
+            embed.addField("No Violations", "No automod violations recorded in the specified period.", false);
+        } else {
+            StringBuilder violatorList = new StringBuilder();
+            int rank = 1;
+            
+            for (Map<String, Object> violator : violators) {
+                String userId = (String) violator.get("user_id");
+                String violationType = (String) violator.get("violation_type");
+                int count = (Integer) violator.get("violation_count");
+                String emoji = getEmojiForViolationType(violationType);
+                
+                violatorList.append("**").append(rank).append(".** <@").append(userId).append("> - ")
+                          .append(emoji).append(" **").append(violationType).append("**: ").append(count).append(" violations\n");
+                rank++;
+            }
+            
+            embed.addField("Violation Records", violatorList.toString(), false);
+            embed.setFooter("💡 Use /automod-clear-violations to pardon a user");
+        }
+        
+        event.replyEmbeds(embed.build()).setEphemeral(true).queue();
     }
 }

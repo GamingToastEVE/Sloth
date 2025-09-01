@@ -28,6 +28,7 @@ public class Sloth {
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new AutomodCommandListener(handler));
+        api.addEventListener(new AutomodMessageListener(handler)); // NEW: Processes messages through automod
         api.addEventListener(new SystemManagementCommandListener(handler));
         api.addEventListener(new HelpCommandListener());
         api.addEventListener(new GuildEventListener(handler));
@@ -51,6 +52,9 @@ public class Sloth {
         
         // Automatically activate systems for all guilds based on database
         activateStoredSystems(handler, api.getGuilds());
+        
+        // Schedule periodic cleanup of expired automod data
+        scheduleAutomodCleanup(handler);
     }
     
     /**
@@ -90,5 +94,28 @@ public class Sloth {
             adder.addStatisticsCommands();
         }
         System.out.println("Finished activating stored systems for all guilds");
+    }
+    
+    /**
+     * Schedule periodic cleanup of expired automod data
+     */
+    private static void scheduleAutomodCleanup(DatabaseHandler handler) {
+        // Create a timer that runs every hour to clean up expired data
+        java.util.Timer timer = new java.util.Timer(true); // daemon thread
+        java.util.TimerTask cleanupTask = new java.util.TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    handler.cleanupExpiredAutomodData();
+                } catch (Exception e) {
+                    System.err.println("Error during automod cleanup: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        };
+        
+        // Schedule to run every hour (3600000 milliseconds)
+        timer.scheduleAtFixedRate(cleanupTask, 3600000, 3600000);
+        System.out.println("Scheduled automod cleanup to run every hour");
     }
 }
