@@ -11,14 +11,6 @@ Sloth offers several modular systems that can be independently activated per ser
 - Automated moderation actions
 - Comprehensive logging of moderation activities
 
-### 🤖 Automod System
-- Create custom automod rules for different violations
-- Support for spam detection, caps lock, links, invites, bad words, and mention spam
-- Configurable actions: warn, mute, kick, ban, or delete messages
-- Threshold-based enforcement with customizable durations
-- Whitelist support for channels and roles
-- Enable/disable rules individually
-
 ### ⚠️ Warning System
 - Issue warnings to users with different severity levels
 - Configurable automatic actions based on warning thresholds
@@ -88,7 +80,6 @@ Use the `/add-system` command to activate different systems on your server:
 /add-system system:Warning System  
 /add-system system:Ticket System
 /add-system system:Moderation System
-/add-system system:Automod System
 ```
 
 ### Available Systems
@@ -118,14 +109,6 @@ Use the `/add-system` command to activate different systems on your server:
 - `/untimeout` - Remove timeout from a user
 - `/purge` - Delete multiple messages from the channel
 - `/slowmode` - Set slowmode for the current channel
-
-#### Automod System
-- `/automod-create` - Create a new automod rule
-- `/automod-list` - List all automod rules for the server
-- `/automod-view` - View details of a specific automod rule
-- `/automod-edit` - Edit an existing automod rule
-- `/automod-toggle` - Enable or disable an automod rule
-- `/automod-delete` - Delete an automod rule
 
 ## Database
 
