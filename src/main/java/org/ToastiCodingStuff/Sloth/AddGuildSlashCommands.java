@@ -144,7 +144,9 @@ public class AddGuildSlashCommands {
                         .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule", true)
                         .addOption(OptionType.BOOLEAN, "enabled", "Whether the rule should be enabled", true),
                 Commands.slash("automod-delete", "Delete an automod rule")
-                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule to delete", true)
+                        .addOption(OptionType.INTEGER, "rule_id", "ID of the automod rule to delete", true),
+                Commands.slash("automod-stats", "View automod statistics for this server")
+                        .addOption(OptionType.INTEGER, "days", "Number of days to look back (1-30, default: 7)", false)
         ).queue();
     }
 
