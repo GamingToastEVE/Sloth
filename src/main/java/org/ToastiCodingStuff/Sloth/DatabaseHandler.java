@@ -59,7 +59,6 @@ public class DatabaseHandler {
             createTicketsTable();
             createTicketMessagesTable();
             createGuildSettingsTable();
-            createAutomodRulesTable();
             createRolePermissionsTable();
             createBotLogsTable();
             createStatisticsTable();
@@ -254,7 +253,6 @@ public class DatabaseHandler {
             "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
             "guild_id INTEGER NOT NULL UNIQUE, " +
             "modlog_channel INTEGER, " +
-            "automod_enabled INTEGER DEFAULT 0, " +
             "warn_threshold_kick INTEGER DEFAULT 5, " +
             "warn_threshold_ban INTEGER DEFAULT 8, " +
             "warn_expire_days INTEGER DEFAULT 30, " +
@@ -277,41 +275,6 @@ public class DatabaseHandler {
             "FOR EACH ROW " +
             "BEGIN " +
                 "UPDATE guild_settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-            "END";
-        stmt.execute(trigger);
-    }
-
-    /**
-     * Create automod_rules table
-     */
-    private void createAutomodRulesTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS automod_rules (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "guild_id INTEGER NOT NULL, " +
-            "name TEXT NOT NULL, " +
-            "rule_type TEXT NOT NULL CHECK(rule_type IN ('SPAM', 'CAPS', 'LINKS', 'INVITE', 'BADWORDS', 'MENTION_SPAM')), " +
-            "enabled INTEGER DEFAULT 1, " +
-            "action TEXT DEFAULT 'WARN' CHECK(action IN ('WARN', 'MUTE', 'KICK', 'BAN', 'DELETE')), " +
-            "threshold INTEGER DEFAULT 1, " +
-            "duration INTEGER, " +
-            "whitelist TEXT, " +
-            "config TEXT, " +
-            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
-            "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
-            ")";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-        
-        // Create indexes
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_automod_guild_enabled ON automod_rules(guild_id, enabled)");
-        
-        // Create trigger for updated_at
-        String trigger = "CREATE TRIGGER IF NOT EXISTS update_automod_rules_updated_at " +
-            "AFTER UPDATE ON automod_rules " +
-            "FOR EACH ROW " +
-            "BEGIN " +
-                "UPDATE automod_rules SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
             "END";
         stmt.execute(trigger);
     }
@@ -372,7 +335,6 @@ public class DatabaseHandler {
             "bans_performed INTEGER DEFAULT 0, " +
             "tickets_created INTEGER DEFAULT 0, " +
             "tickets_closed INTEGER DEFAULT 0, " +
-            "automod_actions INTEGER DEFAULT 0, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
             "UNIQUE(guild_id, date)" +
@@ -410,7 +372,7 @@ public class DatabaseHandler {
         String createTable = "CREATE TABLE IF NOT EXISTS guild_systems (" +
             "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
-            "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system', 'automod-system')), " +
+            "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system')), " +
             "active INTEGER DEFAULT 1, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
@@ -1410,18 +1372,11 @@ public class DatabaseHandler {
     }
 
     /**
-     * Increment automod actions count for a guild
-     */
-    public void incrementAutomodActions(String guildId) {
-        updateStatistics(guildId, "automod_actions", 1);
-    }
-
-    /**
      * Get statistics for a guild for a specific date
      */
     public String getStatisticsForDate(String guildId, String date) {
         try {
-            String query = "SELECT warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed, automod_actions " +
+            String query = "SELECT warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1435,8 +1390,7 @@ public class DatabaseHandler {
                 result.append("🦶 Kicks Performed: ").append(rs.getInt("kicks_performed")).append("\n");
                 result.append("🔨 Bans Performed: ").append(rs.getInt("bans_performed")).append("\n");
                 result.append("🎫 Tickets Created: ").append(rs.getInt("tickets_created")).append("\n");
-                result.append("✅ Tickets Closed: ").append(rs.getInt("tickets_closed")).append("\n");
-                result.append("🤖 Automod Actions: ").append(rs.getInt("automod_actions"));
+                result.append("✅ Tickets Closed: ").append(rs.getInt("tickets_closed"));
                 return result.toString();
             } else {
                 return "No statistics found for " + date + ".";
@@ -1460,7 +1414,7 @@ public class DatabaseHandler {
      */
     public String getWeeklyStatistics(String guildId) {
         try {
-            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed, automod_actions " +
+            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date >= date('now', '-7 days') ORDER BY date DESC";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1469,7 +1423,7 @@ public class DatabaseHandler {
             StringBuilder result = new StringBuilder();
             result.append("**Weekly Statistics (Last 7 Days):**\n");
             
-            int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTicketsCreated = 0, totalTicketsClosed = 0, totalAutomod = 0;
+            int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTicketsCreated = 0, totalTicketsClosed = 0;
             boolean hasData = false;
             
             while (rs.next()) {
@@ -1480,18 +1434,16 @@ public class DatabaseHandler {
                 int bans = rs.getInt("bans_performed");
                 int ticketsCreated = rs.getInt("tickets_created");
                 int ticketsClosed = rs.getInt("tickets_closed");
-                int automod = rs.getInt("automod_actions");
                 
                 totalWarnings += warnings;
                 totalKicks += kicks;
                 totalBans += bans;
                 totalTicketsCreated += ticketsCreated;
                 totalTicketsClosed += ticketsClosed;
-                totalAutomod += automod;
                 
                 result.append("\n**").append(date).append(":**\n");
                 result.append("🔸 ").append(warnings).append(" | 🦶 ").append(kicks).append(" | 🔨 ").append(bans);
-                result.append(" | 🎫 ").append(ticketsCreated).append(" | ✅ ").append(ticketsClosed).append(" | 🤖 ").append(automod);
+                result.append(" | 🎫 ").append(ticketsCreated).append(" | ✅ ").append(ticketsClosed);
             }
             
             if (hasData) {
@@ -1500,8 +1452,7 @@ public class DatabaseHandler {
                 result.append("🦶 Kicks: ").append(totalKicks).append("\n");
                 result.append("🔨 Bans: ").append(totalBans).append("\n");
                 result.append("🎫 Tickets Created: ").append(totalTicketsCreated).append("\n");
-                result.append("✅ Tickets Closed: ").append(totalTicketsClosed).append("\n");
-                result.append("🤖 Automod Actions: ").append(totalAutomod);
+                result.append("✅ Tickets Closed: ").append(totalTicketsClosed);
                 return result.toString();
             } else {
                 return "No statistics found for the last 7 days.";
