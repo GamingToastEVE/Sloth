@@ -1,5 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -39,8 +40,8 @@ public class StatisticsCommandListener extends ListenerAdapter {
             return;
         }
 
-        String statistics = handler.getTodaysStatistics(guildId);
-        event.reply(statistics).setEphemeral(false).queue();
+        EmbedBuilder embed = handler.getTodaysModerationStatisticsEmbed(guildId);
+        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleWeeklyStatsCommand(SlashCommandInteractionEvent event, String guildId) {
@@ -50,8 +51,8 @@ public class StatisticsCommandListener extends ListenerAdapter {
             return;
         }
 
-        String statistics = handler.getWeeklyStatistics(guildId);
-        event.reply(statistics).setEphemeral(false).queue();
+        EmbedBuilder embed = handler.getWeeklyModerationStatisticsEmbed(guildId);
+        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleDateStatsCommand(SlashCommandInteractionEvent event, String guildId) {
@@ -71,7 +72,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
             return;
         }
 
-        String statistics = handler.getStatisticsForDate(guildId, dateString);
-        event.reply(statistics).setEphemeral(false).queue();
+        EmbedBuilder embed = handler.getModerationStatisticsForDateEmbed(guildId, dateString);
+        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 }
