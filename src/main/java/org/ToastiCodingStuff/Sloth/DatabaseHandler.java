@@ -1,7 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
 import java.awt.Color;
-import java.io.PrintStream;
 import java.sql.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
@@ -44,10 +43,10 @@ public class DatabaseHandler {
     private void initializeTables() {
         try {
             // Check if tables already exist, if so break the method
-            /*if (tablesAlreadyExist()) {
+            if (tablesAlreadyExist()) {
                 System.out.println("Database tables already exist, skipping initialization.");
                 return;
-            }*/
+            }
             
             // Enable foreign keys
             Statement stmt = connection.createStatement();
@@ -162,7 +161,7 @@ public class DatabaseHandler {
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "moderator_id INTEGER NOT NULL, " +
-            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'MUTE', 'TEMP_MUTE', 'UNMUTE', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT')), " +
+            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT')), " +
             "reason TEXT NOT NULL, " +
             "duration INTEGER, " +
             "expires_at TEXT, " +
@@ -501,10 +500,7 @@ public class DatabaseHandler {
             PreparedStatement hasWarnSystem = connection.prepareStatement(hasWarnSystemSettingsAndStuff);
             hasWarnSystem.setString(1, guildID);
             ResultSet rs = hasWarnSystem.executeQuery();
-            if (rs == null) {
-                return false;
-            }
-            return true;
+            return rs != null;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

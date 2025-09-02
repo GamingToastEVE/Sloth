@@ -14,7 +14,7 @@ public class Sloth {
     public static void main(String[] args) throws Exception {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
-        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
+        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
