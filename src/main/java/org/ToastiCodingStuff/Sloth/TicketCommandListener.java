@@ -220,7 +220,8 @@ public class TicketCommandListener extends ListenerAdapter {
                     }
 
                     // Create ticket in database
-                    int ticketId = handler.createTicket(guildId, userId, channel.getId(), "general", subject, priority);
+                    int ticketId = handler.createTicket(guildId, userId, channel.getId(), "general", subject, priority, 
+                            event.getUser().getEffectiveName(), event.getUser().getDiscriminator(), event.getUser().getAvatarUrl());
                     
                     if (ticketId > 0) {
                         // Update channel name to include ticket ID
