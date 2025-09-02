@@ -58,8 +58,10 @@ public class AddGuildSlashCommands {
         // Always add statistics commands
         allCommands.addAll(getStatisticsCommands());
 
-        // Update guild commands with all commands at once
-        guild.updateCommands().addCommands(allCommands).queue();
+        // Upsert guild commands to avoid replacing existing commands
+        for (SlashCommandData command : allCommands) {
+            guild.upsertCommand(command).queue();
+        }
     }
 
     /**
@@ -162,7 +164,9 @@ public class AddGuildSlashCommands {
         if (databaseHandler != null) {
             updateAllGuildCommands();
         } else {
-            guild.updateCommands().addCommands(getLogChannelCommands()).queue();
+            for (SlashCommandData command : getLogChannelCommands()) {
+                guild.upsertCommand(command).queue();
+            }
         }
     }
 
@@ -170,7 +174,9 @@ public class AddGuildSlashCommands {
         if (databaseHandler != null) {
             updateAllGuildCommands();
         } else {
-            guild.updateCommands().addCommands(getWarnCommands()).queue();
+            for (SlashCommandData command : getWarnCommands()) {
+                guild.upsertCommand(command).queue();
+            }
         }
     }
 
@@ -178,7 +184,9 @@ public class AddGuildSlashCommands {
         if (databaseHandler != null) {
             updateAllGuildCommands();
         } else {
-            guild.updateCommands().addCommands(getModerationCommands()).queue();
+            for (SlashCommandData command : getModerationCommands()) {
+                guild.upsertCommand(command).queue();
+            }
         }
     }
 
@@ -186,7 +194,9 @@ public class AddGuildSlashCommands {
         if (databaseHandler != null) {
             updateAllGuildCommands();
         } else {
-            guild.updateCommands().addCommands(getTicketCommands()).queue();
+            for (SlashCommandData command : getTicketCommands()) {
+                guild.upsertCommand(command).queue();
+            }
         }
     }
 
@@ -197,10 +207,8 @@ public class AddGuildSlashCommands {
                 .addChoice("Ticket System", "ticket-system")
                 .addChoice("Moderation System", "moderation-system");
 
-        guild.updateCommands().addCommands(
-                Commands.slash("add-system", "Add commands for a specific system")
-                        .addOptions(systemOption)
-        ).queue();
+        guild.upsertCommand(Commands.slash("add-system", "Add commands for a specific system")
+                .addOptions(systemOption)).queue();
     }*/
 
     public void addStatisticsCommands() {
@@ -215,6 +223,8 @@ public class AddGuildSlashCommands {
      * Add only statistics commands without checking for other systems
      */
     private void addStatisticsCommandsOnly() {
-        guild.updateCommands().addCommands(getStatisticsCommands()).queue();
+        for (SlashCommandData command : getStatisticsCommands()) {
+            guild.upsertCommand(command).queue();
+        }
     }
 }
