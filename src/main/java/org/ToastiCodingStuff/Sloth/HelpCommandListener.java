@@ -161,6 +161,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         .setDescription("Complete list of available commands by system:\n\n")
                         .addField("**System Management**", 
                                 "`/add-system` - Activate a system for your server\n" +
+                                "`/list-systems` - View activated systems\n" +
                                 "`/help` - Show this help system", false)
                         .addField("**Log Channel System**", 
                                 "`/set-log-channel` - Configure logging channel\n" +
