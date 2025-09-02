@@ -162,7 +162,7 @@ public class DatabaseHandler {
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "moderator_id INTEGER NOT NULL, " +
-            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'MUTE', 'TEMP_MUTE', 'UNMUTE', 'UNBAN', 'WARN')), " +
+            "action_type TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'MUTE', 'TEMP_MUTE', 'UNMUTE', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT')), " +
             "reason TEXT NOT NULL, " +
             "duration INTEGER, " +
             "expires_at TEXT, " +
@@ -1451,6 +1451,205 @@ public class DatabaseHandler {
             System.err.println("Error getting weekly statistics: " + e.getMessage());
             e.printStackTrace();
             return "Error retrieving weekly statistics.";
+        }
+    }
+
+    /**
+     * Get moderation statistics for a guild for a specific date using embeds
+     */
+    public EmbedBuilder getModerationStatisticsForDateEmbed(String guildId, String date) {
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📊 Moderation Statistics")
+                .setDescription("Statistics for " + date)
+                .setColor(Color.BLUE)
+                .setTimestamp(java.time.Instant.now());
+
+        try {
+            // Get counts from moderation_actions table
+            String query = "SELECT action_type, COUNT(*) as count FROM moderation_actions " +
+                    "WHERE guild_id = ? AND DATE(created_at) = ? " +
+                    "GROUP BY action_type ORDER BY action_type";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, date);
+            ResultSet rs = stmt.executeQuery();
+
+            boolean hasData = false;
+            StringBuilder moderationStats = new StringBuilder();
+
+            while (rs.next()) {
+                hasData = true;
+                String actionType = rs.getString("action_type");
+                int count = rs.getInt("count");
+                String emoji = getModerationEmoji(actionType);
+                moderationStats.append(emoji).append(" ").append(actionType).append(": ").append(count).append("\n");
+            }
+
+            // Get ticket statistics
+            String ticketQuery = "SELECT " +
+                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(created_at) = ?) as tickets_created, " +
+                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(closed_at) = ?) as tickets_closed";
+            PreparedStatement ticketStmt = connection.prepareStatement(ticketQuery);
+            ticketStmt.setString(1, guildId);
+            ticketStmt.setString(2, date);
+            ticketStmt.setString(3, guildId);
+            ticketStmt.setString(4, date);
+            ResultSet ticketRs = ticketStmt.executeQuery();
+
+            if (ticketRs.next()) {
+                int ticketsCreated = ticketRs.getInt("tickets_created");
+                int ticketsClosed = ticketRs.getInt("tickets_closed");
+                
+                if (ticketsCreated > 0 || ticketsClosed > 0) {
+                    hasData = true;
+                    moderationStats.append("🎫 TICKETS_CREATED: ").append(ticketsCreated).append("\n");
+                    moderationStats.append("🔒 TICKETS_CLOSED: ").append(ticketsClosed).append("\n");
+                }
+            }
+
+            if (hasData) {
+                embed.addField("Moderation Actions", moderationStats.toString(), false);
+            } else {
+                embed.addField("No Activity", "No moderation actions or ticket activity found for " + date, false);
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error getting moderation statistics: " + e.getMessage());
+            e.printStackTrace();
+            embed.addField("Error", "Failed to retrieve statistics for " + date, false);
+        }
+
+        return embed;
+    }
+
+    /**
+     * Get moderation statistics for today using embeds
+     */
+    public EmbedBuilder getTodaysModerationStatisticsEmbed(String guildId) {
+        return getModerationStatisticsForDateEmbed(guildId, getCurrentDate());
+    }
+
+    /**
+     * Get moderation statistics for the last 7 days using embeds
+     */
+    public EmbedBuilder getWeeklyModerationStatisticsEmbed(String guildId) {
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📊 Weekly Moderation Statistics")
+                .setDescription("Statistics for the last 7 days")
+                .setColor(Color.BLUE)
+                .setTimestamp(java.time.Instant.now());
+
+        try {
+            // Get daily breakdown
+            String dailyQuery = "SELECT DATE(created_at) as date, action_type, COUNT(*) as count " +
+                    "FROM moderation_actions " +
+                    "WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days') " +
+                    "GROUP BY DATE(created_at), action_type " +
+                    "ORDER BY date DESC, action_type";
+            PreparedStatement dailyStmt = connection.prepareStatement(dailyQuery);
+            dailyStmt.setString(1, guildId);
+            ResultSet dailyRs = dailyStmt.executeQuery();
+
+            StringBuilder dailyBreakdown = new StringBuilder();
+            String currentDate = "";
+            boolean hasData = false;
+
+            while (dailyRs.next()) {
+                hasData = true;
+                String date = dailyRs.getString("date");
+                String actionType = dailyRs.getString("action_type");
+                int count = dailyRs.getInt("count");
+
+                if (!date.equals(currentDate)) {
+                    if (!currentDate.isEmpty()) {
+                        dailyBreakdown.append("\n");
+                    }
+                    dailyBreakdown.append("**").append(date).append(":**\n");
+                    currentDate = date;
+                }
+                
+                String emoji = getModerationEmoji(actionType);
+                dailyBreakdown.append(emoji).append(" ").append(count).append(" ");
+            }
+
+            // Get total counts
+            String totalQuery = "SELECT action_type, COUNT(*) as count FROM moderation_actions " +
+                    "WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days') " +
+                    "GROUP BY action_type ORDER BY count DESC";
+            PreparedStatement totalStmt = connection.prepareStatement(totalQuery);
+            totalStmt.setString(1, guildId);
+            ResultSet totalRs = totalStmt.executeQuery();
+
+            StringBuilder totalStats = new StringBuilder();
+            while (totalRs.next()) {
+                String actionType = totalRs.getString("action_type");
+                int count = totalRs.getInt("count");
+                String emoji = getModerationEmoji(actionType);
+                totalStats.append(emoji).append(" ").append(actionType).append(": ").append(count).append("\n");
+            }
+
+            // Get ticket statistics for the week
+            String weeklyTicketQuery = "SELECT " +
+                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days')) as tickets_created, " +
+                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(closed_at) >= DATE('now', '-7 days')) as tickets_closed";
+            PreparedStatement weeklyTicketStmt = connection.prepareStatement(weeklyTicketQuery);
+            weeklyTicketStmt.setString(1, guildId);
+            weeklyTicketStmt.setString(2, guildId);
+            ResultSet weeklyTicketRs = weeklyTicketStmt.executeQuery();
+
+            if (weeklyTicketRs.next()) {
+                int ticketsCreated = weeklyTicketRs.getInt("tickets_created");
+                int ticketsClosed = weeklyTicketRs.getInt("tickets_closed");
+                
+                if (ticketsCreated > 0 || ticketsClosed > 0) {
+                    hasData = true;
+                    totalStats.append("🎫 TICKETS_CREATED: ").append(ticketsCreated).append("\n");
+                    totalStats.append("🔒 TICKETS_CLOSED: ").append(ticketsClosed).append("\n");
+                }
+            }
+
+            if (hasData) {
+                if (dailyBreakdown.length() > 0) {
+                    // Split into chunks if too long
+                    String dailyContent = dailyBreakdown.toString();
+                    if (dailyContent.length() > 1024) {
+                        dailyContent = dailyContent.substring(0, 1000) + "...\n*(truncated)*";
+                    }
+                    embed.addField("Daily Breakdown", dailyContent, false);
+                }
+                
+                if (totalStats.length() > 0) {
+                    embed.addField("Weekly Totals", totalStats.toString(), true);
+                }
+            } else {
+                embed.addField("No Activity", "No moderation actions found for the last 7 days", false);
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error getting weekly moderation statistics: " + e.getMessage());
+            e.printStackTrace();
+            embed.addField("Error", "Failed to retrieve weekly statistics", false);
+        }
+
+        return embed;
+    }
+
+    /**
+     * Get appropriate emoji for moderation action type
+     */
+    private String getModerationEmoji(String actionType) {
+        switch (actionType.toUpperCase()) {
+            case "WARN": return "⚠️";
+            case "KICK": return "🦶";
+            case "BAN": return "🔨";
+            case "TEMP_BAN": return "🔨⏰";
+            case "UNBAN": return "🔓";
+            case "MUTE": return "🔇";
+            case "TEMP_MUTE": return "🔇⏰";
+            case "UNMUTE": return "🔊";
+            case "TIMEOUT": return "⏱️";
+            case "UNTIMEOUT": return "⏰";
+            default: return "⚖️";
         }
     }
 
