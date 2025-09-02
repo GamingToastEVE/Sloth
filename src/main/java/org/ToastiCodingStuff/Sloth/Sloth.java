@@ -60,31 +60,20 @@ public class Sloth {
         for (Guild guild : guilds) {
             java.util.List<String> activatedSystems = handler.getActivatedSystems(guild.getId());
             if (!activatedSystems.isEmpty()) {
-                AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
                 System.out.println("Activating stored systems for guild " + guild.getName() + " (ID: " + guild.getId() + "):");
                 
                 for (String systemType : activatedSystems) {
                     System.out.println("  - Activating " + systemType + " system");
-                    switch (systemType) {
-                        case "log-channel":
-                            adder.addLogChannelCommands();
-                            break;
-                        case "warn-system":
-                            adder.addWarnCommands();
-                            break;
-                        case "ticket-system":
-                            adder.addTicketCommands();
-                            break;
-                        case "moderation-system":
-                            adder.addModerationCommands();
-                            break;
-                    }
                 }
+                
+                // Use the new constructor and method to update all commands at once
+                AddGuildSlashCommands adder = new AddGuildSlashCommands(guild, handler);
+                adder.updateAllGuildCommands();
+            } else {
+                // If no systems are activated, just add statistics commands
+                AddGuildSlashCommands adder = new AddGuildSlashCommands(guild, handler);
+                adder.updateAllGuildCommands(); // This will add only statistics commands
             }
-            
-            // Always add statistics commands (they are not part of the system management)
-            AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
-            adder.addStatisticsCommands();
         }
         System.out.println("Finished activating stored systems for all guilds");
     }

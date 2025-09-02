@@ -39,27 +39,27 @@ public class SystemManagementCommandListener extends ListenerAdapter {
         String systemType = event.getOption("system").getAsString();
         Guild guild = event.getGuild();
         String guildId = guild.getId();
-        AddGuildSlashCommands adder = new AddGuildSlashCommands(guild);
+        
+        // Activate the system in the database first
+        databaseHandler.activateGuildSystem(guildId, systemType);
+        
+        // Use the new constructor that includes the database handler
+        AddGuildSlashCommands adder = new AddGuildSlashCommands(guild, databaseHandler);
+        
+        // Update all guild commands to include the new system and preserve existing ones
+        adder.updateAllGuildCommands();
 
         switch (systemType) {
             case "log-channel":
-                adder.addLogChannelCommands();
-                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Log channel commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "warn-system":
-                adder.addWarnCommands();
-                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Warning system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "ticket-system":
-                adder.addTicketCommands();
-                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Ticket system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             case "moderation-system":
-                adder.addModerationCommands();
-                databaseHandler.activateGuildSystem(guildId, systemType);
                 event.reply("✅ Moderation system commands have been added to this server!").setEphemeral(true).queue();
                 break;
             default:

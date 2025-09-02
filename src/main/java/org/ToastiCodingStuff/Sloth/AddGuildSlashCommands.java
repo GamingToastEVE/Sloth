@@ -4,83 +4,190 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class AddGuildSlashCommands {
     private final Guild guild;
+    private final DatabaseHandler databaseHandler;
 
     public AddGuildSlashCommands(Guild guild) {
         this.guild = guild;
+        this.databaseHandler = null; // For backwards compatibility
     }
 
+    public AddGuildSlashCommands(Guild guild, DatabaseHandler databaseHandler) {
+        this.guild = guild;
+        this.databaseHandler = databaseHandler;
+    }
+
+    /**
+     * Update guild commands for all currently activated systems
+     * This method ensures that all systems remain active when a new system is added
+     */
+    public void updateAllGuildCommands() {
+        if (databaseHandler == null) {
+            // Fallback for backwards compatibility - just add statistics
+            addStatisticsCommandsOnly();
+            return;
+        }
+
+        List<String> activatedSystems = databaseHandler.getActivatedSystems(guild.getId());
+        List<SlashCommandData> allCommands = new ArrayList<>();
+
+        // Add commands for each activated system
+        for (String systemType : activatedSystems) {
+            switch (systemType) {
+                case "log-channel":
+                    allCommands.addAll(getLogChannelCommands());
+                    break;
+                case "warn-system":
+                    allCommands.addAll(getWarnCommands());
+                    break;
+                case "ticket-system":
+                    allCommands.addAll(getTicketCommands());
+                    break;
+                case "moderation-system":
+                    allCommands.addAll(getModerationCommands());
+                    break;
+            }
+        }
+
+        // Always add statistics commands
+        allCommands.addAll(getStatisticsCommands());
+
+        // Update guild commands with all commands at once
+        guild.updateCommands().addCommands(allCommands).queue();
+    }
+
+    /**
+     * Get log channel commands without updating guild
+     */
+    private List<SlashCommandData> getLogChannelCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("set-log-channel", "Sets the log channel.")
+                .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true));
+        commands.add(Commands.slash("get-log-channel", "gets the log channel"));
+        return commands;
+    }
+
+    /**
+     * Get warn commands without updating guild
+     */
+    private List<SlashCommandData> getWarnCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("warn", "Issue a warning to a user")
+                .addOption(OptionType.USER, "user", "User to warn", true)
+                .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
+                .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false));
+        commands.add(Commands.slash("set-warn-settings", "Configure warning system settings")
+                .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
+                .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
+                .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false));
+        commands.add(Commands.slash("get-warn-settings", "View current warning system settings"));
+        return commands;
+    }
+
+    /**
+     * Get moderation commands without updating guild
+     */
+    private List<SlashCommandData> getModerationCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("kick", "Kick a user from the server")
+                .addOption(OptionType.USER, "user", "User to kick", true)
+                .addOption(OptionType.STRING, "reason", "Reason for the kick", false));
+        commands.add(Commands.slash("ban", "Ban a user from the server")
+                .addOption(OptionType.USER, "user", "User to ban", true)
+                .addOption(OptionType.STRING, "reason", "Reason for the ban", false));
+        commands.add(Commands.slash("unban", "Unban a user from the server")
+                .addOption(OptionType.STRING, "userid", "User ID to unban", true)
+                .addOption(OptionType.STRING, "reason", "Reason for the unban", false));
+        commands.add(Commands.slash("timeout", "Timeout a user for a specified duration")
+                .addOption(OptionType.USER, "user", "User to timeout", true)
+                .addOption(OptionType.INTEGER, "minutes", "Duration in minutes (max 40320 = 28 days)", true)
+                .addOption(OptionType.STRING, "reason", "Reason for the timeout", false));
+        commands.add(Commands.slash("untimeout", "Remove timeout from a user")
+                .addOption(OptionType.USER, "user", "User to remove timeout from", true)
+                .addOption(OptionType.STRING, "reason", "Reason for removing timeout", false));
+        commands.add(Commands.slash("purge", "Delete multiple messages from the channel")
+                .addOption(OptionType.INTEGER, "amount", "Number of messages to delete (1-100)", true)
+                .addOption(OptionType.USER, "user", "Only delete messages from this user", false));
+        commands.add(Commands.slash("slowmode", "Set slowmode for the current channel")
+                .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true));
+        return commands;
+    }
+
+    /**
+     * Get ticket commands without updating guild
+     */
+    private List<SlashCommandData> getTicketCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("ticket-setup", "Configure the ticket system for this server")
+                .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
+                .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
+                .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false)
+                .addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
+        commands.add(Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"));
+        commands.add(Commands.slash("close-ticket", "Close the current ticket")
+                .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false));
+        commands.add(Commands.slash("assign-ticket", "Assign current ticket to a staff member")
+                .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true));
+        commands.add(Commands.slash("set-ticket-priority", "Change the priority of the current ticket")
+                .addOptions(new OptionData(OptionType.STRING, "priority", "Priority level", true)
+                        .addChoice("Low", "LOW")
+                        .addChoice("Medium", "MEDIUM")
+                        .addChoice("High", "HIGH")
+                        .addChoice("Urgent", "URGENT")));
+        commands.add(Commands.slash("ticket-info", "Get information about the current ticket"));
+        commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
+        return commands;
+    }
+
+    /**
+     * Get statistics commands without updating guild
+     */
+    private List<SlashCommandData> getStatisticsCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("stats-today", "View today's server moderation statistics"));
+        commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
+        commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
+                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
+        return commands;
+    }
+
+    // The old methods are kept for backwards compatibility but now use the new approach
     public void addLogChannelCommands () {
-        guild.updateCommands().addCommands(
-                Commands.slash("set-log-channel", "Sets the log channel.")
-                        .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true),
-                Commands.slash("get-log-channel", "gets the log channel")
-        ).queue();
+        if (databaseHandler != null) {
+            updateAllGuildCommands();
+        } else {
+            guild.updateCommands().addCommands(getLogChannelCommands()).queue();
+        }
     }
 
     public void addWarnCommands() {
-        guild.updateCommands().addCommands(
-                Commands.slash("warn", "Issue a warning to a user")
-                        .addOption(OptionType.USER, "user", "User to warn", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
-                        .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
-                Commands.slash("set-warn-settings", "Configure warning system settings")
-                        .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
-                        .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
-                        .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
-                Commands.slash("get-warn-settings", "View current warning system settings")
-        ).queue();
+        if (databaseHandler != null) {
+            updateAllGuildCommands();
+        } else {
+            guild.updateCommands().addCommands(getWarnCommands()).queue();
+        }
     }
 
     public void addModerationCommands() {
-        guild.updateCommands().addCommands(
-                Commands.slash("kick", "Kick a user from the server")
-                        .addOption(OptionType.USER, "user", "User to kick", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the kick", false),
-                Commands.slash("ban", "Ban a user from the server")
-                        .addOption(OptionType.USER, "user", "User to ban", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the ban", false),
-                Commands.slash("unban", "Unban a user from the server")
-                        .addOption(OptionType.STRING, "userid", "User ID to unban", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the unban", false),
-                Commands.slash("timeout", "Timeout a user for a specified duration")
-                        .addOption(OptionType.USER, "user", "User to timeout", true)
-                        .addOption(OptionType.INTEGER, "minutes", "Duration in minutes (max 40320 = 28 days)", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for the timeout", false),
-                Commands.slash("untimeout", "Remove timeout from a user")
-                        .addOption(OptionType.USER, "user", "User to remove timeout from", true)
-                        .addOption(OptionType.STRING, "reason", "Reason for removing timeout", false),
-                Commands.slash("purge", "Delete multiple messages from the channel")
-                        .addOption(OptionType.INTEGER, "amount", "Number of messages to delete (1-100)", true)
-                        .addOption(OptionType.USER, "user", "Only delete messages from this user", false),
-                Commands.slash("slowmode", "Set slowmode for the current channel")
-                        .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true)
-        ).queue();
+        if (databaseHandler != null) {
+            updateAllGuildCommands();
+        } else {
+            guild.updateCommands().addCommands(getModerationCommands()).queue();
+        }
     }
 
     public void addTicketCommands() {
-        guild.updateCommands().addCommands(
-                Commands.slash("ticket-setup", "Configure the ticket system for this server")
-                        .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
-                        .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
-                        .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false)
-                        .addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false),
-                Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"),
-                Commands.slash("close-ticket", "Close the current ticket")
-                        .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
-                Commands.slash("assign-ticket", "Assign current ticket to a staff member")
-                        .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
-                Commands.slash("set-ticket-priority", "Change the priority of the current ticket")
-                        .addOptions(new OptionData(OptionType.STRING, "priority", "Priority level", true)
-                                .addChoice("Low", "LOW")
-                                .addChoice("Medium", "MEDIUM")
-                                .addChoice("High", "HIGH")
-                                .addChoice("Urgent", "URGENT")),
-                Commands.slash("ticket-info", "Get information about the current ticket"),
-                Commands.slash("ticket-transcript", "Generate a transcript of the current ticket")
-        ).queue();
+        if (databaseHandler != null) {
+            updateAllGuildCommands();
+        } else {
+            guild.updateCommands().addCommands(getTicketCommands()).queue();
+        }
     }
 
     /*public void addSystemManagementCommands() {
@@ -97,11 +204,17 @@ public class AddGuildSlashCommands {
     }*/
 
     public void addStatisticsCommands() {
-        guild.updateCommands().addCommands(
-                Commands.slash("stats-today", "View today's server moderation statistics"),
-                Commands.slash("stats-week", "View this week's server moderation statistics"),
-                Commands.slash("stats-date", "View server statistics for a specific date")
-                        .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true)
-        ).queue();
+        if (databaseHandler != null) {
+            updateAllGuildCommands();
+        } else {
+            addStatisticsCommandsOnly();
+        }
+    }
+
+    /**
+     * Add only statistics commands without checking for other systems
+     */
+    private void addStatisticsCommandsOnly() {
+        guild.updateCommands().addCommands(getStatisticsCommands()).queue();
     }
 }
