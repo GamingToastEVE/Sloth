@@ -64,6 +64,8 @@ public class TicketCommandListener extends ListenerAdapter {
             handleCreateTicketButton(event);
         } else if (customId.equals("close_ticket_confirm")) {
             handleCloseTicketConfirm(event);
+        } else if (customId.equals("delete_channel")) {
+            handleDeleteChannel(event);
         }
     }
 
@@ -343,11 +345,51 @@ public class TicketCommandListener extends ListenerAdapter {
                     .addField("Closed at", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
                     .setColor(Color.RED);
 
-            event.replyEmbeds(embed.build()).queue();
+            Button deleteChannelButton = Button.danger("delete_channel", "🗑️ Delete Channel");
+
+            event.replyEmbeds(embed.build()).setActionRow(deleteChannelButton).queue();
             channel.getManager().setName("closed-" + channel.getName()).queue();
         } else {
             event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
         }
+    }
+
+    private void handleDeleteChannel(ButtonInteractionEvent event) {
+        if (!Objects.equals(event.getButton().getId(), "delete_channel")) {
+            return;
+        }
+
+        TextChannel channel = event.getChannel().asTextChannel();
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        
+        // Check if this is a closed ticket channel (should start with "closed-")
+        if (!channel.getName().startsWith("closed-")) {
+            event.reply("❌ This channel cannot be deleted. Only closed ticket channels can be deleted.").setEphemeral(true).queue();
+            return;
+        }
+        
+        // Check if user has permission to delete the channel
+        // Support role members or users with manage channels permission can delete
+        String supportRoleId = handler.getTicketRole(guildId);
+        boolean hasPermission = false;
+        
+        if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
+                .anyMatch(role -> role.getId().equals(supportRoleId))) {
+            hasPermission = true;
+        } else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
+            hasPermission = true;
+        }
+
+        if (!hasPermission) {
+            event.reply("❌ You don't have permission to delete this channel.").setEphemeral(true).queue();
+            return;
+        }
+
+        // Acknowledge the interaction and delete the channel
+        event.reply("🗑️ Deleting channel...").setEphemeral(true).queue(
+            success -> channel.delete().reason("Ticket channel deleted by " + event.getUser().getEffectiveName()).queue(),
+            error -> event.reply("❌ Failed to delete channel.").setEphemeral(true).queue()
+        );
     }
 
     private void handleAssignTicket(SlashCommandInteractionEvent event, String guildId) {
