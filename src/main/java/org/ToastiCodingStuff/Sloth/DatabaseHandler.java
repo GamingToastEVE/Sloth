@@ -1085,7 +1085,7 @@ public class DatabaseHandler {
     /**
      * Create a new ticket
      */
-    public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority) {
+    public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority, String username, String discriminator, String avatarUrl) {
         try {
             // Ensure the guild exists in the guilds table
             String checkGuildQuery = "SELECT id FROM guilds WHERE id = ?";
@@ -1100,18 +1100,8 @@ public class DatabaseHandler {
                 insertGuildStmt.executeUpdate();
             }
 
-            // Ensure the user exists in the users table
-            String checkUserQuery = "SELECT id FROM users WHERE id = ?";
-            PreparedStatement checkUserStmt = connection.prepareStatement(checkUserQuery);
-            checkUserStmt.setString(1, userId);
-            ResultSet userResult = checkUserStmt.executeQuery();
-
-            if (!userResult.next()) {
-                String insertUserQuery = "INSERT INTO users (id) VALUES (?)";
-                PreparedStatement insertUserStmt = connection.prepareStatement(insertUserQuery);
-                insertUserStmt.setString(1, userId);
-                insertUserStmt.executeUpdate();
-            }
+            // Ensure the user exists in the users table with full data
+            insertOrUpdateUser(userId, username, discriminator, avatarUrl);
 
             // Insert the ticket
             String insertTicket = "INSERT INTO tickets (guild_id, user_id, channel_id, category, subject, priority, status) VALUES (?, ?, ?, ?, ?, ?, 'OPEN')";
