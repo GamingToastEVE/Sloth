@@ -39,12 +39,11 @@ public class Sloth {
                 .addChoice("Ticket System", "ticket-system")
                 .addChoice("Moderation System", "moderation-system");
 
-        api.updateCommands().addCommands(
-                Commands.slash("add-system", "Add commands for a specific system")
-                        .addOptions(systemOption),
-                Commands.slash("list-systems", "Show which systems are currently activated on this server"),
-                Commands.slash("help", "Show help and documentation for Sloth bot")
-        ).queue();
+        // Register global commands using upsertCommand to avoid replacing existing commands
+        api.upsertCommand(Commands.slash("add-system", "Add commands for a specific system")
+                .addOptions(systemOption)).queue();
+        api.upsertCommand(Commands.slash("list-systems", "Show which systems are currently activated on this server")).queue();
+        api.upsertCommand(Commands.slash("help", "Show help and documentation for Sloth bot")).queue();
         
         // Sync all current guilds to database
         handler.syncGuilds(api.getGuilds());
