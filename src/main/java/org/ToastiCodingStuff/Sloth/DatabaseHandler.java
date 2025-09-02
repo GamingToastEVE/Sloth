@@ -65,6 +65,9 @@ public class DatabaseHandler {
             createGuildsTable();
             createGuildSystemsTable();
             
+            // Handle statistics table migrations
+            migrateStatisticsTable();
+            
             // Create legacy tables for backward compatibility
             createLegacyTables();
             
@@ -332,6 +335,8 @@ public class DatabaseHandler {
             "warnings_issued INTEGER DEFAULT 0, " +
             "kicks_performed INTEGER DEFAULT 0, " +
             "bans_performed INTEGER DEFAULT 0, " +
+            "timeouts_performed INTEGER DEFAULT 0, " +
+            "untimeouts_performed INTEGER DEFAULT 0, " +
             "tickets_created INTEGER DEFAULT 0, " +
             "tickets_closed INTEGER DEFAULT 0, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
@@ -340,6 +345,36 @@ public class DatabaseHandler {
             ")";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
+    }
+
+    /**
+     * Migrate existing statistics table to add timeout columns
+     */
+    private void migrateStatisticsTable() throws SQLException {
+        Statement stmt = connection.createStatement();
+        
+        // Check if timeout columns already exist
+        String checkColumns = "PRAGMA table_info(statistics)";
+        ResultSet rs = stmt.executeQuery(checkColumns);
+        boolean hasTimeouts = false;
+        boolean hasUntimeouts = false;
+        
+        while (rs.next()) {
+            String columnName = rs.getString("name");
+            if ("timeouts_performed".equals(columnName)) {
+                hasTimeouts = true;
+            } else if ("untimeouts_performed".equals(columnName)) {
+                hasUntimeouts = true;
+            }
+        }
+        
+        // Add missing columns
+        if (!hasTimeouts) {
+            stmt.execute("ALTER TABLE statistics ADD COLUMN timeouts_performed INTEGER DEFAULT 0");
+        }
+        if (!hasUntimeouts) {
+            stmt.execute("ALTER TABLE statistics ADD COLUMN untimeouts_performed INTEGER DEFAULT 0");
+        }
     }
 
     /**
@@ -1344,6 +1379,20 @@ public class DatabaseHandler {
     }
 
     /**
+     * Increment timeouts performed count for a guild
+     */
+    public void incrementTimeoutsPerformed(String guildId) {
+        updateStatistics(guildId, "timeouts_performed", 1);
+    }
+
+    /**
+     * Increment untimeouts performed count for a guild
+     */
+    public void incrementUntimeoutsPerformed(String guildId) {
+        updateStatistics(guildId, "untimeouts_performed", 1);
+    }
+
+    /**
      * Increment tickets created count for a guild
      */
     public void incrementTicketsCreated(String guildId) {
@@ -1362,7 +1411,7 @@ public class DatabaseHandler {
      */
     public String getStatisticsForDate(String guildId, String date) {
         try {
-            String query = "SELECT warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed " +
+            String query = "SELECT warnings_issued, kicks_performed, bans_performed, timeouts_performed, untimeouts_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1375,6 +1424,8 @@ public class DatabaseHandler {
                 result.append("🔸 Warnings Issued: ").append(rs.getInt("warnings_issued")).append("\n");
                 result.append("🦶 Kicks Performed: ").append(rs.getInt("kicks_performed")).append("\n");
                 result.append("🔨 Bans Performed: ").append(rs.getInt("bans_performed")).append("\n");
+                result.append("⏱️ Timeouts Performed: ").append(rs.getInt("timeouts_performed")).append("\n");
+                result.append("⏰ Untimeouts Performed: ").append(rs.getInt("untimeouts_performed")).append("\n");
                 result.append("🎫 Tickets Created: ").append(rs.getInt("tickets_created")).append("\n");
                 result.append("✅ Tickets Closed: ").append(rs.getInt("tickets_closed"));
                 return result.toString();
@@ -1400,7 +1451,7 @@ public class DatabaseHandler {
      */
     public String getWeeklyStatistics(String guildId) {
         try {
-            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, tickets_created, tickets_closed " +
+            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, timeouts_performed, untimeouts_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date >= date('now', '-7 days') ORDER BY date DESC";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1409,7 +1460,7 @@ public class DatabaseHandler {
             StringBuilder result = new StringBuilder();
             result.append("**Weekly Statistics (Last 7 Days):**\n");
             
-            int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTicketsCreated = 0, totalTicketsClosed = 0;
+            int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTimeouts = 0, totalUntimeouts = 0, totalTicketsCreated = 0, totalTicketsClosed = 0;
             boolean hasData = false;
             
             while (rs.next()) {
@@ -1418,17 +1469,22 @@ public class DatabaseHandler {
                 int warnings = rs.getInt("warnings_issued");
                 int kicks = rs.getInt("kicks_performed");
                 int bans = rs.getInt("bans_performed");
+                int timeouts = rs.getInt("timeouts_performed");
+                int untimeouts = rs.getInt("untimeouts_performed");
                 int ticketsCreated = rs.getInt("tickets_created");
                 int ticketsClosed = rs.getInt("tickets_closed");
                 
                 totalWarnings += warnings;
                 totalKicks += kicks;
                 totalBans += bans;
+                totalTimeouts += timeouts;
+                totalUntimeouts += untimeouts;
                 totalTicketsCreated += ticketsCreated;
                 totalTicketsClosed += ticketsClosed;
                 
                 result.append("\n**").append(date).append(":**\n");
                 result.append("🔸 ").append(warnings).append(" | 🦶 ").append(kicks).append(" | 🔨 ").append(bans);
+                result.append(" | ⏱️ ").append(timeouts).append(" | ⏰ ").append(untimeouts);
                 result.append(" | 🎫 ").append(ticketsCreated).append(" | ✅ ").append(ticketsClosed);
             }
             
@@ -1437,6 +1493,8 @@ public class DatabaseHandler {
                 result.append("🔸 Warnings: ").append(totalWarnings).append("\n");
                 result.append("🦶 Kicks: ").append(totalKicks).append("\n");
                 result.append("🔨 Bans: ").append(totalBans).append("\n");
+                result.append("⏱️ Timeouts: ").append(totalTimeouts).append("\n");
+                result.append("⏰ Untimeouts: ").append(totalUntimeouts).append("\n");
                 result.append("🎫 Tickets Created: ").append(totalTicketsCreated).append("\n");
                 result.append("✅ Tickets Closed: ").append(totalTicketsClosed);
                 return result.toString();

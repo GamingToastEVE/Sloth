@@ -279,6 +279,9 @@ public class ModerationCommandListener extends ListenerAdapter {
                         .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT", reason, duration.toString(), expiresAt);
                 
+                // Update statistics
+                handler.incrementTimeoutsPerformed(guildId);
+                
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "TIMEOUT (" + minutes + "m)", targetName, moderatorName, reason);
             },
@@ -331,6 +334,9 @@ public class ModerationCommandListener extends ListenerAdapter {
                 
                 // Log moderation action
                 handler.insertModerationAction(guildId, userId, moderatorId, "UNTIMEOUT", reason, null, null);
+                
+                // Update statistics
+                handler.incrementUntimeoutsPerformed(guildId);
                 
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "UNTIMEOUT", targetName, moderatorName, reason);

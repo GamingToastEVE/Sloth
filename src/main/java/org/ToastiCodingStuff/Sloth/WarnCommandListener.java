@@ -96,6 +96,9 @@ public class WarnCommandListener extends ListenerAdapter {
                                             .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                                     handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT", 
                                         "Maximum warnings reached", timeoutDuration.toString(), timeoutExpiresAt);
+                                    
+                                    // Update statistics
+                                    handler.incrementTimeoutsPerformed(guildId);
                                 },
                                 error -> {
                                     // Handle timeout failure silently - warning was still issued
