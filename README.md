@@ -71,17 +71,6 @@ Use the `/help` command to access Sloth's interactive help system. The help syst
 
 Navigate between help sections using the interactive buttons.
 
-### System Management
-
-Use the `/add-system` command to activate different systems on your server:
-
-```
-/add-system system:Log Channel System
-/add-system system:Warning System  
-/add-system system:Ticket System
-/add-system system:Moderation System
-```
-
 ### Available Systems
 
 #### Log Channel System
