@@ -32,24 +32,33 @@ public class Sloth {
 
         api.upsertCommand(Commands.slash("help", "Show help and documentation for Sloth bot")).queue();
         
+        // Register all system commands globally
+        registerGlobalCommands(api, handler);
+        
         // Sync all current guilds to database
         handler.syncGuilds(api.getGuilds());
-        
-        // Automatically activate systems for all guilds based on database
-        activateStoredSystems(handler, api.getGuilds());
     }
     
     /**
-     * Add all system commands to all guilds
+     * Register all system commands globally
      */
-    private static void activateStoredSystems(DatabaseHandler handler, java.util.List<Guild> guilds) {
-        for (Guild guild : guilds) {
-            System.out.println("Adding all system commands to guild " + guild.getName() + " (ID: " + guild.getId() + ")");
-            
-            // Add all commands to every guild
-            AddGuildSlashCommands adder = new AddGuildSlashCommands(guild, handler);
-            adder.updateAllGuildCommands();
+    private static void registerGlobalCommands(JDA api, DatabaseHandler handler) {
+        System.out.println("Registering all system commands globally...");
+        
+        // Create a temporary AddGuildSlashCommands instance to get command lists
+        // We can use null guild since we only need the command definitions
+        AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(null, handler);
+        
+        // Get all commands and register them globally
+        java.util.List<net.dv8tion.jda.api.interactions.commands.build.SlashCommandData> allCommands = new java.util.ArrayList<>();
+        allCommands.addAll(commandProvider.getAllCommands());
+        
+        // Register each command globally
+        for (net.dv8tion.jda.api.interactions.commands.build.SlashCommandData command : allCommands) {
+            api.upsertCommand(command).queue();
+            System.out.println("Registered global command: " + command.getName());
         }
-        System.out.println("Finished adding all commands to all guilds");
+        
+        System.out.println("Finished registering " + allCommands.size() + " global commands");
     }
 }

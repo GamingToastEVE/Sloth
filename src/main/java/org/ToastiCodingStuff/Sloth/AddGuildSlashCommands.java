@@ -22,12 +22,11 @@ public class AddGuildSlashCommands {
         this.guild = guild;
         this.databaseHandler = databaseHandler;
     }
-
+    
     /**
-     * Update guild commands for all systems
-     * This method adds commands from all systems to the guild
+     * Get all commands from all systems - used for global command registration
      */
-    public void updateAllGuildCommands() {
+    public List<SlashCommandData> getAllCommands() {
         List<SlashCommandData> allCommands = new ArrayList<>();
 
         // Add commands for all systems
@@ -36,6 +35,23 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTicketCommands());
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
+        
+        return allCommands;
+    }
+
+    /**
+     * Update guild commands for all systems
+     * This method adds commands from all systems to the guild
+     * @deprecated Commands are now registered globally. This method is kept for compatibility.
+     */
+    @Deprecated
+    public void updateAllGuildCommands() {
+        if (guild == null) {
+            System.out.println("Warning: Cannot update guild commands - guild is null. Commands should be registered globally.");
+            return;
+        }
+        
+        List<SlashCommandData> allCommands = getAllCommands();
 
         // Upsert guild commands to avoid replacing existing commands
         for (SlashCommandData command : allCommands) {
