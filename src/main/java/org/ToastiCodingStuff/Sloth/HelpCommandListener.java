@@ -75,7 +75,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• **Ticket System** - Professional support channel management\n" +
                                 "• **Statistics Tracking** - Monitor server engagement\n\n" +
                                 "**Getting Started:**\n" +
-                                "1. Use `/add-system` to activate desired systems\n" +
+                                "1. All systems are available to use immediately\n" +
                                 "2. Configure each system using setup commands\n" +
                                 "3. Start managing your server more effectively!")
                         .setColor(Color.GREEN)
@@ -114,7 +114,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Daily and weekly reports\n" +
                                 "• Engagement metrics", false)
                         .setColor(Color.ORANGE)
-                        .setFooter("Use /add-system to activate any system");
+                        .setFooter("All systems are ready to use!");
 
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
@@ -128,10 +128,10 @@ public class HelpCommandListener extends ListenerAdapter {
             case "setup":
                 embed.setTitle("📋 System Setup Guide")
                         .setDescription("Follow these steps to configure Sloth for your server:\n\n")
-                        .addField("**Step 1: Activate Systems**", 
-                                "Use `/add-system` to activate the systems you want:\n" +
-                                "• Choose from: Log Channel, Warning, Ticket, Moderation\n" +
-                                "• Each system adds its own commands", false)
+                        .addField("**Step 1: Choose Systems to Configure**", 
+                                "All systems are available to use:\n" +
+                                "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
+                                "• Configure only the ones you need", false)
                         .addField("**Step 2: Configure Systems**", 
                                 "**Log Channel:** `/set-log-channel #channel`\n" +
                                 "**Warning System:** `/set-warn-settings`\n" +
@@ -159,10 +159,6 @@ public class HelpCommandListener extends ListenerAdapter {
             case "commands":
                 embed.setTitle("📖 Command Reference")
                         .setDescription("Complete list of available commands by system:\n\n")
-                        .addField("**System Management**", 
-                                "`/add-system` - Activate a system for your server\n" +
-                                "`/list-systems` - View activated systems\n" +
-                                "`/help` - Show this help system", false)
                         .addField("**Log Channel System**", 
                                 "`/set-log-channel` - Configure logging channel\n" +
                                 "`/get-log-channel` - View current log channel", false)
@@ -186,6 +182,8 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
                                 "`/stats-date` - Statistics for specific date", false)
+                        .addField("**General Commands**", 
+                                "`/help` - Show this help system", false)
                         .setColor(Color.MAGENTA)
                         .setFooter("All commands require appropriate permissions");
 
