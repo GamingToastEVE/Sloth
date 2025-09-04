@@ -24,38 +24,17 @@ public class AddGuildSlashCommands {
     }
 
     /**
-     * Update guild commands for all currently activated systems
-     * This method ensures that all systems remain active when a new system is added
+     * Update guild commands for all systems
+     * This method adds commands from all systems to the guild
      */
     public void updateAllGuildCommands() {
-        if (databaseHandler == null) {
-            // Fallback for backwards compatibility - just add statistics
-            addStatisticsCommandsOnly();
-            return;
-        }
-
-        List<String> activatedSystems = databaseHandler.getActivatedSystems(guild.getId());
         List<SlashCommandData> allCommands = new ArrayList<>();
 
-        // Add commands for each activated system
-        for (String systemType : activatedSystems) {
-            switch (systemType) {
-                case "log-channel":
-                    allCommands.addAll(getLogChannelCommands());
-                    break;
-                case "warn-system":
-                    allCommands.addAll(getWarnCommands());
-                    break;
-                case "ticket-system":
-                    allCommands.addAll(getTicketCommands());
-                    break;
-                case "moderation-system":
-                    allCommands.addAll(getModerationCommands());
-                    break;
-            }
-        }
-
-        // Always add statistics commands
+        // Add commands for all systems
+        allCommands.addAll(getLogChannelCommands());
+        allCommands.addAll(getWarnCommands());
+        allCommands.addAll(getTicketCommands());
+        allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
 
         // Upsert guild commands to avoid replacing existing commands
@@ -161,70 +140,24 @@ public class AddGuildSlashCommands {
 
     // The old methods are kept for backwards compatibility but now use the new approach
     public void addLogChannelCommands () {
-        if (databaseHandler != null) {
-            updateAllGuildCommands();
-        } else {
-            for (SlashCommandData command : getLogChannelCommands()) {
-                guild.upsertCommand(command).queue();
-            }
-        }
+        updateAllGuildCommands();
     }
 
     public void addWarnCommands() {
-        if (databaseHandler != null) {
-            updateAllGuildCommands();
-        } else {
-            for (SlashCommandData command : getWarnCommands()) {
-                guild.upsertCommand(command).queue();
-            }
-        }
+        updateAllGuildCommands();
     }
 
     public void addModerationCommands() {
-        if (databaseHandler != null) {
-            updateAllGuildCommands();
-        } else {
-            for (SlashCommandData command : getModerationCommands()) {
-                guild.upsertCommand(command).queue();
-            }
-        }
+        updateAllGuildCommands();
     }
 
     public void addTicketCommands() {
-        if (databaseHandler != null) {
-            updateAllGuildCommands();
-        } else {
-            for (SlashCommandData command : getTicketCommands()) {
-                guild.upsertCommand(command).queue();
-            }
-        }
+        updateAllGuildCommands();
     }
-
-    /*public void addSystemManagementCommands() {
-        OptionData systemOption = new OptionData(OptionType.STRING, "system", "Which system to add", true)
-                .addChoice("Log Channel System", "log-channel")
-                .addChoice("Warning System", "warn-system")
-                .addChoice("Ticket System", "ticket-system")
-                .addChoice("Moderation System", "moderation-system");
-
-        guild.upsertCommand(Commands.slash("add-system", "Add commands for a specific system")
-                .addOptions(systemOption)).queue();
-    }*/
 
     public void addStatisticsCommands() {
-        if (databaseHandler != null) {
-            updateAllGuildCommands();
-        } else {
-            addStatisticsCommandsOnly();
-        }
+        updateAllGuildCommands();
     }
 
-    /**
-     * Add only statistics commands without checking for other systems
-     */
-    private void addStatisticsCommandsOnly() {
-        for (SlashCommandData command : getStatisticsCommands()) {
-            guild.upsertCommand(command).queue();
-        }
-    }
+
 }
