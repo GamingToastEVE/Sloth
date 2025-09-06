@@ -116,6 +116,10 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Server activity tracking\n" +
                                 "• Daily and weekly reports\n" +
                                 "• Engagement metrics", false)
+                        .addField("📝 **Embed System**", 
+                                "• Create custom embed templates\n" +
+                                "• Reuse embeds across channels\n" +
+                                "• Professional message formatting", false)
                         .setColor(Color.ORANGE)
                         .setFooter("All systems are ready to use!");
 
@@ -187,6 +191,12 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
                                 "`/stats-date` - Statistics for specific date", false)
+                        .addField("**Embed System**", 
+                                "`/embed-create` - Create custom embed template\n" +
+                                "`/embed-send` - Send a saved embed template\n" +
+                                "`/embed-list` - List all embed templates\n" +
+                                "`/embed-edit` - Edit existing template\n" +
+                                "`/embed-delete` - Delete embed template", false)
                         .addField("**General Commands**", 
                                 "`/help` - Show this help system", false)
                         .setColor(Color.MAGENTA)
