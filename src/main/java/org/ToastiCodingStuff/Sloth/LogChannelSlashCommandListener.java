@@ -29,7 +29,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
                 event.reply("Log Channel set to: " + channel.getAsMention()).queue();
                 return;
             }
-            event.reply("Couldnt find a Log Channel.").queue();
+            event.reply("Couldn't find a Log Channel.").queue();
         }
     }
 }

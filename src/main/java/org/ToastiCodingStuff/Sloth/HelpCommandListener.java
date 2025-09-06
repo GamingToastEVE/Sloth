@@ -52,6 +52,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference\n" +
                                 "📜 **Legal** - Terms of Service and Privacy Policy\n" +
+                                "💡 **Support Development** - How to support the bot\n\n" +
                                 "Note: this bot is completely reworked and settings from the old version will not carry over.")
                         .setColor(Color.BLUE)
                         .setFooter("Use the buttons below to navigate");
@@ -61,6 +62,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
                         Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -86,6 +88,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
                         Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -121,6 +124,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_setup", "📋 Setup"),
                         Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -152,6 +156,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -192,6 +197,29 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_legal", "📜 Legal")
+                );
+                break;
+
+            case "support_developement":
+                embed.setTitle("💡 Support Development")
+                        .setDescription("Sloth is free to use, but development and hosting incur costs.\n\n" +
+                                "**Ways to Support:**\n" +
+                                "• **Donate:** https://https://ko-fi.com/gamingtoast27542\n + " +
+                                "• **Feedback:** Join our [Support Server](https://discord.gg/dQT53fD8M5) to share ideas and report issues.\n" +
+                                "• **Spread the Word:** Recommend Sloth to other server admins.\n" +
+                                "\nEvery bit of support helps keep Sloth running and improving!" +
+                                "\n\nThank you for considering supporting Sloth!");
+                embed.setColor(Color.PINK)
+                        .setFooter("Navigate using buttons below");
+                actionRow = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home"),
+                        Button.primary("help_overview", "🏠 Overview"),
+                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.link("https://ko-fi.com/gamingtoast27542", "💡 Donate"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -219,16 +247,17 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "For questions about Terms of Service or Privacy Policy:\n" +
                                 "• Discord: **gamingtoasti**\n" +
                                 "• Support Server: https://discord.gg/dQT53fD8M5", false)
-                        .addField("📂 **Source Code**", "https://github.com/GamingToastEVE/Delta", false)
                         .setColor(Color.GRAY)
-                        .setFooter("Last updated: 30.8.25 • Navigate using buttons below");
+                        .setFooter("Last updated: 06.09.25 • Navigate using buttons below");
 
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.link("https://github.com/GamingToastEVE/Delta", "📄 View on GitHub")
                 );
                 break;
 

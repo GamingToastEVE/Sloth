@@ -88,7 +88,8 @@ public class TicketCommandListener extends ListenerAdapter {
         Category category = Objects.requireNonNull(event.getOption("category")).getAsChannel().asCategory();
         TextChannel channel = Objects.requireNonNull(event.getOption("channel")).getAsChannel().asTextChannel();
         Role supportRole = event.getOption("support_role") != null ? Objects.requireNonNull(event.getOption("support_role")).getAsRole() : null;
-        boolean transcriptEnabled = event.getOption("transcript_enabled") == null || Objects.requireNonNull(event.getOption("transcript_enabled")).getAsBoolean();
+        //boolean transcriptEnabled = event.getOption("transcript_enabled") == null || Objects.requireNonNull(event.getOption("transcript_enabled")).getAsBoolean();
+        boolean transcriptEnabled = false; // Default to false for now
 
         String supportRoleId = supportRole != null ? supportRole.getId() : null;
         
@@ -101,7 +102,7 @@ public class TicketCommandListener extends ListenerAdapter {
                     .addField("Ticket Category", category.getAsMention(), true)
                     .addField("Ticket Panel Channel", channel.getAsMention(), true)
                     .addField("Support Role", supportRole != null ? supportRole.getAsMention() : "None", true)
-                    .addField("Transcripts Enabled", transcriptEnabled ? "Yes" : "No", true)
+                    //.addField("Transcripts Enabled", transcriptEnabled ? "Yes" : "No", true)
                     .setColor(Color.GREEN);
             
             event.replyEmbeds(embed.build()).queue();

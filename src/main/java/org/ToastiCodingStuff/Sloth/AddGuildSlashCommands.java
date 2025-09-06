@@ -22,7 +22,7 @@ public class AddGuildSlashCommands {
         this.guild = guild;
         this.databaseHandler = databaseHandler;
     }
-    
+
     /**
      * Get all commands from all systems - used for global command registration
      */
@@ -35,7 +35,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTicketCommands());
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
-        
+
         return allCommands;
     }
 
@@ -50,7 +50,7 @@ public class AddGuildSlashCommands {
             System.out.println("Warning: Cannot update guild commands - guild is null. Commands should be registered globally.");
             return;
         }
-        
+
         List<SlashCommandData> allCommands = getAllCommands();
 
         // Upsert guild commands to avoid replacing existing commands
@@ -124,8 +124,8 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("ticket-setup", "Configure the ticket system for this server")
                 .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
                 .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
-                .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false)
-                .addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
+                .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false));
+                //.addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
         commands.add(Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"));
         commands.add(Commands.slash("close-ticket", "Close the current ticket")
                 .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false));
@@ -138,7 +138,7 @@ public class AddGuildSlashCommands {
                         .addChoice("High", "HIGH")
                         .addChoice("Urgent", "URGENT")));
         commands.add(Commands.slash("ticket-info", "Get information about the current ticket"));
-        commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
+        //commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
         return commands;
     }
 
