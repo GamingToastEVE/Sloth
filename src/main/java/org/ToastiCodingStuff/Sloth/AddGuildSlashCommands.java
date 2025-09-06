@@ -35,6 +35,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTicketCommands());
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
+        allCommands.addAll(getEmbedCommands());
 
         return allCommands;
     }
@@ -154,6 +155,32 @@ public class AddGuildSlashCommands {
         return commands;
     }
 
+    /**
+     * Get embed commands without updating guild
+     */
+    private List<SlashCommandData> getEmbedCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("embed-create", "Create a custom embed template")
+                .addOption(OptionType.STRING, "name", "Name for the embed template", true)
+                .addOption(OptionType.STRING, "title", "Title of the embed", true)
+                .addOption(OptionType.STRING, "description", "Description of the embed", false)
+                .addOption(OptionType.STRING, "color", "Color of the embed (hex code like #FF0000)", false)
+                .addOption(OptionType.STRING, "footer", "Footer text of the embed", false));
+        commands.add(Commands.slash("embed-send", "Send a saved embed template")
+                .addOption(OptionType.STRING, "name", "Name of the embed template to send", true)
+                .addOption(OptionType.CHANNEL, "channel", "Channel to send the embed to (defaults to current)", false));
+        commands.add(Commands.slash("embed-list", "List all saved embed templates"));
+        commands.add(Commands.slash("embed-edit", "Edit an existing embed template")
+                .addOption(OptionType.STRING, "name", "Name of the embed template to edit", true)
+                .addOption(OptionType.STRING, "title", "New title of the embed", false)
+                .addOption(OptionType.STRING, "description", "New description of the embed", false)
+                .addOption(OptionType.STRING, "color", "New color of the embed (hex code like #FF0000)", false)
+                .addOption(OptionType.STRING, "footer", "New footer text of the embed", false));
+        commands.add(Commands.slash("embed-delete", "Delete an embed template")
+                .addOption(OptionType.STRING, "name", "Name of the embed template to delete", true));
+        return commands;
+    }
+
     // The old methods are kept for backwards compatibility but now use the new approach
     public void addLogChannelCommands () {
         updateAllGuildCommands();
@@ -172,6 +199,10 @@ public class AddGuildSlashCommands {
     }
 
     public void addStatisticsCommands() {
+        updateAllGuildCommands();
+    }
+
+    public void addEmbedCommands() {
         updateAllGuildCommands();
     }
 

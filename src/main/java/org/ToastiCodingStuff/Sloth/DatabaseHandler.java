@@ -64,6 +64,7 @@ public class DatabaseHandler {
             createTemporaryDataTable();
             createGuildsTable();
             createGuildSystemsTable();
+            createEmbedTemplatesTable();
             
             // Handle statistics table migrations
             migrateStatisticsTable();
@@ -425,6 +426,42 @@ public class DatabaseHandler {
             "FOR EACH ROW " +
             "BEGIN " +
                 "UPDATE guild_systems SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+            "END";
+        stmt.execute(trigger);
+    }
+
+    /**
+     * Create embed_templates table for storing custom embed configurations
+     */
+    private void createEmbedTemplatesTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS embed_templates (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "guild_id INTEGER NOT NULL, " +
+            "name TEXT NOT NULL, " +
+            "title TEXT NOT NULL, " +
+            "description TEXT, " +
+            "color TEXT, " +
+            "footer TEXT, " +
+            "created_by INTEGER NOT NULL, " +
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
+            "FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE, " +
+            "UNIQUE(guild_id, name)" +
+            ")";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+        
+        // Create indexes
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_embed_templates_guild ON embed_templates(guild_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_embed_templates_name ON embed_templates(guild_id, name)");
+        
+        // Create trigger for updated_at
+        String trigger = "CREATE TRIGGER IF NOT EXISTS update_embed_templates_updated_at " +
+            "AFTER UPDATE ON embed_templates " +
+            "FOR EACH ROW " +
+            "BEGIN " +
+                "UPDATE embed_templates SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
             "END";
         stmt.execute(trigger);
     }
@@ -1758,6 +1795,186 @@ public class DatabaseHandler {
                     logChannel.sendMessageEmbeds(embed.build()).queue();
                 }
             }
+        }
+    }
+
+    // Embed template management methods
+
+    /**
+     * Create a new embed template
+     */
+    public boolean createEmbedTemplate(String guildId, String userId, String name, String title, String description, String color, String footer) {
+        try {
+            // Ensure guild exists
+            ensureGuildExists(guildId);
+            
+            // Ensure user exists (simplified - just insert if not exists)
+            ensureUserExists(userId);
+
+            String insertQuery = "INSERT INTO embed_templates (guild_id, name, title, description, color, footer, created_by) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setString(3, title);
+            stmt.setString(4, description);
+            stmt.setString(5, color);
+            stmt.setString(6, footer);
+            stmt.setString(7, userId);
+            
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+            
+        } catch (SQLException e) {
+            System.err.println("Error creating embed template: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get an embed template by guild and name
+     */
+    public java.util.Map<String, String> getEmbedTemplate(String guildId, String name) {
+        try {
+            String query = "SELECT * FROM embed_templates WHERE guild_id = ? AND name = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                java.util.Map<String, String> template = new java.util.HashMap<>();
+                template.put("name", rs.getString("name"));
+                template.put("title", rs.getString("title"));
+                template.put("description", rs.getString("description"));
+                template.put("color", rs.getString("color"));
+                template.put("footer", rs.getString("footer"));
+                return template;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting embed template: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * List all embed templates for a guild
+     */
+    public java.util.List<String> listEmbedTemplates(String guildId) {
+        java.util.List<String> templates = new java.util.ArrayList<>();
+        try {
+            String query = "SELECT name, title FROM embed_templates WHERE guild_id = ? ORDER BY name";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                templates.add(rs.getString("name") + " - " + rs.getString("title"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error listing embed templates: " + e.getMessage());
+        }
+        return templates;
+    }
+
+    /**
+     * Update an embed template
+     */
+    public boolean updateEmbedTemplate(String guildId, String name, String title, String description, String color, String footer) {
+        try {
+            String updateQuery = "UPDATE embed_templates SET ";
+            java.util.List<String> updates = new java.util.ArrayList<>();
+            java.util.List<String> values = new java.util.ArrayList<>();
+            
+            if (title != null) {
+                updates.add("title = ?");
+                values.add(title);
+            }
+            if (description != null) {
+                updates.add("description = ?");
+                values.add(description);
+            }
+            if (color != null) {
+                updates.add("color = ?");
+                values.add(color);
+            }
+            if (footer != null) {
+                updates.add("footer = ?");
+                values.add(footer);
+            }
+            
+            if (updates.isEmpty()) {
+                return false; // Nothing to update
+            }
+            
+            updateQuery += String.join(", ", updates) + " WHERE guild_id = ? AND name = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            
+            for (int i = 0; i < values.size(); i++) {
+                stmt.setString(i + 1, values.get(i));
+            }
+            stmt.setString(values.size() + 1, guildId);
+            stmt.setString(values.size() + 2, name);
+            
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+            
+        } catch (SQLException e) {
+            System.err.println("Error updating embed template: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Delete an embed template
+     */
+    public boolean deleteEmbedTemplate(String guildId, String name) {
+        try {
+            String deleteQuery = "DELETE FROM embed_templates WHERE guild_id = ? AND name = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+            
+        } catch (SQLException e) {
+            System.err.println("Error deleting embed template: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Helper method to ensure guild exists
+     */
+    private void ensureGuildExists(String guildId) throws SQLException {
+        String checkQuery = "SELECT id FROM guilds WHERE id = ?";
+        PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
+        checkStmt.setString(1, guildId);
+        ResultSet rs = checkStmt.executeQuery();
+        
+        if (!rs.next()) {
+            String insertQuery = "INSERT INTO guilds (id) VALUES (?)";
+            PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+            insertStmt.setString(1, guildId);
+            insertStmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Helper method to ensure user exists
+     */
+    private void ensureUserExists(String userId) throws SQLException {
+        String checkQuery = "SELECT id FROM users WHERE id = ?";
+        PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
+        checkStmt.setString(1, userId);
+        ResultSet rs = checkStmt.executeQuery();
+        
+        if (!rs.next()) {
+            String insertQuery = "INSERT INTO users (id, username, discriminator) VALUES (?, 'Unknown', '0000')";
+            PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+            insertStmt.setString(1, userId);
+            insertStmt.executeUpdate();
         }
     }
 }
