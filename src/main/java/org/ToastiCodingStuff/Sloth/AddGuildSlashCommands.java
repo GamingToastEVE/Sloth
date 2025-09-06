@@ -142,6 +142,31 @@ public class AddGuildSlashCommands {
         return commands;
     }
 
+    private List<SlashCommandData> addEmbedCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("create-embed", "Create a custom embed message")
+                .addOption(OptionType.STRING, "title", "Title of the embed", false)
+                .addOption(OptionType.STRING, "description", "Description of the embed", false)
+                .addOption(OptionType.STRING, "color", "Color of the embed", false)
+                .addOption(OptionType.STRING, "footer", "Footer text of the embed", false)
+                .addOption(OptionType.STRING, "image_url", "URL of the image to include in the embed", false)
+                .addOption(OptionType.STRING, "thumbnail_url", "URL of the thumbnail to include in the embed", false));
+        commands.add(Commands.slash("send-embed", "Send a previously created embed to a channel")
+                .addOption(OptionType.STRING, "embed_id", "ID of the embed to send", true)
+                .addOption(OptionType.CHANNEL, "channel", "Channel to send the embed to", true));
+        commands.add(Commands.slash("remove-embed", "Remove the embed")
+                .addOption(OptionType.STRING, "embed_id", "ID of the embed to remove", true));
+        commands.add(Commands.slash("search-embeds", "Search for embeds by title")
+                .addOption(OptionType.STRING, "title", "Search for title", true));
+        commands.add(Commands.slash("add-button-to-embed", "Add a button to an existing embed")
+                .addOption(OptionType.STRING, "role", "Pressing the button will grant you this role", true)
+                .addOption(OptionType.STRING, "embed_id", "ID of the embed to add button to", true)
+                .addOption(OptionType.STRING, "button_label", "Label for the button", true)
+                .addOption(OptionType.STRING, "button_url", "URL the button will link to", false));
+        return commands;
+    }
+
+
     /**
      * Get statistics commands without updating guild
      */

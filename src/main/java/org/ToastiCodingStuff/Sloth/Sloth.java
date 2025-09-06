@@ -4,7 +4,6 @@ import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
@@ -12,7 +11,7 @@ public class Sloth {
     public static void main(String[] args) throws Exception {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
-        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
+        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
