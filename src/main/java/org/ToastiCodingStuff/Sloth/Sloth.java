@@ -24,13 +24,10 @@ public class Sloth {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
-        api.addEventListener(new BotUsageStatsCommandListener(handler));
+
 
         api.addEventListener(new HelpCommandListener());
         api.addEventListener(new GuildEventListener(handler));
-        
-        // Add command usage tracker - this should be added last to track all commands
-        api.addEventListener(new CommandUsageTracker(handler));
         
         // Register all system commands globally
         registerGlobalCommands(api, handler);
