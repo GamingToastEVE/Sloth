@@ -35,6 +35,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTicketCommands());
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
+        allCommands.addAll(getBotUsageStatsCommands());
 
         return allCommands;
     }
@@ -152,6 +153,19 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
         commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
+        return commands;
+    }
+
+    /**
+     * Get bot usage statistics commands
+     */
+    private List<SlashCommandData> getBotUsageStatsCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("bot-usage-stats", "View comprehensive bot usage statistics (Admin Only)")
+                .addOption(OptionType.INTEGER, "days", "Number of days to analyze (1-365, default: 7)", false)
+                .addOptions(new OptionData(OptionType.STRING, "scope", "Scope of statistics", false)
+                    .addChoice("This Server", "guild")
+                    .addChoice("Global (All Servers)", "global")));
         return commands;
     }
 
