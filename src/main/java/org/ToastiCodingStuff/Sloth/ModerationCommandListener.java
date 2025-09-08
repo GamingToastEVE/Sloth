@@ -24,6 +24,9 @@ public class ModerationCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
+        
+        // Track moderation command usage
+        handler.incrementModerationActions();
 
         switch (event.getName()) {
             case "kick":

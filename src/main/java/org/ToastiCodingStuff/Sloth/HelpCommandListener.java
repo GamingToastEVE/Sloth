@@ -10,10 +10,18 @@ import net.dv8tion.jda.api.interactions.components.ActionRow;
 import java.awt.*;
 
 public class HelpCommandListener extends ListenerAdapter {
+    
+    private final DatabaseHandler handler;
+    
+    public HelpCommandListener(DatabaseHandler handler) {
+        this.handler = handler;
+    }
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("help")) {
+            // Track slash command usage
+            handler.incrementSlashCommands();
             handleHelpCommand(event);
         }
     }

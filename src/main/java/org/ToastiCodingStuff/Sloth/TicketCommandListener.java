@@ -30,6 +30,9 @@ public class TicketCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        
+        // Track ticket command usage
+        handler.incrementTicketActions();
 
         switch (event.getName()) {
             case "ticket-setup":

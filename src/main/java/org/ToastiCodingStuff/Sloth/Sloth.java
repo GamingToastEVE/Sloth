@@ -12,7 +12,7 @@ public class Sloth {
         DatabaseHandler handler = new DatabaseHandler();
         Dotenv dotenv = Dotenv.load();
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
-                .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
+                .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS, GatewayIntent.MESSAGE_CONTENT)
                 .build();
         api.awaitReady();
 
@@ -24,9 +24,9 @@ public class Sloth {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
+        api.addEventListener(new MessageListener(handler));
 
-
-        api.addEventListener(new HelpCommandListener());
+        api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
         
         // Register all system commands globally

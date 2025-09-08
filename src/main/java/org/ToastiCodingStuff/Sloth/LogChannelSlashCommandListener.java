@@ -14,6 +14,9 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction (SlashCommandInteractionEvent event) {
+        // Track slash command usage
+        handler.incrementSlashCommands();
+        
         if (event.getName().equals("set-log-channel")) {
             Channel channel = event.getOption("logchannel").getAsChannel();
             String channelID = handler.setLogChannel(event.getGuild().getId(), channel.getId());

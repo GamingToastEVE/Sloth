@@ -21,6 +21,9 @@ public class WarnCommandListener extends ListenerAdapter {
 
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
+        
+        // Track warning command usage
+        handler.incrementWarningActions();
 
         switch (event.getName()) {
             case "warn":

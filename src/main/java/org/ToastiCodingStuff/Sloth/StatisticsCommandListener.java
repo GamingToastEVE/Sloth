@@ -19,6 +19,9 @@ public class StatisticsCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
+        
+        // Track slash command usage
+        handler.incrementSlashCommands();
 
         switch (event.getName()) {
             case "stats-today":

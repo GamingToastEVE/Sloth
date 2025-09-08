@@ -61,6 +61,7 @@ public class DatabaseHandler {
             createRolePermissionsTable();
             createBotLogsTable();
             createStatisticsTable();
+            createGlobalStatisticsTable();
             createTemporaryDataTable();
             createGuildsTable();
             createGuildSystemsTable();
@@ -342,6 +343,25 @@ public class DatabaseHandler {
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
             "UNIQUE(guild_id, date)" +
+            ")";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create global statistics table for tracking total bot usage
+     */
+    private void createGlobalStatisticsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS global_statistics (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "date TEXT NOT NULL, " +
+            "total_commands INTEGER DEFAULT 0, " +
+            "slash_commands INTEGER DEFAULT 0, " +
+            "moderation_actions INTEGER DEFAULT 0, " +
+            "ticket_actions INTEGER DEFAULT 0, " +
+            "warning_actions INTEGER DEFAULT 0, " +
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "UNIQUE(date)" +
             ")";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
@@ -1404,6 +1424,111 @@ public class DatabaseHandler {
      */
     public void incrementTicketsClosed(String guildId) {
         updateStatistics(guildId, "tickets_closed", 1);
+    }
+
+    // Global Statistics Management Methods
+
+    /**
+     * Update global statistics for a specific action type
+     */
+    private void updateGlobalStatistics(String actionType, int increment) {
+        try {
+            String currentDate = getCurrentDate();
+            
+            // First, try to update existing record
+            String updateQuery = "UPDATE global_statistics SET " + actionType + " = " + actionType + " + ? WHERE date = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setInt(1, increment);
+            updateStmt.setString(2, currentDate);
+            
+            int rowsUpdated = updateStmt.executeUpdate();
+            
+            // If no existing record, insert new one
+            if (rowsUpdated == 0) {
+                String insertQuery = "INSERT INTO global_statistics (date, " + actionType + ") VALUES (?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, currentDate);
+                insertStmt.setInt(2, increment);
+                insertStmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error updating global statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Increment total commands count globally
+     */
+    public void incrementTotalCommands() {
+        updateGlobalStatistics("total_commands", 1);
+    }
+
+    /**
+     * Increment slash commands count globally
+     */
+    public void incrementSlashCommands() {
+        updateGlobalStatistics("slash_commands", 1);
+        incrementTotalCommands();
+    }
+
+    /**
+     * Increment moderation actions count globally
+     */
+    public void incrementModerationActions() {
+        updateGlobalStatistics("moderation_actions", 1);
+        incrementTotalCommands();
+    }
+
+    /**
+     * Increment ticket actions count globally
+     */
+    public void incrementTicketActions() {
+        updateGlobalStatistics("ticket_actions", 1);
+        incrementTotalCommands();
+    }
+
+    /**
+     * Increment warning actions count globally
+     */
+    public void incrementWarningActions() {
+        updateGlobalStatistics("warning_actions", 1);
+        incrementTotalCommands();
+    }
+
+    /**
+     * Get global statistics for all time
+     */
+    public String getGlobalStatistics() {
+        try {
+            String query = "SELECT " +
+                    "SUM(total_commands) as total_commands, " +
+                    "SUM(slash_commands) as slash_commands, " +
+                    "SUM(moderation_actions) as moderation_actions, " +
+                    "SUM(ticket_actions) as ticket_actions, " +
+                    "SUM(warning_actions) as warning_actions " +
+                    "FROM global_statistics";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                StringBuilder result = new StringBuilder();
+                result.append("**🤖 Global Bot Usage Statistics**\n\n");
+                result.append("📊 **Total Commands Used:** ").append(rs.getInt("total_commands")).append("\n");
+                result.append("⚡ **Slash Commands:** ").append(rs.getInt("slash_commands")).append("\n");
+                result.append("🛡️ **Moderation Actions:** ").append(rs.getInt("moderation_actions")).append("\n");
+                result.append("🎫 **Ticket Actions:** ").append(rs.getInt("ticket_actions")).append("\n");
+                result.append("⚠️ **Warning Actions:** ").append(rs.getInt("warning_actions")).append("\n\n");
+                result.append("*Statistics tracked since bot deployment*");
+                return result.toString();
+            } else {
+                return "No global statistics found yet.";
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting global statistics: " + e.getMessage());
+            e.printStackTrace();
+            return "Error retrieving global statistics.";
+        }
     }
 
     /**
