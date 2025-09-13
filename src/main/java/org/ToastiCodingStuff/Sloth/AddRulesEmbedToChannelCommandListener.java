@@ -22,6 +22,46 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    /**
+     * Provides helpful information about Discord markdown formatting
+     */
+    private String getFormattingHelpText() {
+        return "\n\n**ℹ️ Formatting Guide:**\n" +
+               "• **bold text** - Use `**text**`\n" +
+               "• *italic text* - Use `*text*`\n" +
+               "• __underlined text__ - Use `__text__`\n" +
+               "• ~~strikethrough~~ - Use `~~text~~`\n" +
+               "• `inline code` - Use `` `text` ``\n" +
+               "• [links](https://example.com) - Use `[text](url)`\n" +
+               "\n*Note: Titles only support plain text, but descriptions and footers support all formatting.*";
+    }
+
+    /**
+     * Validates if the text contains formatting characters and provides feedback
+     */
+    private String validateTextWithFormatting(String text, String fieldName, int maxLength) {
+        if (text.length() > maxLength) {
+            return "❌ " + fieldName + " must be " + maxLength + " characters or less!";
+        }
+        
+        // Check if title contains formatting characters (since titles don't support formatting)
+        if ("Title".equals(fieldName) && containsFormattingCharacters(text)) {
+            return "⚠️ " + fieldName + " contains formatting characters. " +
+                   "Discord embed titles only support plain text. " +
+                   "Consider moving formatting to the description.";
+        }
+        
+        return null; // No validation errors
+    }
+
+    /**
+     * Checks if text contains Discord markdown formatting characters
+     */
+    private boolean containsFormattingCharacters(String text) {
+        return text.contains("**") || text.contains("*") || text.contains("__") || 
+               text.contains("~~") || text.contains("`") || text.contains("[");
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
@@ -85,20 +125,31 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             footer = event.getOption("footer").getAsString();
         }
 
-        // Validate inputs
-        if (title.length() > 256) {
-            event.reply("❌ Title must be 256 characters or less!").setEphemeral(true).queue();
+        // Validate inputs with formatting awareness
+        String titleValidation = validateTextWithFormatting(title, "Title", 256);
+        if (titleValidation != null) {
+            event.reply(titleValidation + getFormattingHelpText()).setEphemeral(true).queue();
             return;
         }
         
-        if (description.length() > 4096) {
-            event.reply("❌ Description must be 4096 characters or less!").setEphemeral(true).queue();
+        String descriptionValidation = validateTextWithFormatting(description, "Description", 4096);
+        if (descriptionValidation != null) {
+            event.reply(descriptionValidation).setEphemeral(true).queue();
             return;
         }
         
         if (buttonLabel.length() > 80) {
             event.reply("❌ Button label must be 80 characters or less!").setEphemeral(true).queue();
             return;
+        }
+        
+        // Validate footer if provided
+        if (footer != null && !footer.isEmpty()) {
+            String footerValidation = validateTextWithFormatting(footer, "Footer", 2048);
+            if (footerValidation != null) {
+                event.reply(footerValidation).setEphemeral(true).queue();
+                return;
+            }
         }
 
         // Add to database
@@ -114,11 +165,19 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         );
 
         if (success) {
-            event.reply("✅ Successfully added rules embed to the database!\n" +
+            String successMessage = "✅ Successfully added rules embed to the database!\n" +
                        "📋 **Title:** " + title + "\n" +
                        "🎭 **Role:** " + mentionRole.getAsMention() + "\n" +
                        "🔘 **Button:** " + buttonLabel + "\n" +
-                       "Use `/setup-rules` in a channel to display the rules with verification buttons.").setEphemeral(true).queue();
+                       "Use `/setup-rules` in a channel to display the rules with verification buttons.";
+            
+            // Add formatting info if description or footer contains formatting
+            if (containsFormattingCharacters(description) || 
+                (footer != null && containsFormattingCharacters(footer))) {
+                successMessage += "\n\n✨ **Formatting detected!** Your embed will display with Discord markdown formatting.";
+            }
+            
+            event.reply(successMessage).setEphemeral(true).queue();
         } else {
             event.reply("❌ Failed to add rules embed to database. Please try again or contact an administrator.").setEphemeral(true).queue();
         }

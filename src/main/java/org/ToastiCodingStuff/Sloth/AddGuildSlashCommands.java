@@ -78,13 +78,13 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> commands = new ArrayList<>();
         commands.add(Commands.slash("setup-rules", "Sets up the rules in the current channel"));
         commands.add(Commands.slash("add-rules-embed", "Adds a rules embed to the database (max 3)")
-                .addOption(OptionType.STRING, "title", "Title of the embed", true)
-                .addOption(OptionType.STRING, "description", "Description of the embed", true)
+                .addOption(OptionType.STRING, "title", "Title of the embed (plain text only)", true)
+                .addOption(OptionType.STRING, "description", "Description of the embed (supports Discord markdown formatting)", true)
                 .addOption(OptionType.ROLE, "role_to_give", "Role to give members after pressing the verify button", true)
                 .addOption(OptionType.STRING, "button_label", "Label for the verify button (no label, no button)", false)
                 .addOption(OptionType.STRING, "button_emoji", "Emoji for the verify button (optional)", false)
                 .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false)
-                .addOption(OptionType.STRING, "footer", "Footer text of the embed", false));
+                .addOption(OptionType.STRING, "footer", "Footer text of the embed (supports Discord markdown formatting)", false));
         return commands;
     }
 
