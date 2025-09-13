@@ -582,6 +582,25 @@ public class DatabaseHandler {
     /**
      * Example of how to use updateTableColumns() for statistics table migration.
      * This method demonstrates the new generic approach and can be used as a reference.
+     * 
+     * Additional examples:
+     * 
+     * // Example 1: Add multiple columns to user table
+     * Map<String, String> userColumns = new HashMap<>();
+     * userColumns.put("last_login", "TEXT");
+     * userColumns.put("login_count", "INTEGER DEFAULT 0");
+     * userColumns.put("email_verified", "INTEGER DEFAULT 0");
+     * updateTableColumns("users", userColumns);
+     * 
+     * // Example 2: Add single column to tickets table
+     * addColumnIfNotExists("tickets", "priority", "TEXT DEFAULT 'medium'");
+     * 
+     * // Example 3: Add multiple columns with different types
+     * Map<String, String> guildColumns = new HashMap<>();
+     * guildColumns.put("premium_until", "TEXT");
+     * guildColumns.put("feature_flags", "INTEGER DEFAULT 0");
+     * guildColumns.put("max_members", "INTEGER DEFAULT 100");
+     * updateTableColumns("guilds", guildColumns);
      */
     private void migrateStatisticsTableUsingGenericFunction() throws SQLException {
         java.util.Map<String, String> columnsToAdd = new java.util.HashMap<>();
