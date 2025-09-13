@@ -317,11 +317,14 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• `\\n` → Line breaks in descriptions\n" +
                                 "• `\\*` → Escape special characters", false)
                         .addField("**Tips for Rules Embeds**", 
+                                "• **Titles**: Only support plain text (no formatting)\n" +
+                                "• **Descriptions & Footers**: Support all Discord markdown\n" +
                                 "• Use **bold** for rule headers\n" +
                                 "• Use `code blocks` for examples\n" +
                                 "• Keep descriptions under 4096 characters\n" +
                                 "• Use line breaks (\\n) for better readability\n" +
-                                "• Test formatting before publishing", false)
+                                "• Test formatting before publishing\n" +
+                                "• Bot will warn if you use formatting in titles", false)
                         .setColor(Color.YELLOW)
                         .setFooter("Navigate using buttons below");
 
