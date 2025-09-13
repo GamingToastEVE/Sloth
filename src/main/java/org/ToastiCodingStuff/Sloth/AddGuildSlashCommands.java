@@ -35,6 +35,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTicketCommands());
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
+        allCommands.addAll(getRuleCommands());
 
         return allCommands;
     }
@@ -67,6 +68,23 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("set-log-channel", "Sets the log channel.")
                 .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true));
         commands.add(Commands.slash("get-log-channel", "gets the log channel"));
+        return commands;
+    }
+
+    /**
+     * Get Rule Commands without updating guild
+     */
+    private List<SlashCommandData> getRuleCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("setup-rules", "Sets up the rules in the current channel"));
+        commands.add(Commands.slash("add-rules-embed", "Adds a rules embed to the database (max 3)")
+                .addOption(OptionType.STRING, "title", "Title of the embed", true)
+                .addOption(OptionType.STRING, "description", "Description of the embed", true)
+                .addOption(OptionType.ROLE, "mention_role", "Role to give members after pressing the verify button", true)
+                .addOption(OptionType.STRING, "button_label", "Label for the verify button", true)
+                .addOption(OptionType.STRING, "button_emoji", "Emoji for the verify button (optional)", false)
+                .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false)
+                .addOption(OptionType.STRING, "footer", "Footer text of the embed", false));
         return commands;
     }
 

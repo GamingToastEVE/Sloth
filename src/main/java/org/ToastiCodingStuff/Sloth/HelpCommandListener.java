@@ -41,6 +41,7 @@ public class HelpCommandListener extends ListenerAdapter {
     private void showHelpPage(SlashCommandInteractionEvent slashEvent, ButtonInteractionEvent buttonEvent, String page) {
         EmbedBuilder embed = new EmbedBuilder();
         ActionRow actionRow;
+        ActionRow actionRow2;
 
         switch (page) {
             case "home":
@@ -60,7 +61,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
@@ -86,7 +89,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
@@ -122,7 +127,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
@@ -154,7 +161,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Systems")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
@@ -195,7 +204,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Systems")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_setup", "📋 Setup"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
@@ -217,10 +228,12 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
-                        Button.link("https://ko-fi.com/gamingtoast27542", "💡 Donate"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_legal", "📜 Legal"),
+                        Button.link("https://ko-fi.com/gamingtoast27542", "☕ Donate")
                 );
                 break;
 
@@ -254,7 +267,9 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.link("https://github.com/GamingToastEVE/Delta", "📄 View on GitHub")
@@ -269,9 +284,9 @@ public class HelpCommandListener extends ListenerAdapter {
 
         // Send the response
         if (slashEvent != null) {
-            slashEvent.replyEmbeds(embed.build()).addComponents(actionRow).setEphemeral(false).queue();
+            slashEvent.replyEmbeds(embed.build()).addComponents(actionRow, actionRow2).setEphemeral(false).queue();
         } else if (buttonEvent != null) {
-            buttonEvent.editMessageEmbeds(embed.build()).setComponents(actionRow).queue();
+            buttonEvent.editMessageEmbeds(embed.build()).setComponents(actionRow, actionRow2).queue();
         }
     }
 }

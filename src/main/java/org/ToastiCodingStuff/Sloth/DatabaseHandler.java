@@ -2,6 +2,8 @@ package org.ToastiCodingStuff.Sloth;
 
 import java.awt.Color;
 import java.sql.*;
+import java.util.ArrayList;
+
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -28,11 +30,22 @@ public class DatabaseHandler {
      */
     private boolean tablesAlreadyExist() {
         try {
-            Statement stmt = connection.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='guilds'");
-            return rs.next(); // Returns true if guilds table exists
+            DatabaseMetaData meta = connection.getMetaData();
+            String[] tableNames = {
+                "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
+                "guild_settings", "role_permissions", "bot_logs", "statistics",
+                "temporary_data", "guilds", "guild_systems", "rules_embeds_channel"
+            };
+            for (String tableName : tableNames) {
+                ResultSet rs = meta.getTables(null, null, tableName, null);
+                if (!rs.next()) {
+                    return false; // If any table does not exist, return false
+                }
+            }
+            return true; // All tables exist
         } catch (SQLException e) {
-            System.err.println("Error checking if tables exist: " + e.getMessage());
+            System.err.println("Error checking database tables: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
@@ -42,11 +55,12 @@ public class DatabaseHandler {
      */
     private void initializeTables() {
         try {
-            // Check if tables already exist, if so break the method
+            // Check for every table if already exist, if so break the method
             if (tablesAlreadyExist()) {
-                System.out.println("Database tables already exist, skipping initialization.");
+                System.out.println("Database tables already exist. Skipping initialization.");
                 return;
             }
+
             
             // Enable foreign keys
             Statement stmt = connection.createStatement();
@@ -64,6 +78,7 @@ public class DatabaseHandler {
             createTemporaryDataTable();
             createGuildsTable();
             createGuildSystemsTable();
+            createRulesEmbedsChannel();
             
             // Handle statistics table migrations
             migrateStatisticsTable();
@@ -80,6 +95,24 @@ public class DatabaseHandler {
     /**
      * Create guilds table - main table for Discord servers/guilds
      */
+    private void createRulesEmbedsChannel () throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS rules_embeds_channel (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "guild_id INTEGER, " +
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "title TEXT NOT NULL, " +
+            "description TEXT NOT NULL, " +
+            "footer TEXT, " +
+            "color TEXT DEFAULT 'green', " +
+            "role_id TEXT, " +
+            "button_label TEXT, " +
+            "button_emoji_id TEXT, " +
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
+            ")";
+
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
     private void createGuildsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS guilds (" +
             "id INTEGER PRIMARY KEY, " +
@@ -461,6 +494,86 @@ public class DatabaseHandler {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    //add Embed to Database
+    public Boolean addRulesEmbedToDatabase(String guildID, String title, String description, String footer, String color) {
+        try {
+            if (getNumberOfEmbedsInDataBase(guildID) >= 3) {
+                System.out.println("Guild already has a rules embed in the database.");
+                return false;
+            }
+            String insertEmbed = "INSERT INTO rules_embeds_channel (guild_id, title, description, footer, color) VALUES (?, ?, ?, ?, ?)";
+            PreparedStatement pstmt = connection.prepareStatement(insertEmbed);
+            pstmt.setString(1, guildID);
+            pstmt.setString(2, title);
+            pstmt.setString(3, description);
+            pstmt.setString(4, footer);
+            pstmt.setString(5, color);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error adding rules embed to database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return true;
+    }
+
+    public int getNumberOfEmbedsInDataBase (String guildID) {
+        try {
+            String query = "SELECT COUNT(*) AS count FROM rules_embeds_channel WHERE guild_id = ?";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, guildID);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("count");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting number of embeds in database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public ArrayList<EmbedBuilder> getAllRulesEmbedFromDatabase (String guildID) {
+        try {
+            ArrayList<EmbedBuilder> embeds = new ArrayList<>();
+            int number = getNumberOfEmbedsInDataBase(guildID);
+            String query = "SELECT * FROM rules_embeds_channel WHERE guild_id = ?";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, guildID);
+            ResultSet rs = pstmt.executeQuery();
+            for (int i = 0; i < number; i++) {
+                if (rs.next()) {
+                    String title = rs.getString("title");
+                    String description = rs.getString("description");
+                    String footer = rs.getString("footer");
+                    String color = rs.getString("color");
+                    EmbedBuilder embed = new EmbedBuilder();
+                    embed.setTitle(title);
+                    embed.setDescription(description);
+                    if (footer != null && !footer.isEmpty()) {
+                        embed.setFooter(footer);
+                    }
+                    if (color != null && !color.isEmpty()) {
+                        try {
+                            Color parsedColor = Color.decode(color);
+                            embed.setColor(parsedColor);
+                        } catch (NumberFormatException e) {
+                            // If color is not a valid hex code, use default green
+                            embed.setColor(Color.GREEN);
+                        }
+                    } else {
+                        embed.setColor(Color.GREEN);
+                    }
+                    embeds.add(embed);
+                }
+            }
+            return embeds;
+        } catch (SQLException e) {
+            System.err.println("Error getting rules embed from database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
     }
 
     //Log Channel Databasekram
