@@ -7,6 +7,52 @@ import java.util.*;
  * Comprehensive database migration system for automatic column management.
  * This class handles schema evolution by detecting missing columns and automatically
  * adding them to maintain database consistency across versions.
+ * 
+ * <h2>Key Features:</h2>
+ * <ul>
+ *   <li><strong>Automatic Column Detection:</strong> Compares expected schemas with actual database structure</li>
+ *   <li><strong>Safe Migrations:</strong> Only adds missing columns, never removes or modifies existing data</li>
+ *   <li><strong>SQLite Compatibility:</strong> Handles SQLite-specific constraints like CURRENT_TIMESTAMP defaults</li>
+ *   <li><strong>Migration Tracking:</strong> Records all migrations with timestamps and execution times</li>
+ *   <li><strong>Schema Validation:</strong> Verifies database structure matches expected definitions</li>
+ *   <li><strong>Index/Trigger Management:</strong> Applies missing indexes and triggers</li>
+ * </ul>
+ * 
+ * <h2>Usage Example:</h2>
+ * <pre>
+ * // Basic usage - automatically run on DatabaseHandler initialization
+ * DatabaseHandler handler = new DatabaseHandler();
+ * 
+ * // Manual migration check
+ * handler.runMigrationCheck();
+ * 
+ * // Get migration history
+ * List&lt;Map&lt;String, Object&gt;&gt; history = handler.getMigrationHistory();
+ * 
+ * // Validate current schema
+ * boolean isValid = handler.validateDatabaseSchema();
+ * </pre>
+ * 
+ * <h2>How It Works:</h2>
+ * <ol>
+ *   <li>Define expected table schemas in {@link #getExpectedSchemas()}</li>
+ *   <li>Compare expected columns with actual database columns</li>
+ *   <li>Automatically add any missing columns with proper defaults</li>
+ *   <li>Apply missing indexes and triggers</li>
+ *   <li>Record migration in tracking table for audit purposes</li>
+ * </ol>
+ * 
+ * <h2>Adding New Features:</h2>
+ * To add new columns for a feature:
+ * <ol>
+ *   <li>Update the table schema definition in the appropriate create*Schema() method</li>
+ *   <li>Restart the application - migration runs automatically</li>
+ *   <li>New columns are added with proper defaults, existing data is preserved</li>
+ * </ol>
+ * 
+ * @author Sloth Bot Development Team
+ * @version 1.0
+ * @since 2025-09-13
  */
 public class DatabaseMigrationManager {
     
@@ -500,7 +546,7 @@ public class DatabaseMigrationManager {
     }
     
     /**
-     * Add a single column to a table
+     * Add a single column to a table with special handling for SQLite constraints
      */
     private void addColumnToTable(String tableName, String columnName, String columnDefinition) throws SQLException {
         String alterQuery = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
@@ -508,6 +554,29 @@ public class DatabaseMigrationManager {
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(alterQuery);
             System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "'");
+        } catch (SQLException e) {
+            // Handle SQLite constraint for columns with CURRENT_TIMESTAMP default
+            if (e.getMessage().contains("Cannot add a column with non-constant default")) {
+                System.out.println("Handling SQLite constraint for column '" + columnName + "' with CURRENT_TIMESTAMP default");
+                
+                // For timestamp columns, add them without default first, then update
+                String modifiedDefinition = columnDefinition.replace("DEFAULT CURRENT_TIMESTAMP", "");
+                String alterQueryNoDefault = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + modifiedDefinition;
+                
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute(alterQueryNoDefault);
+                    
+                    // Update all existing rows to have the current timestamp
+                    if (columnDefinition.contains("DEFAULT CURRENT_TIMESTAMP")) {
+                        String updateQuery = "UPDATE " + tableName + " SET " + columnName + " = CURRENT_TIMESTAMP WHERE " + columnName + " IS NULL";
+                        stmt.execute(updateQuery);
+                    }
+                    
+                    System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "' (with SQLite constraint workaround)");
+                }
+            } else {
+                throw e; // Re-throw if it's a different error
+            }
         }
     }
     

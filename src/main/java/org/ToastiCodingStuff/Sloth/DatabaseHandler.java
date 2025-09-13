@@ -121,7 +121,22 @@ public class DatabaseHandler {
     }
 
     /**
-     * Initialize all database tables if they don't exist and run comprehensive migrations
+     * Initialize all database tables if they don't exist and run comprehensive migrations.
+     * 
+     * This method implements a comprehensive database migration system that:
+     * 1. Creates tables from scratch if the database is new
+     * 2. Automatically detects missing columns in existing tables
+     * 3. Adds missing columns while preserving existing data
+     * 4. Applies indexes and triggers that may be missing
+     * 5. Validates the final schema against expected definitions
+     * 6. Tracks all migrations for audit purposes
+     * 
+     * The migration system handles:
+     * - Schema evolution across software versions
+     * - SQLite constraints (e.g., CURRENT_TIMESTAMP defaults)
+     * - Data preservation during migrations
+     * - Rollback safety (additive changes only)
+     * - Migration history and performance tracking
      */
     private void initializeTables() {
         try {
@@ -529,28 +544,49 @@ public class DatabaseHandler {
     }
 
     /**
-     * Generic function to update table columns when needed.
-     * This function checks if specified columns exist in a table and adds them if they don't.
+     * Example method demonstrating how to add a new column to an existing table.
+     * This shows how developers can easily extend the database schema in future updates.
      * 
-     * <p>Example usage:</p>
-     * <pre>
-     * // Add multiple columns to a table
-     * Map&lt;String, String&gt; columns = new HashMap&lt;&gt;();
-     * columns.put("email", "TEXT");
-     * columns.put("age", "INTEGER DEFAULT 0");
-     * columns.put("active", "INTEGER DEFAULT 1");
-     * boolean result = updateTableColumns("users", columns);
+     * Usage example:
      * 
-     * // Add a single column
-     * boolean result = addColumnIfNotExists("tickets", "priority", "TEXT DEFAULT 'medium'");
-     * </pre>
-     * 
-     * @param tableName The name of the table to update
-     * @param columns A map where keys are column names and values are column definitions (e.g., "INTEGER DEFAULT 0")
-     * @return true if any columns were added, false if all columns already existed
-     * @throws SQLException if there's an error checking or updating the table
-     * @throws IllegalArgumentException if tableName is null or empty
+     * // To add a new feature that requires a new column:
+     * // 1. Add the column to the schema definition in DatabaseMigrationManager
+     * // 2. The migration system will automatically detect and add it on next startup
+     * // 3. Optionally call this method to add columns manually during runtime
      */
+    public boolean addNewFeatureColumn(String tableName, String columnName, String columnDefinition) {
+        try {
+            return addColumnIfNotExists(tableName, columnName, columnDefinition);
+        } catch (SQLException e) {
+            System.err.println("Error adding new feature column: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Example of adding multiple columns for a new feature.
+     * This demonstrates the power of the new migration system.
+     */
+    public void addNewFeatureColumns() {
+        System.out.println("Adding columns for new Discord bot features...");
+        
+        // Example: Adding user preference columns
+        java.util.Map<String, String> userPreferenceColumns = new java.util.HashMap<>();
+        userPreferenceColumns.put("timezone", "TEXT DEFAULT 'UTC'");
+        userPreferenceColumns.put("notification_preferences", "TEXT DEFAULT 'all'");
+        userPreferenceColumns.put("last_activity", "TEXT");
+        
+        try {
+            boolean added = updateTableColumns("users", userPreferenceColumns);
+            if (added) {
+                System.out.println("Successfully added user preference columns!");
+            } else {
+                System.out.println("User preference columns already exist or no changes needed.");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error adding user preference columns: " + e.getMessage());
+        }
+    }
     public boolean updateTableColumns(String tableName, java.util.Map<String, String> columns) throws SQLException {
         if (tableName == null || tableName.trim().isEmpty()) {
             throw new IllegalArgumentException("Table name cannot be null or empty");
