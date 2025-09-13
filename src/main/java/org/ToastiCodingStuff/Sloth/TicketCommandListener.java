@@ -245,7 +245,7 @@ public class TicketCommandListener extends ListenerAdapter {
                         // Send welcome message in ticket channel
                         EmbedBuilder welcomeEmbed = new EmbedBuilder()
                                 .setTitle("🎫 Ticket #" + ticketId + " - " + subject)
-                                .setDescription("**Description:**\n" + processLinebreaks(description))
+                                .setDescription("**Description:**\n" + handler.processLinebreaks(description))
                                 .addField("👤 Created by", event.getUser().getAsMention(), true)
                                 //.addField("📈 Priority", priority, true)
                                 .addField("📅 Created", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
@@ -692,20 +692,6 @@ public class TicketCommandListener extends ListenerAdapter {
                 event.getHook().sendMessageEmbeds(embed.build()).queue();
             }
         }, error -> event.getHook().sendMessage("❌ Failed to retrieve channel history for transcript.").queue());
-    }
-    
-    /**
-     * Process literal linebreak characters in text to actual newlines for Discord
-     * @param text The text to process
-     * @return The text with linebreaks converted
-     */
-    private String processLinebreaks(String text) {
-        if (text == null) return null;
-        
-        // Convert literal \n, \r\n, and \r to actual newlines
-        return text.replace("\\n", "\n")
-                  .replace("\\r\\n", "\n")  // Windows style
-                  .replace("\\r", "\n");    // Mac style
     }
 
     private Color getPriorityColor(String priority) {

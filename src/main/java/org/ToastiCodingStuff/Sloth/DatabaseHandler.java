@@ -10,7 +10,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 public class DatabaseHandler {
-    
+
     /**
      * Data class to hold complete rules embed information
      */
@@ -947,7 +947,7 @@ public class DatabaseHandler {
                 String buttonLabel = rs.getString("button_label");
                 String buttonEmoji = rs.getString("button_emoji_id");
                 
-                RulesEmbedData embedData = new RulesEmbedData(id, title, description, footer, color, roleId, buttonLabel, buttonEmoji);
+                RulesEmbedData embedData = new RulesEmbedData(id, title, processLinebreaks(description), footer, color, roleId, buttonLabel, buttonEmoji);
                 embedDataList.add(embedData);
             }
             return embedDataList;
@@ -2374,6 +2374,15 @@ public class DatabaseHandler {
         }
     }
 
+    public String processLinebreaks(String text) {
+        if (text == null) return null;
+
+        // Convert literal \n, \r\n, and \r to actual newlines
+        return text.replace("\\n", "\n")
+                .replace("\\r\\n", "\n")  // Windows style
+                .replace("\\r", "\n");    // Mac style
+    }
+
     /**
      * Get moderation statistics for a guild for a specific date using embeds
      */
@@ -2463,6 +2472,52 @@ public class DatabaseHandler {
      */
     public EmbedBuilder getTodaysModerationStatisticsEmbed(String guildId) {
         return getModerationStatisticsForDateEmbed(guildId, getCurrentDate());
+    }
+
+    public EmbedBuilder getUserModerationStatisticsEmbed(String guildId, String userId) {
+        // Fetch user statistics from the database
+        String query = "SELECT SUM(warnings_issued) AS total_warnings, " +
+                "SUM(kicks_performed) AS total_kicks, " +
+                "SUM(bans_performed) AS total_bans, " +
+                "SUM(timeouts_performed) AS total_timeouts, " +
+                "SUM(untimeouts_performed) AS total_untimeouts " +
+                "FROM statistics WHERE guild_id = ? AND user_id = ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                int totalWarnings = rs.getInt("total_warnings");
+                int totalKicks = rs.getInt("total_kicks");
+                int totalBans = rs.getInt("total_bans");
+                int totalTimeouts = rs.getInt("total_timeouts");
+                int totalUntimeouts = rs.getInt("total_untimeouts");
+
+                EmbedBuilder embed = new EmbedBuilder();
+                embed.setTitle("User Moderation Statistics");
+                embed.setColor(Color.BLUE);
+                embed.addField("Total Warnings", String.valueOf(totalWarnings), true);
+                embed.addField("Total Kicks", String.valueOf(totalKicks), true);
+                embed.addField("Total Bans", String.valueOf(totalBans), true);
+                embed.addField("Total Timeouts", String.valueOf(totalTimeouts), true);
+                embed.addField("Total Untimeouts", String.valueOf(totalUntimeouts), true);
+                return embed;
+            } else {
+                EmbedBuilder embed = new EmbedBuilder();
+                embed.setTitle("User Moderation Statistics");
+                embed.setColor(Color.RED);
+                embed.setDescription("No statistics found for the specified user.");
+                return embed;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.setTitle("User Moderation Statistics");
+            embed.setColor(Color.RED);
+            embed.setDescription("An error occurred while fetching statistics.");
+            return embed;
+        }
     }
 
     /**
