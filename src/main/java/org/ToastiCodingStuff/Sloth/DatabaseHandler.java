@@ -39,9 +39,9 @@ public class DatabaseHandler {
         public EmbedBuilder toEmbedBuilder() {
             EmbedBuilder embed = new EmbedBuilder();
             embed.setTitle(title);
-            embed.setDescription(description);
+            embed.setDescription(processLinebreaks(description));
             if (footer != null && !footer.isEmpty()) {
-                embed.setFooter(footer);
+                embed.setFooter(processLinebreaks(footer));
             }
             if (color != null && !color.isEmpty()) {
                 try {
@@ -74,6 +74,20 @@ public class DatabaseHandler {
                 embed.setColor(Color.GREEN);
             }
             return embed;
+        }
+        
+        /**
+         * Process literal linebreak characters in text to actual newlines for Discord
+         * @param text The text to process
+         * @return The text with linebreaks converted
+         */
+        private String processLinebreaks(String text) {
+            if (text == null) return null;
+            
+            // Convert literal \n, \r\n, and \r to actual newlines
+            return text.replace("\\n", "\n")
+                      .replace("\\r\\n", "\n")  // Windows style
+                      .replace("\\r", "\n");    // Mac style
         }
     }
 
