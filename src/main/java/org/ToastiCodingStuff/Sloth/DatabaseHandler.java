@@ -449,6 +449,8 @@ public class DatabaseHandler {
 
     /**
      * Migrate existing statistics table to add timeout and verification columns
+     * Note: This method is kept for backward compatibility. 
+     * New migrations should use updateTableColumns() for a more generic approach.
      */
     private void migrateStatisticsTable() throws SQLException {
         Statement stmt = connection.createStatement();
@@ -481,6 +483,132 @@ public class DatabaseHandler {
         if (!hasVerifications) {
             stmt.execute("ALTER TABLE statistics ADD COLUMN verifications_performed INTEGER DEFAULT 0");
         }
+    }
+
+    /**
+     * Generic function to update table columns when needed.
+     * This function checks if specified columns exist in a table and adds them if they don't.
+     * 
+     * <p>Example usage:</p>
+     * <pre>
+     * // Add multiple columns to a table
+     * Map&lt;String, String&gt; columns = new HashMap&lt;&gt;();
+     * columns.put("email", "TEXT");
+     * columns.put("age", "INTEGER DEFAULT 0");
+     * columns.put("active", "INTEGER DEFAULT 1");
+     * boolean result = updateTableColumns("users", columns);
+     * 
+     * // Add a single column
+     * boolean result = addColumnIfNotExists("tickets", "priority", "TEXT DEFAULT 'medium'");
+     * </pre>
+     * 
+     * @param tableName The name of the table to update
+     * @param columns A map where keys are column names and values are column definitions (e.g., "INTEGER DEFAULT 0")
+     * @return true if any columns were added, false if all columns already existed
+     * @throws SQLException if there's an error checking or updating the table
+     * @throws IllegalArgumentException if tableName is null or empty
+     */
+    public boolean updateTableColumns(String tableName, java.util.Map<String, String> columns) throws SQLException {
+        if (tableName == null || tableName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Table name cannot be null or empty");
+        }
+        if (columns == null || columns.isEmpty()) {
+            return false; // Nothing to update
+        }
+
+        Statement stmt = connection.createStatement();
+        boolean columnsAdded = false;
+        
+        try {
+            // Check existing columns in the table
+            String checkColumns = "PRAGMA table_info(" + tableName + ")";
+            ResultSet rs = stmt.executeQuery(checkColumns);
+            
+            // Collect existing column names
+            java.util.Set<String> existingColumns = new java.util.HashSet<>();
+            while (rs.next()) {
+                existingColumns.add(rs.getString("name"));
+            }
+            rs.close();
+            
+            // Add missing columns
+            for (java.util.Map.Entry<String, String> column : columns.entrySet()) {
+                String columnName = column.getKey();
+                String columnDefinition = column.getValue();
+                
+                // Validate column name and definition
+                if (columnName == null || columnName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Column name cannot be null or empty");
+                }
+                if (columnDefinition == null || columnDefinition.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Column definition cannot be null or empty for column: " + columnName);
+                }
+                
+                if (!existingColumns.contains(columnName)) {
+                    try {
+                        String alterQuery = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
+                        stmt.execute(alterQuery);
+                        System.out.println("Added column '" + columnName + "' to table '" + tableName + "'");
+                        columnsAdded = true;
+                    } catch (SQLException e) {
+                        System.err.println("Error adding column '" + columnName + "' to table '" + tableName + "': " + e.getMessage());
+                        throw new SQLException("Failed to add column '" + columnName + "' to table '" + tableName + "'", e);
+                    }
+                }
+            }
+            
+        } finally {
+            stmt.close();
+        }
+        
+        return columnsAdded;
+    }
+
+    /**
+     * Convenience method to add a single column to a table if it doesn't exist.
+     * 
+     * @param tableName The name of the table to update
+     * @param columnName The name of the column to add
+     * @param columnDefinition The SQL definition of the column (e.g., "INTEGER DEFAULT 0", "TEXT NOT NULL")
+     * @return true if the column was added, false if it already existed
+     * @throws SQLException if there's an error checking or updating the table
+     */
+    public boolean addColumnIfNotExists(String tableName, String columnName, String columnDefinition) throws SQLException {
+        java.util.Map<String, String> columns = new java.util.HashMap<>();
+        columns.put(columnName, columnDefinition);
+        return updateTableColumns(tableName, columns);
+    }
+
+    /**
+     * Example of how to use updateTableColumns() for statistics table migration.
+     * This method demonstrates the new generic approach and can be used as a reference.
+     * 
+     * Additional examples:
+     * 
+     * // Example 1: Add multiple columns to user table
+     * Map<String, String> userColumns = new HashMap<>();
+     * userColumns.put("last_login", "TEXT");
+     * userColumns.put("login_count", "INTEGER DEFAULT 0");
+     * userColumns.put("email_verified", "INTEGER DEFAULT 0");
+     * updateTableColumns("users", userColumns);
+     * 
+     * // Example 2: Add single column to tickets table
+     * addColumnIfNotExists("tickets", "priority", "TEXT DEFAULT 'medium'");
+     * 
+     * // Example 3: Add multiple columns with different types
+     * Map<String, String> guildColumns = new HashMap<>();
+     * guildColumns.put("premium_until", "TEXT");
+     * guildColumns.put("feature_flags", "INTEGER DEFAULT 0");
+     * guildColumns.put("max_members", "INTEGER DEFAULT 100");
+     * updateTableColumns("guilds", guildColumns);
+     */
+    private void migrateStatisticsTableUsingGenericFunction() throws SQLException {
+        java.util.Map<String, String> columnsToAdd = new java.util.HashMap<>();
+        columnsToAdd.put("timeouts_performed", "INTEGER DEFAULT 0");
+        columnsToAdd.put("untimeouts_performed", "INTEGER DEFAULT 0");
+        columnsToAdd.put("verifications_performed", "INTEGER DEFAULT 0");
+        
+        updateTableColumns("statistics", columnsToAdd);
     }
 
     /**
