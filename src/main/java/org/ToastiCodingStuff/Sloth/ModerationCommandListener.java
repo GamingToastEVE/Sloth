@@ -108,6 +108,10 @@ public class ModerationCommandListener extends ListenerAdapter {
                 // Update statistics
                 handler.incrementKicksPerformed(guildId);
                 
+                // Update user statistics
+                handler.incrementUserKicksReceived(guildId, userId);
+                handler.incrementUserKicksPerformed(guildId, moderatorId);
+                
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "KICK", targetName, moderatorName, reason);
             },
@@ -174,6 +178,10 @@ public class ModerationCommandListener extends ListenerAdapter {
                 
                 // Update statistics
                 handler.incrementBansPerformed(guildId);
+                
+                // Update user statistics
+                handler.incrementUserBansReceived(guildId, userId);
+                handler.incrementUserBansPerformed(guildId, moderatorId);
                 
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "BAN", targetName, moderatorName, reason);

@@ -170,6 +170,11 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
         commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
+        commands.add(Commands.slash("user-info", "View user information and statistics")
+                .addOption(OptionType.USER, "user", "User to view information for", true));
+        commands.add(Commands.slash("user-stats-date", "View user statistics for a specific date")
+                .addOption(OptionType.USER, "user", "User to view statistics for", true)
+                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
         return commands;
     }
 

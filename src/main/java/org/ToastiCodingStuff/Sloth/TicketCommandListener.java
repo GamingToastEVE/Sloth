@@ -234,6 +234,9 @@ public class TicketCommandListener extends ListenerAdapter {
                         // Update statistics for tickets created
                         handler.incrementTicketsCreated(guildId);
                         
+                        // Update user statistics for ticket creation
+                        handler.incrementUserTicketsCreated(guildId, userId);
+                        
                         // Send audit log entry for ticket creation
                         handler.sendAuditLogEntry(event.getGuild(), "TICKET_CREATED", 
                                 "Ticket #" + ticketId + " - " + subject, 
@@ -289,6 +292,9 @@ public class TicketCommandListener extends ListenerAdapter {
             // Update statistics for tickets closed
             handler.incrementTicketsClosed(guildId);
             
+            // Update user statistics for ticket closure
+            handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
+            
             // Send audit log entry for ticket closure
             handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
                     "Ticket #" + ticketId, 
@@ -334,6 +340,9 @@ public class TicketCommandListener extends ListenerAdapter {
             // Update statistics for tickets closed
             String guildId = Objects.requireNonNull(event.getGuild()).getId();
             handler.incrementTicketsClosed(guildId);
+            
+            // Update user statistics for ticket closure
+            handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
             
             // Send audit log entry for ticket closure via button
             handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 

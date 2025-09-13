@@ -138,6 +138,7 @@ public class DatabaseMigrationManager {
         schemas.put("role_permissions", createRolePermissionsSchema());
         schemas.put("bot_logs", createBotLogsSchema());
         schemas.put("statistics", createStatisticsSchema());
+        schemas.put("user_statistics", createUserStatisticsSchema());
         schemas.put("temporary_data", createTemporaryDataSchema());
         schemas.put("guild_systems", createGuildSystemsSchema());
         schemas.put("rules_embeds_channel", createRulesEmbedsChannelSchema());
@@ -346,6 +347,34 @@ public class DatabaseMigrationManager {
             .addColumn("tickets_closed", "INTEGER DEFAULT 0")
             .addColumn("verifications_performed", "INTEGER DEFAULT 0")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+    
+    /**
+     * Define the user_statistics table schema
+     */
+    private TableSchema createUserStatisticsSchema() {
+        return new TableSchema("user_statistics")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("date", "TEXT NOT NULL")
+            .addColumn("warnings_received", "INTEGER DEFAULT 0")
+            .addColumn("warnings_issued", "INTEGER DEFAULT 0")
+            .addColumn("kicks_received", "INTEGER DEFAULT 0")
+            .addColumn("kicks_performed", "INTEGER DEFAULT 0")
+            .addColumn("bans_received", "INTEGER DEFAULT 0")
+            .addColumn("bans_performed", "INTEGER DEFAULT 0")
+            .addColumn("timeouts_received", "INTEGER DEFAULT 0")
+            .addColumn("timeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("untimeouts_received", "INTEGER DEFAULT 0")
+            .addColumn("untimeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("tickets_created", "INTEGER DEFAULT 0")
+            .addColumn("tickets_closed", "INTEGER DEFAULT 0")
+            .addColumn("verifications_performed", "INTEGER DEFAULT 0")
+            .addColumn("messages_sent", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_guild_user_date ON user_statistics(guild_id, user_id, date)")
+            .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_date ON user_statistics(date)");
     }
     
     /**
