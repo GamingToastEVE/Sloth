@@ -99,6 +99,10 @@ public class WarnCommandListener extends ListenerAdapter {
                                     
                                     // Update statistics
                                     handler.incrementTimeoutsPerformed(guildId);
+                                    
+                                    // Update user statistics
+                                    handler.incrementUserTimeoutsReceived(guildId, userId);
+                                    handler.incrementUserTimeoutsPerformed(guildId, moderatorId);
                                 },
                                 error -> {
                                     // Handle timeout failure silently - warning was still issued
@@ -120,6 +124,10 @@ public class WarnCommandListener extends ListenerAdapter {
             
             // Update statistics for warnings issued
             handler.incrementWarningsIssued(guildId);
+            
+            // Update user statistics
+            handler.incrementUserWarningsReceived(guildId, userId);
+            handler.incrementUserWarningsIssued(guildId, moderatorId);
             
             // Send audit log entry to log channel
             handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(), 

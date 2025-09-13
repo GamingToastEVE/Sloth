@@ -185,6 +185,7 @@ public class DatabaseHandler {
             createRolePermissionsTable();
             createBotLogsTable();
             createStatisticsTable();
+            createUserStatisticsTable();
             createTemporaryDataTable();
             createGuildsTable();
             createGuildSystemsTable();
@@ -517,6 +518,44 @@ public class DatabaseHandler {
             ")";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
+    }
+
+    /**
+     * Create user_statistics table
+     */
+    private void createUserStatisticsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS user_statistics (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "guild_id INTEGER NOT NULL, " +
+            "user_id INTEGER NOT NULL, " +
+            "date TEXT NOT NULL, " +
+            "warnings_received INTEGER DEFAULT 0, " +
+            "warnings_issued INTEGER DEFAULT 0, " +
+            "kicks_received INTEGER DEFAULT 0, " +
+            "kicks_performed INTEGER DEFAULT 0, " +
+            "bans_received INTEGER DEFAULT 0, " +
+            "bans_performed INTEGER DEFAULT 0, " +
+            "timeouts_received INTEGER DEFAULT 0, " +
+            "timeouts_performed INTEGER DEFAULT 0, " +
+            "untimeouts_received INTEGER DEFAULT 0, " +
+            "untimeouts_performed INTEGER DEFAULT 0, " +
+            "tickets_created INTEGER DEFAULT 0, " +
+            "tickets_closed INTEGER DEFAULT 0, " +
+            "verifications_performed INTEGER DEFAULT 0, " +
+            "messages_sent INTEGER DEFAULT 0, " +
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
+            "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, " +
+            "UNIQUE(guild_id, user_id, date)" +
+            ")";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+        
+        // Create indexes for better performance
+        String createIndexGuildUserDate = "CREATE INDEX IF NOT EXISTS idx_user_statistics_guild_user_date ON user_statistics(guild_id, user_id, date)";
+        String createIndexDate = "CREATE INDEX IF NOT EXISTS idx_user_statistics_date ON user_statistics(date)";
+        stmt.execute(createIndexGuildUserDate);
+        stmt.execute(createIndexDate);
     }
 
     /**
@@ -1875,6 +1914,349 @@ public class DatabaseHandler {
      */
     public void incrementVerificationsPerformed(String guildId) {
         updateStatistics(guildId, "verifications_performed", 1);
+    }
+
+    // USER STATISTICS FUNCTIONS
+
+    /**
+     * Update statistics for a user and specific action type
+     */
+    private void updateUserStatistics(String guildId, String userId, String actionType, int increment) {
+        try {
+            String currentDate = getCurrentDate();
+            
+            // First, try to update existing record
+            String updateQuery = "UPDATE user_statistics SET " + actionType + " = " + actionType + " + ? WHERE guild_id = ? AND user_id = ? AND date = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setInt(1, increment);
+            updateStmt.setString(2, guildId);
+            updateStmt.setString(3, userId);
+            updateStmt.setString(4, currentDate);
+            
+            int rowsUpdated = updateStmt.executeUpdate();
+            
+            // If no existing record, insert new one
+            if (rowsUpdated == 0) {
+                String insertQuery = "INSERT INTO user_statistics (guild_id, user_id, date, " + actionType + ") VALUES (?, ?, ?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, guildId);
+                insertStmt.setString(2, userId);
+                insertStmt.setString(3, currentDate);
+                insertStmt.setInt(4, increment);
+                insertStmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error updating user statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Increment warnings received count for a user
+     */
+    public void incrementUserWarningsReceived(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "warnings_received", 1);
+    }
+
+    /**
+     * Increment warnings issued count for a user
+     */
+    public void incrementUserWarningsIssued(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "warnings_issued", 1);
+    }
+
+    /**
+     * Increment kicks received count for a user
+     */
+    public void incrementUserKicksReceived(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "kicks_received", 1);
+    }
+
+    /**
+     * Increment kicks performed count for a user
+     */
+    public void incrementUserKicksPerformed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "kicks_performed", 1);
+    }
+
+    /**
+     * Increment bans received count for a user
+     */
+    public void incrementUserBansReceived(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "bans_received", 1);
+    }
+
+    /**
+     * Increment bans performed count for a user
+     */
+    public void incrementUserBansPerformed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "bans_performed", 1);
+    }
+
+    /**
+     * Increment timeouts received count for a user
+     */
+    public void incrementUserTimeoutsReceived(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "timeouts_received", 1);
+    }
+
+    /**
+     * Increment timeouts performed count for a user
+     */
+    public void incrementUserTimeoutsPerformed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "timeouts_performed", 1);
+    }
+
+    /**
+     * Increment untimeouts received count for a user
+     */
+    public void incrementUserUntimeoutsReceived(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "untimeouts_received", 1);
+    }
+
+    /**
+     * Increment untimeouts performed count for a user
+     */
+    public void incrementUserUntimeoutsPerformed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "untimeouts_performed", 1);
+    }
+
+    /**
+     * Increment tickets created count for a user
+     */
+    public void incrementUserTicketsCreated(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "tickets_created", 1);
+    }
+
+    /**
+     * Increment tickets closed count for a user
+     */
+    public void incrementUserTicketsClosed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "tickets_closed", 1);
+    }
+
+    /**
+     * Increment verifications performed count for a user
+     */
+    public void incrementUserVerificationsPerformed(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "verifications_performed", 1);
+    }
+
+    /**
+     * Increment messages sent count for a user
+     */
+    public void incrementUserMessagesSent(String guildId, String userId) {
+        updateUserStatistics(guildId, userId, "messages_sent", 1);
+    }
+
+    /**
+     * Get user information and statistics embed
+     */
+    public EmbedBuilder getUserInfoEmbed(String guildId, String userId) {
+        try {
+            // Get user basic info
+            String userQuery = "SELECT username, discriminator, avatar, created_at FROM users WHERE id = ?";
+            PreparedStatement userStmt = connection.prepareStatement(userQuery);
+            userStmt.setString(1, userId);
+            ResultSet userRs = userStmt.executeQuery();
+            
+            if (!userRs.next()) {
+                return new EmbedBuilder()
+                    .setTitle("❌ User Not Found")
+                    .setDescription("User information not available in database.")
+                    .setColor(Color.RED);
+            }
+            
+            String username = userRs.getString("username");
+            String discriminator = userRs.getString("discriminator");
+            String avatar = userRs.getString("avatar");
+            String createdAt = userRs.getString("created_at");
+            
+            // Create embed with user info
+            EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("👤 User Information: " + username + (discriminator != null ? "#" + discriminator : ""))
+                .setColor(Color.BLUE)
+                .setTimestamp(java.time.Instant.now());
+            
+            if (avatar != null && !avatar.isEmpty()) {
+                embed.setThumbnail(avatar);
+            }
+            
+            // Add basic user info
+            embed.addField("📅 Joined Database", createdAt != null ? createdAt : "Unknown", true);
+            embed.addField("🆔 User ID", userId, true);
+            
+            // Get user statistics
+            String statsQuery = "SELECT " +
+                "SUM(warnings_received) as total_warnings_received, " +
+                "SUM(warnings_issued) as total_warnings_issued, " +
+                "SUM(kicks_received) as total_kicks_received, " +
+                "SUM(kicks_performed) as total_kicks_performed, " +
+                "SUM(bans_received) as total_bans_received, " +
+                "SUM(bans_performed) as total_bans_performed, " +
+                "SUM(timeouts_received) as total_timeouts_received, " +
+                "SUM(timeouts_performed) as total_timeouts_performed, " +
+                "SUM(untimeouts_received) as total_untimeouts_received, " +
+                "SUM(untimeouts_performed) as total_untimeouts_performed, " +
+                "SUM(tickets_created) as total_tickets_created, " +
+                "SUM(tickets_closed) as total_tickets_closed, " +
+                "SUM(verifications_performed) as total_verifications_performed, " +
+                "SUM(messages_sent) as total_messages_sent " +
+                "FROM user_statistics WHERE guild_id = ? AND user_id = ?";
+            
+            PreparedStatement statsStmt = connection.prepareStatement(statsQuery);
+            statsStmt.setString(1, guildId);
+            statsStmt.setString(2, userId);
+            ResultSet statsRs = statsStmt.executeQuery();
+            
+            if (statsRs.next()) {
+                StringBuilder moderationStats = new StringBuilder();
+                StringBuilder activityStats = new StringBuilder();
+                
+                // Moderation received stats
+                int warningsReceived = statsRs.getInt("total_warnings_received");
+                int kicksReceived = statsRs.getInt("total_kicks_received");
+                int bansReceived = statsRs.getInt("total_bans_received");
+                int timeoutsReceived = statsRs.getInt("total_timeouts_received");
+                int untimeoutsReceived = statsRs.getInt("total_untimeouts_received");
+                
+                if (warningsReceived > 0 || kicksReceived > 0 || bansReceived > 0 || timeoutsReceived > 0 || untimeoutsReceived > 0) {
+                    moderationStats.append("**Moderation Received:**\n");
+                    if (warningsReceived > 0) moderationStats.append("⚠️ Warnings: ").append(warningsReceived).append("\n");
+                    if (kicksReceived > 0) moderationStats.append("🦶 Kicks: ").append(kicksReceived).append("\n");
+                    if (bansReceived > 0) moderationStats.append("🔨 Bans: ").append(bansReceived).append("\n");
+                    if (timeoutsReceived > 0) moderationStats.append("⏱️ Timeouts: ").append(timeoutsReceived).append("\n");
+                    if (untimeoutsReceived > 0) moderationStats.append("⏰ Untimeouts: ").append(untimeoutsReceived).append("\n");
+                }
+                
+                // Moderation performed stats
+                int warningsIssued = statsRs.getInt("total_warnings_issued");
+                int kicksPerformed = statsRs.getInt("total_kicks_performed");
+                int bansPerformed = statsRs.getInt("total_bans_performed");
+                int timeoutsPerformed = statsRs.getInt("total_timeouts_performed");
+                int untimeoutsPerformed = statsRs.getInt("total_untimeouts_performed");
+                
+                if (warningsIssued > 0 || kicksPerformed > 0 || bansPerformed > 0 || timeoutsPerformed > 0 || untimeoutsPerformed > 0) {
+                    if (moderationStats.length() > 0) moderationStats.append("\n");
+                    moderationStats.append("**Moderation Performed:**\n");
+                    if (warningsIssued > 0) moderationStats.append("⚠️ Warnings Issued: ").append(warningsIssued).append("\n");
+                    if (kicksPerformed > 0) moderationStats.append("🦶 Kicks Performed: ").append(kicksPerformed).append("\n");
+                    if (bansPerformed > 0) moderationStats.append("🔨 Bans Performed: ").append(bansPerformed).append("\n");
+                    if (timeoutsPerformed > 0) moderationStats.append("⏱️ Timeouts Performed: ").append(timeoutsPerformed).append("\n");
+                    if (untimeoutsPerformed > 0) moderationStats.append("⏰ Untimeouts Performed: ").append(untimeoutsPerformed).append("\n");
+                }
+                
+                // Activity stats
+                int ticketsCreated = statsRs.getInt("total_tickets_created");
+                int ticketsClosed = statsRs.getInt("total_tickets_closed");
+                int verificationsPerformed = statsRs.getInt("total_verifications_performed");
+                int messagesSent = statsRs.getInt("total_messages_sent");
+                
+                if (ticketsCreated > 0 || ticketsClosed > 0 || verificationsPerformed > 0 || messagesSent > 0) {
+                    activityStats.append("**Activity Stats:**\n");
+                    if (ticketsCreated > 0) activityStats.append("🎫 Tickets Created: ").append(ticketsCreated).append("\n");
+                    if (ticketsClosed > 0) activityStats.append("✅ Tickets Closed: ").append(ticketsClosed).append("\n");
+                    if (verificationsPerformed > 0) activityStats.append("✅ Verifications: ").append(verificationsPerformed).append("\n");
+                    if (messagesSent > 0) activityStats.append("💬 Messages Sent: ").append(messagesSent).append("\n");
+                }
+                
+                // Add fields to embed
+                if (moderationStats.length() > 0) {
+                    embed.addField("📊 Moderation Statistics", moderationStats.toString(), false);
+                }
+                if (activityStats.length() > 0) {
+                    embed.addField("📈 Activity Statistics", activityStats.toString(), false);
+                }
+                
+                if (moderationStats.length() == 0 && activityStats.length() == 0) {
+                    embed.addField("📊 Statistics", "No activity recorded yet.", false);
+                }
+            } else {
+                embed.addField("📊 Statistics", "No activity recorded yet.", false);
+            }
+            
+            return embed;
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting user info: " + e.getMessage());
+            e.printStackTrace();
+            return new EmbedBuilder()
+                .setTitle("❌ Error")
+                .setDescription("Failed to retrieve user information.")
+                .setColor(Color.RED);
+        }
+    }
+
+    /**
+     * Get user statistics for a specific date
+     */
+    public EmbedBuilder getUserStatisticsForDateEmbed(String guildId, String userId, String date) {
+        try {
+            // Get user basic info
+            String userQuery = "SELECT username, discriminator FROM users WHERE id = ?";
+            PreparedStatement userStmt = connection.prepareStatement(userQuery);
+            userStmt.setString(1, userId);
+            ResultSet userRs = userStmt.executeQuery();
+            
+            String displayName = "Unknown User";
+            if (userRs.next()) {
+                String username = userRs.getString("username");
+                String discriminator = userRs.getString("discriminator");
+                displayName = username + (discriminator != null ? "#" + discriminator : "");
+            }
+            
+            EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("📊 User Statistics for " + date)
+                .setDescription("Statistics for " + displayName)
+                .setColor(Color.BLUE)
+                .setTimestamp(java.time.Instant.now());
+            
+            // Get statistics for the specific date
+            String statsQuery = "SELECT * FROM user_statistics WHERE guild_id = ? AND user_id = ? AND date = ?";
+            PreparedStatement statsStmt = connection.prepareStatement(statsQuery);
+            statsStmt.setString(1, guildId);
+            statsStmt.setString(2, userId);
+            statsStmt.setString(3, date);
+            ResultSet statsRs = statsStmt.executeQuery();
+            
+            if (statsRs.next()) {
+                StringBuilder stats = new StringBuilder();
+                
+                // Check each statistic and add if > 0
+                if (statsRs.getInt("warnings_received") > 0) stats.append("⚠️ Warnings Received: ").append(statsRs.getInt("warnings_received")).append("\n");
+                if (statsRs.getInt("warnings_issued") > 0) stats.append("⚠️ Warnings Issued: ").append(statsRs.getInt("warnings_issued")).append("\n");
+                if (statsRs.getInt("kicks_received") > 0) stats.append("🦶 Kicks Received: ").append(statsRs.getInt("kicks_received")).append("\n");
+                if (statsRs.getInt("kicks_performed") > 0) stats.append("🦶 Kicks Performed: ").append(statsRs.getInt("kicks_performed")).append("\n");
+                if (statsRs.getInt("bans_received") > 0) stats.append("🔨 Bans Received: ").append(statsRs.getInt("bans_received")).append("\n");
+                if (statsRs.getInt("bans_performed") > 0) stats.append("🔨 Bans Performed: ").append(statsRs.getInt("bans_performed")).append("\n");
+                if (statsRs.getInt("timeouts_received") > 0) stats.append("⏱️ Timeouts Received: ").append(statsRs.getInt("timeouts_received")).append("\n");
+                if (statsRs.getInt("timeouts_performed") > 0) stats.append("⏱️ Timeouts Performed: ").append(statsRs.getInt("timeouts_performed")).append("\n");
+                if (statsRs.getInt("untimeouts_received") > 0) stats.append("⏰ Untimeouts Received: ").append(statsRs.getInt("untimeouts_received")).append("\n");
+                if (statsRs.getInt("untimeouts_performed") > 0) stats.append("⏰ Untimeouts Performed: ").append(statsRs.getInt("untimeouts_performed")).append("\n");
+                if (statsRs.getInt("tickets_created") > 0) stats.append("🎫 Tickets Created: ").append(statsRs.getInt("tickets_created")).append("\n");
+                if (statsRs.getInt("tickets_closed") > 0) stats.append("✅ Tickets Closed: ").append(statsRs.getInt("tickets_closed")).append("\n");
+                if (statsRs.getInt("verifications_performed") > 0) stats.append("✅ Verifications: ").append(statsRs.getInt("verifications_performed")).append("\n");
+                if (statsRs.getInt("messages_sent") > 0) stats.append("💬 Messages Sent: ").append(statsRs.getInt("messages_sent")).append("\n");
+                
+                if (stats.length() > 0) {
+                    embed.addField("📈 Daily Activity", stats.toString(), false);
+                } else {
+                    embed.addField("📈 Daily Activity", "No activity recorded for this date.", false);
+                }
+            } else {
+                embed.addField("📈 Daily Activity", "No activity recorded for this date.", false);
+            }
+            
+            return embed;
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting user statistics for date: " + e.getMessage());
+            e.printStackTrace();
+            return new EmbedBuilder()
+                .setTitle("❌ Error")
+                .setDescription("Failed to retrieve user statistics.")
+                .setColor(Color.RED);
+        }
     }
 
     /**
