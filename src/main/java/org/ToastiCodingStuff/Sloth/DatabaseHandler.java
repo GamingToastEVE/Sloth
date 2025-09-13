@@ -121,36 +121,38 @@ public class DatabaseHandler {
      */
     private void initializeTables() {
         try {
-            // Check for every table if already exist, if so break the method
-            if (tablesAlreadyExist()) {
-                System.out.println("Database tables already exist. Skipping initialization.");
-                return;
-            }
-
-            
             // Enable foreign keys
             Statement stmt = connection.createStatement();
             stmt.execute("PRAGMA foreign_keys = ON;");
 
-            createUsersTable();
-            createWarningsTable();
-            createModerationActionsTable();
-            createTicketsTable();
-            createTicketMessagesTable();
-            createGuildSettingsTable();
-            createRolePermissionsTable();
-            createBotLogsTable();
-            createStatisticsTable();
-            createTemporaryDataTable();
-            createGuildsTable();
-            createGuildSystemsTable();
-            createRulesEmbedsChannel();
+            // Check if all tables exist; if not, create them
+            if (!tablesAlreadyExist()) {
+                System.out.println("Creating missing database tables...");
+                createUsersTable();
+                createWarningsTable();
+                createModerationActionsTable();
+                createTicketsTable();
+                createTicketMessagesTable();
+                createGuildSettingsTable();
+                createRolePermissionsTable();
+                createBotLogsTable();
+                createStatisticsTable();
+                createTemporaryDataTable();
+                createGuildsTable();
+                createGuildSystemsTable();
+                createRulesEmbedsChannel();
+                
+                // Create legacy tables for backward compatibility
+                createLegacyTables();
+                
+                System.out.println("Database table creation completed.");
+            } else {
+                System.out.println("Database tables already exist.");
+            }
             
-            // Handle statistics table migrations
-            migrateStatisticsTable();
-            
-            // Create legacy tables for backward compatibility
-            createLegacyTables();
+            // Always run comprehensive migration to check for missing columns
+            // This ensures that all tables have the latest schema regardless of when they were created
+            migrateAllTables();
             
         } catch (SQLException e) {
             System.err.println("Error initializing database tables: " + e.getMessage());
@@ -482,6 +484,209 @@ public class DatabaseHandler {
         }
         if (!hasVerifications) {
             stmt.execute("ALTER TABLE statistics ADD COLUMN verifications_performed INTEGER DEFAULT 0");
+        }
+    }
+
+    /**
+     * Comprehensive migration method that checks all tables for missing columns and adds them automatically.
+     * This method defines the expected schema for each table and ensures all required columns exist.
+     * It uses the generic updateTableColumns() function for consistency and error handling.
+     */
+    private void migrateAllTables() throws SQLException {
+        System.out.println("Checking all tables for missing columns...");
+        
+        try {
+            // Users table migration
+            java.util.Map<String, String> usersColumns = new java.util.HashMap<>();
+            usersColumns.put("id", "INTEGER PRIMARY KEY");
+            usersColumns.put("username", "TEXT NOT NULL");
+            usersColumns.put("discriminator", "TEXT");
+            usersColumns.put("avatar", "TEXT");
+            usersColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            usersColumns.put("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("users", usersColumns);
+
+            // Guilds table migration
+            java.util.Map<String, String> guildsColumns = new java.util.HashMap<>();
+            guildsColumns.put("id", "INTEGER PRIMARY KEY");
+            guildsColumns.put("name", "TEXT NOT NULL");
+            guildsColumns.put("prefix", "TEXT DEFAULT '!'");
+            guildsColumns.put("language", "TEXT DEFAULT 'de'");
+            guildsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            guildsColumns.put("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            guildsColumns.put("active", "INTEGER DEFAULT 1");
+            updateTableColumns("guilds", guildsColumns);
+
+            // Warnings table migration
+            java.util.Map<String, String> warningsColumns = new java.util.HashMap<>();
+            warningsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            warningsColumns.put("guild_id", "INTEGER NOT NULL");
+            warningsColumns.put("user_id", "INTEGER NOT NULL");
+            warningsColumns.put("moderator_id", "INTEGER NOT NULL");
+            warningsColumns.put("reason", "TEXT NOT NULL");
+            warningsColumns.put("severity", "TEXT DEFAULT 'MEDIUM'");
+            warningsColumns.put("active", "INTEGER DEFAULT 1");
+            warningsColumns.put("expires_at", "TEXT");
+            warningsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("warnings", warningsColumns);
+
+            // Moderation_actions table migration
+            java.util.Map<String, String> moderationActionsColumns = new java.util.HashMap<>();
+            moderationActionsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            moderationActionsColumns.put("guild_id", "INTEGER NOT NULL");
+            moderationActionsColumns.put("user_id", "INTEGER NOT NULL");
+            moderationActionsColumns.put("moderator_id", "INTEGER NOT NULL");
+            moderationActionsColumns.put("action_type", "TEXT NOT NULL");
+            moderationActionsColumns.put("reason", "TEXT NOT NULL");
+            moderationActionsColumns.put("duration", "INTEGER");
+            moderationActionsColumns.put("expires_at", "TEXT");
+            moderationActionsColumns.put("active", "INTEGER DEFAULT 1");
+            moderationActionsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("moderation_actions", moderationActionsColumns);
+
+            // Tickets table migration
+            java.util.Map<String, String> ticketsColumns = new java.util.HashMap<>();
+            ticketsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            ticketsColumns.put("guild_id", "INTEGER NOT NULL");
+            ticketsColumns.put("user_id", "INTEGER NOT NULL");
+            ticketsColumns.put("channel_id", "INTEGER");
+            ticketsColumns.put("category", "TEXT DEFAULT 'general'");
+            ticketsColumns.put("subject", "TEXT");
+            ticketsColumns.put("status", "TEXT DEFAULT 'OPEN'");
+            ticketsColumns.put("priority", "TEXT DEFAULT 'MEDIUM'");
+            ticketsColumns.put("assigned_to", "INTEGER");
+            ticketsColumns.put("closed_by", "INTEGER");
+            ticketsColumns.put("closed_reason", "TEXT");
+            ticketsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            ticketsColumns.put("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            ticketsColumns.put("closed_at", "TEXT");
+            updateTableColumns("tickets", ticketsColumns);
+
+            // Ticket_messages table migration
+            java.util.Map<String, String> ticketMessagesColumns = new java.util.HashMap<>();
+            ticketMessagesColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            ticketMessagesColumns.put("ticket_id", "INTEGER NOT NULL");
+            ticketMessagesColumns.put("user_id", "INTEGER NOT NULL");
+            ticketMessagesColumns.put("message_id", "INTEGER NOT NULL");
+            ticketMessagesColumns.put("content", "TEXT NOT NULL");
+            ticketMessagesColumns.put("attachments", "TEXT");
+            ticketMessagesColumns.put("is_staff", "INTEGER DEFAULT 0");
+            ticketMessagesColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("ticket_messages", ticketMessagesColumns);
+
+            // Guild_settings table migration
+            java.util.Map<String, String> guildSettingsColumns = new java.util.HashMap<>();
+            guildSettingsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            guildSettingsColumns.put("guild_id", "INTEGER NOT NULL");
+            guildSettingsColumns.put("modlog_channel", "INTEGER");
+            guildSettingsColumns.put("warn_threshold_kick", "INTEGER DEFAULT 5");
+            guildSettingsColumns.put("warn_threshold_ban", "INTEGER DEFAULT 8");
+            guildSettingsColumns.put("warn_expire_days", "INTEGER DEFAULT 30");
+            guildSettingsColumns.put("ticket_category", "INTEGER");
+            guildSettingsColumns.put("ticket_channel", "INTEGER");
+            guildSettingsColumns.put("ticket_role", "INTEGER");
+            guildSettingsColumns.put("ticket_transcript", "INTEGER DEFAULT 1");
+            guildSettingsColumns.put("join_role", "INTEGER");
+            guildSettingsColumns.put("mute_role", "INTEGER");
+            guildSettingsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            guildSettingsColumns.put("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("guild_settings", guildSettingsColumns);
+
+            // Role_permissions table migration
+            java.util.Map<String, String> rolePermissionsColumns = new java.util.HashMap<>();
+            rolePermissionsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            rolePermissionsColumns.put("guild_id", "INTEGER NOT NULL");
+            rolePermissionsColumns.put("role_id", "INTEGER NOT NULL");
+            rolePermissionsColumns.put("permission", "TEXT NOT NULL");
+            rolePermissionsColumns.put("allowed", "INTEGER DEFAULT 1");
+            rolePermissionsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("role_permissions", rolePermissionsColumns);
+
+            // Bot_logs table migration
+            java.util.Map<String, String> botLogsColumns = new java.util.HashMap<>();
+            botLogsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            botLogsColumns.put("guild_id", "INTEGER");
+            botLogsColumns.put("user_id", "INTEGER");
+            botLogsColumns.put("event_type", "TEXT NOT NULL");
+            botLogsColumns.put("message", "TEXT NOT NULL");
+            botLogsColumns.put("data", "TEXT");
+            botLogsColumns.put("level", "TEXT DEFAULT 'INFO'");
+            botLogsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("bot_logs", botLogsColumns);
+
+            // Statistics table migration
+            java.util.Map<String, String> statisticsColumns = new java.util.HashMap<>();
+            statisticsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            statisticsColumns.put("guild_id", "INTEGER NOT NULL");
+            statisticsColumns.put("date", "TEXT NOT NULL");
+            statisticsColumns.put("warnings_issued", "INTEGER DEFAULT 0");
+            statisticsColumns.put("kicks_performed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("bans_performed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("timeouts_performed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("untimeouts_performed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("tickets_created", "INTEGER DEFAULT 0");
+            statisticsColumns.put("tickets_closed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("verifications_performed", "INTEGER DEFAULT 0");
+            statisticsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("statistics", statisticsColumns);
+
+            // Temporary_data table migration
+            java.util.Map<String, String> temporaryDataColumns = new java.util.HashMap<>();
+            temporaryDataColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            temporaryDataColumns.put("guild_id", "INTEGER NOT NULL");
+            temporaryDataColumns.put("user_id", "INTEGER NOT NULL");
+            temporaryDataColumns.put("data_type", "TEXT NOT NULL");
+            temporaryDataColumns.put("data", "TEXT NOT NULL");
+            temporaryDataColumns.put("expires_at", "TEXT NOT NULL");
+            temporaryDataColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("temporary_data", temporaryDataColumns);
+
+            // Guild_systems table migration
+            java.util.Map<String, String> guildSystemsColumns = new java.util.HashMap<>();
+            guildSystemsColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            guildSystemsColumns.put("guild_id", "INTEGER NOT NULL");
+            guildSystemsColumns.put("system_type", "TEXT NOT NULL");
+            guildSystemsColumns.put("active", "INTEGER DEFAULT 1");
+            guildSystemsColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            guildSystemsColumns.put("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            updateTableColumns("guild_systems", guildSystemsColumns);
+
+            // Rules_embeds_channel table migration
+            java.util.Map<String, String> rulesEmbedsChannelColumns = new java.util.HashMap<>();
+            rulesEmbedsChannelColumns.put("id", "INTEGER PRIMARY KEY AUTOINCREMENT");
+            rulesEmbedsChannelColumns.put("guild_id", "INTEGER");
+            rulesEmbedsChannelColumns.put("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            rulesEmbedsChannelColumns.put("title", "TEXT NOT NULL");
+            rulesEmbedsChannelColumns.put("description", "TEXT NOT NULL");
+            rulesEmbedsChannelColumns.put("footer", "TEXT");
+            rulesEmbedsChannelColumns.put("color", "TEXT DEFAULT 'green'");
+            rulesEmbedsChannelColumns.put("role_id", "TEXT");
+            rulesEmbedsChannelColumns.put("button_label", "TEXT");
+            rulesEmbedsChannelColumns.put("button_emoji_id", "TEXT");
+            updateTableColumns("rules_embeds_channel", rulesEmbedsChannelColumns);
+
+            // Legacy tables migration - these are created for backward compatibility
+            // Log_channels table migration
+            java.util.Map<String, String> logChannelsColumns = new java.util.HashMap<>();
+            logChannelsColumns.put("guildid", "TEXT PRIMARY KEY");
+            logChannelsColumns.put("channelid", "TEXT NOT NULL");
+            updateTableColumns("log_channels", logChannelsColumns);
+
+            // Warn_system_settings table migration
+            java.util.Map<String, String> warnSystemSettingsColumns = new java.util.HashMap<>();
+            warnSystemSettingsColumns.put("guild_id", "TEXT PRIMARY KEY");
+            warnSystemSettingsColumns.put("max_warns", "INTEGER NOT NULL");
+            warnSystemSettingsColumns.put("minutes_muted", "INTEGER NOT NULL");
+            warnSystemSettingsColumns.put("role_id", "TEXT NOT NULL");
+            warnSystemSettingsColumns.put("warn_time_hours", "INTEGER NOT NULL");
+            updateTableColumns("warn_system_settings", warnSystemSettingsColumns);
+
+            System.out.println("All table migrations completed successfully.");
+            
+        } catch (SQLException e) {
+            System.err.println("Error during table migrations: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
     }
 
