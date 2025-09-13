@@ -438,6 +438,7 @@ public class DatabaseHandler {
             "untimeouts_performed INTEGER DEFAULT 0, " +
             "tickets_created INTEGER DEFAULT 0, " +
             "tickets_closed INTEGER DEFAULT 0, " +
+            "verifications_performed INTEGER DEFAULT 0, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
             "UNIQUE(guild_id, date)" +
@@ -447,7 +448,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Migrate existing statistics table to add timeout columns
+     * Migrate existing statistics table to add timeout and verification columns
      */
     private void migrateStatisticsTable() throws SQLException {
         Statement stmt = connection.createStatement();
@@ -457,6 +458,7 @@ public class DatabaseHandler {
         ResultSet rs = stmt.executeQuery(checkColumns);
         boolean hasTimeouts = false;
         boolean hasUntimeouts = false;
+        boolean hasVerifications = false;
         
         while (rs.next()) {
             String columnName = rs.getString("name");
@@ -464,6 +466,8 @@ public class DatabaseHandler {
                 hasTimeouts = true;
             } else if ("untimeouts_performed".equals(columnName)) {
                 hasUntimeouts = true;
+            } else if ("verifications_performed".equals(columnName)) {
+                hasVerifications = true;
             }
         }
         
@@ -473,6 +477,9 @@ public class DatabaseHandler {
         }
         if (!hasUntimeouts) {
             stmt.execute("ALTER TABLE statistics ADD COLUMN untimeouts_performed INTEGER DEFAULT 0");
+        }
+        if (!hasVerifications) {
+            stmt.execute("ALTER TABLE statistics ADD COLUMN verifications_performed INTEGER DEFAULT 0");
         }
     }
 
@@ -1639,6 +1646,13 @@ public class DatabaseHandler {
     }
 
     /**
+     * Increment verifications performed count for a guild
+     */
+    public void incrementVerificationsPerformed(String guildId) {
+        updateStatistics(guildId, "verifications_performed", 1);
+    }
+
+    /**
      * Get statistics for a guild for a specific date
      */
     public String getStatisticsForDate(String guildId, String date) {
@@ -1793,6 +1807,22 @@ public class DatabaseHandler {
                 }
             }
 
+            // Get verification statistics
+            String verificationQuery = "SELECT verifications_performed FROM statistics WHERE guild_id = ? AND date = ?";
+            PreparedStatement verificationStmt = connection.prepareStatement(verificationQuery);
+            verificationStmt.setString(1, guildId);
+            verificationStmt.setString(2, date);
+            ResultSet verificationRs = verificationStmt.executeQuery();
+
+            if (verificationRs.next()) {
+                int verificationsPerformed = verificationRs.getInt("verifications_performed");
+                
+                if (verificationsPerformed > 0) {
+                    hasData = true;
+                    moderationStats.append("✅ VERIFICATIONS_PERFORMED: ").append(verificationsPerformed).append("\n");
+                }
+            }
+
             if (hasData) {
                 embed.addField("Moderation Actions", moderationStats.toString(), false);
             } else {
@@ -1891,6 +1921,22 @@ public class DatabaseHandler {
                     hasData = true;
                     totalStats.append("🎫 TICKETS_CREATED: ").append(ticketsCreated).append("\n");
                     totalStats.append("🔒 TICKETS_CLOSED: ").append(ticketsClosed).append("\n");
+                }
+            }
+
+            // Get weekly verification statistics
+            String weeklyVerificationQuery = "SELECT SUM(verifications_performed) as total_verifications " +
+                    "FROM statistics WHERE guild_id = ? AND date >= DATE('now', '-7 days')";
+            PreparedStatement weeklyVerificationStmt = connection.prepareStatement(weeklyVerificationQuery);
+            weeklyVerificationStmt.setString(1, guildId);
+            ResultSet weeklyVerificationRs = weeklyVerificationStmt.executeQuery();
+
+            if (weeklyVerificationRs.next()) {
+                int totalVerifications = weeklyVerificationRs.getInt("total_verifications");
+                
+                if (totalVerifications > 0) {
+                    hasData = true;
+                    totalStats.append("✅ VERIFICATIONS_PERFORMED: ").append(totalVerifications).append("\n");
                 }
             }
 

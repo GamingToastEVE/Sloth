@@ -217,6 +217,8 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             // Add the role
             event.getGuild().addRoleToMember(member, verificationRole).queue(
                 success -> {
+                    // Track verification statistics
+                    handler.incrementVerificationsPerformed(guildId);
                     event.reply("✅ Successfully verified! You have been given the " + verificationRole.getName() + " role.").setEphemeral(true).queue();
                 },
                 error -> {
