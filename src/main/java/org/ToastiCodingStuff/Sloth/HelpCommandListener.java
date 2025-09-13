@@ -121,6 +121,10 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Server activity tracking\n" +
                                 "• Daily and weekly reports\n" +
                                 "• Engagement metrics", false)
+                        .addField("📋 **Rules/Verification System**", 
+                                "• Custom rules embeds with verification buttons\n" +
+                                "• Role assignment upon verification\n" +
+                                "• Verification statistics tracking", false)
                         .setColor(Color.ORANGE)
                         .setFooter("All systems are ready to use!");
 
@@ -196,6 +200,9 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
                                 "`/stats-date` - Statistics for specific date", false)
+                        .addField("**Rules/Verification System**", 
+                                "`/add-rules-embed` - Create rules embeds with verification\n" +
+                                "`/setup-rules` - Display rules in current channel", false)
                         .addField("**General Commands**", 
                                 "`/help` - Show this help system", false)
                         .setColor(Color.MAGENTA)
