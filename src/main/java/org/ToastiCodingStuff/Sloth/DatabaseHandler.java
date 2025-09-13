@@ -895,65 +895,22 @@ public class DatabaseHandler {
         return new ArrayList<>();
     }
 
-    public ArrayList<EmbedBuilder> getAllRulesEmbedFromDatabase (String guildID) {
+    public String getRoleIDFromRulesEmbed (String guildID) {
+        String roleId = "0";
         try {
-            ArrayList<EmbedBuilder> embeds = new ArrayList<>();
-            int number = getNumberOfEmbedsInDataBase(guildID);
-            String query = "SELECT * FROM rules_embeds_channel WHERE guild_id = ?";
+            String query = "SELECT role_id FROM rules_embeds_channel WHERE guild_id = ?";
             PreparedStatement pstmt = connection.prepareStatement(query);
             pstmt.setString(1, guildID);
             ResultSet rs = pstmt.executeQuery();
-            for (int i = 0; i < number; i++) {
-                if (rs.next()) {
-                    String title = rs.getString("title");
-                    String description = rs.getString("description");
-                    String footer = rs.getString("footer");
-                    String color = rs.getString("color");
-                    EmbedBuilder embed = new EmbedBuilder();
-                    embed.setTitle(title);
-                    embed.setDescription(description);
-                    if (footer != null && !footer.isEmpty()) {
-                        embed.setFooter(footer);
-                    }
-                    if (color != null && !color.isEmpty()) {
-                        try {
-                            // Handle hex colors and named colors
-                            if (color.startsWith("#")) {
-                                Color parsedColor = Color.decode(color);
-                                embed.setColor(parsedColor);
-                            } else {
-                                // Handle named colors
-                                switch (color.toLowerCase()) {
-                                    case "red": embed.setColor(Color.RED); break;
-                                    case "blue": embed.setColor(Color.BLUE); break;
-                                    case "green": embed.setColor(Color.GREEN); break;
-                                    case "yellow": embed.setColor(Color.YELLOW); break;
-                                    case "orange": embed.setColor(Color.ORANGE); break;
-                                    case "pink": embed.setColor(Color.PINK); break;
-                                    case "cyan": embed.setColor(Color.CYAN); break;
-                                    case "magenta": embed.setColor(Color.MAGENTA); break;
-                                    case "white": embed.setColor(Color.WHITE); break;
-                                    case "black": embed.setColor(Color.BLACK); break;
-                                    case "gray": case "grey": embed.setColor(Color.GRAY); break;
-                                    default: embed.setColor(Color.GREEN); break;
-                                }
-                            }
-                        } catch (NumberFormatException e) {
-                            // If color is not a valid hex code, use default green
-                            embed.setColor(Color.GREEN);
-                        }
-                    } else {
-                        embed.setColor(Color.GREEN);
-                    }
-                    embeds.add(embed);
-                }
+            if (rs.next()) {
+                roleId = rs.getString("role_id");
+                System.out.println("Found role ID: " + roleId);
             }
-            return embeds;
         } catch (SQLException e) {
-            System.err.println("Error getting rules embed from database: " + e.getMessage());
+            System.err.println("Error getting role ID from rules embed: " + e.getMessage());
             e.printStackTrace();
         }
-        return null;
+        return roleId;
     }
 
     //Log Channel Databasekram

@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.interactions.components.ActionRow;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
@@ -61,7 +62,7 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         // Get required parameters
         String title = event.getOption("title").getAsString();
         String description = event.getOption("description").getAsString();
-        Role mentionRole = event.getOption("mention_role").getAsRole();
+        Role mentionRole = Objects.requireNonNull(event.getOption("role_to_give")).getAsRole();
 
         // Get optional parameters
         String buttonEmoji = "✅";
@@ -139,8 +140,6 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             return;
         }
 
-        event.deferReply().queue();
-
         // Send each embed with its verification button
         for (int i = 0; i < embedDataList.size(); i++) {
             // Create button
@@ -170,33 +169,19 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
         }
 
+        event.reply("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").setEphemeral(true).queue();
+
         //event.getHook().editOriginal("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").queue();
     }
 
     private void handleRulesVerificationButton(ButtonInteractionEvent event, String customId) {
         try {
             // Extract embed ID from custom ID (format: rules_verify_<id>)
-            int embedId = Integer.parseInt(customId.substring(13));
-            String guildId = event.getGuild().getId();
-            
-            // Get the specific embed data
-            ArrayList<DatabaseHandler.RulesEmbedData> embedDataList = handler.getAllRulesEmbedDataFromDatabase(guildId);
-            DatabaseHandler.RulesEmbedData targetEmbed = null;
-            
-            for (DatabaseHandler.RulesEmbedData embedData : embedDataList) {
-                if (embedData.id == embedId) {
-                    targetEmbed = embedData;
-                    break;
-                }
-            }
-            
-            if (targetEmbed == null || targetEmbed.roleId == null) {
-                event.reply("❌ Error: Could not find the associated role for this verification button.").setEphemeral(true).queue();
-                return;
-            }
+            String embedId = handler.getRoleIDFromRulesEmbed(event.getGuild().getId());
+            System.out.println("Extracted embed ID: " + embedId);
             
             // Get the role
-            Role verificationRole = event.getGuild().getRoleById(targetEmbed.roleId);
+            Role verificationRole = Objects.requireNonNull(event.getGuild()).getRoleById(embedId);
             if (verificationRole == null) {
                 event.reply("❌ Error: The verification role no longer exists. Please contact an administrator.").setEphemeral(true).queue();
                 return;
@@ -218,7 +203,7 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             event.getGuild().addRoleToMember(member, verificationRole).queue(
                 success -> {
                     // Track verification statistics
-                    handler.incrementVerificationsPerformed(guildId);
+                    handler.incrementVerificationsPerformed(event.getGuild().getId());
                     event.reply("✅ Successfully verified! You have been given the " + verificationRole.getName() + " role.").setEphemeral(true).queue();
                 },
                 error -> {

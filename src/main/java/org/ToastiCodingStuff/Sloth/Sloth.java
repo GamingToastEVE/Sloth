@@ -33,6 +33,8 @@ public class Sloth {
         // Register all system commands globally
         registerGlobalCommands(api, handler);
 
+        handler.runMigrationCheck();
+
         // Sync all current guilds to database
         handler.syncGuilds(api.getGuilds());
     }
