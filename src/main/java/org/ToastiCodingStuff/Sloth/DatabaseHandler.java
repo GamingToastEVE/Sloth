@@ -9,6 +9,72 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 public class DatabaseHandler {
+    
+    /**
+     * Data class to hold complete rules embed information
+     */
+    public static class RulesEmbedData {
+        public final int id;
+        public final String title;
+        public final String description;
+        public final String footer;
+        public final String color;
+        public final String roleId;
+        public final String buttonLabel;
+        public final String buttonEmoji;
+        
+        public RulesEmbedData(int id, String title, String description, String footer, String color, 
+                             String roleId, String buttonLabel, String buttonEmoji) {
+            this.id = id;
+            this.title = title;
+            this.description = description;
+            this.footer = footer;
+            this.color = color;
+            this.roleId = roleId;
+            this.buttonLabel = buttonLabel;
+            this.buttonEmoji = buttonEmoji;
+        }
+        
+        public EmbedBuilder toEmbedBuilder() {
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.setTitle(title);
+            embed.setDescription(description);
+            if (footer != null && !footer.isEmpty()) {
+                embed.setFooter(footer);
+            }
+            if (color != null && !color.isEmpty()) {
+                try {
+                    // Handle hex colors (e.g., "#FF0000") and named colors
+                    if (color.startsWith("#")) {
+                        Color parsedColor = Color.decode(color);
+                        embed.setColor(parsedColor);
+                    } else {
+                        // Handle named colors
+                        switch (color.toLowerCase()) {
+                            case "red": embed.setColor(Color.RED); break;
+                            case "blue": embed.setColor(Color.BLUE); break;
+                            case "green": embed.setColor(Color.GREEN); break;
+                            case "yellow": embed.setColor(Color.YELLOW); break;
+                            case "orange": embed.setColor(Color.ORANGE); break;
+                            case "pink": embed.setColor(Color.PINK); break;
+                            case "cyan": embed.setColor(Color.CYAN); break;
+                            case "magenta": embed.setColor(Color.MAGENTA); break;
+                            case "white": embed.setColor(Color.WHITE); break;
+                            case "black": embed.setColor(Color.BLACK); break;
+                            case "gray": case "grey": embed.setColor(Color.GRAY); break;
+                            default: embed.setColor(Color.GREEN); break;
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // If color is not valid, use default green
+                    embed.setColor(Color.GREEN);
+                }
+            } else {
+                embed.setColor(Color.GREEN);
+            }
+            return embed;
+        }
+    }
 
     private final Connection connection;
     public DatabaseHandler() {
@@ -497,23 +563,28 @@ public class DatabaseHandler {
     }
 
     //add Embed to Database
-    public Boolean addRulesEmbedToDatabase(String guildID, String title, String description, String footer, String color) {
+    public Boolean addRulesEmbedToDatabase(String guildID, String title, String description, String footer, String color, String roleId, String buttonLabel, String buttonEmoji) {
         try {
             if (getNumberOfEmbedsInDataBase(guildID) >= 3) {
-                System.out.println("Guild already has a rules embed in the database.");
+                System.out.println("Guild already has maximum rules embeds (3) in the database.");
                 return false;
             }
-            String insertEmbed = "INSERT INTO rules_embeds_channel (guild_id, title, description, footer, color) VALUES (?, ?, ?, ?, ?)";
+            String insertEmbed = "INSERT INTO rules_embeds_channel (guild_id, title, description, footer, color, role_id, button_label, button_emoji_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             PreparedStatement pstmt = connection.prepareStatement(insertEmbed);
             pstmt.setString(1, guildID);
             pstmt.setString(2, title);
             pstmt.setString(3, description);
             pstmt.setString(4, footer);
             pstmt.setString(5, color);
+            pstmt.setString(6, roleId);
+            pstmt.setString(7, buttonLabel);
+            pstmt.setString(8, buttonEmoji);
             pstmt.executeUpdate();
+            System.out.println("Successfully added rules embed to database for guild: " + guildID);
         } catch (SQLException e) {
             System.err.println("Error adding rules embed to database: " + e.getMessage());
             e.printStackTrace();
+            return false;
         }
         return true;
     }
@@ -532,6 +603,35 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    public ArrayList<RulesEmbedData> getAllRulesEmbedDataFromDatabase(String guildID) {
+        try {
+            ArrayList<RulesEmbedData> embedDataList = new ArrayList<>();
+            String query = "SELECT * FROM rules_embeds_channel WHERE guild_id = ?";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setString(1, guildID);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String title = rs.getString("title");
+                String description = rs.getString("description");
+                String footer = rs.getString("footer");
+                String color = rs.getString("color");
+                String roleId = rs.getString("role_id");
+                String buttonLabel = rs.getString("button_label");
+                String buttonEmoji = rs.getString("button_emoji_id");
+                
+                RulesEmbedData embedData = new RulesEmbedData(id, title, description, footer, color, roleId, buttonLabel, buttonEmoji);
+                embedDataList.add(embedData);
+            }
+            return embedDataList;
+        } catch (SQLException e) {
+            System.err.println("Error getting rules embed data from database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return new ArrayList<>();
     }
 
     public ArrayList<EmbedBuilder> getAllRulesEmbedFromDatabase (String guildID) {
@@ -556,8 +656,27 @@ public class DatabaseHandler {
                     }
                     if (color != null && !color.isEmpty()) {
                         try {
-                            Color parsedColor = Color.decode(color);
-                            embed.setColor(parsedColor);
+                            // Handle hex colors and named colors
+                            if (color.startsWith("#")) {
+                                Color parsedColor = Color.decode(color);
+                                embed.setColor(parsedColor);
+                            } else {
+                                // Handle named colors
+                                switch (color.toLowerCase()) {
+                                    case "red": embed.setColor(Color.RED); break;
+                                    case "blue": embed.setColor(Color.BLUE); break;
+                                    case "green": embed.setColor(Color.GREEN); break;
+                                    case "yellow": embed.setColor(Color.YELLOW); break;
+                                    case "orange": embed.setColor(Color.ORANGE); break;
+                                    case "pink": embed.setColor(Color.PINK); break;
+                                    case "cyan": embed.setColor(Color.CYAN); break;
+                                    case "magenta": embed.setColor(Color.MAGENTA); break;
+                                    case "white": embed.setColor(Color.WHITE); break;
+                                    case "black": embed.setColor(Color.BLACK); break;
+                                    case "gray": case "grey": embed.setColor(Color.GRAY); break;
+                                    default: embed.setColor(Color.GREEN); break;
+                                }
+                            }
                         } catch (NumberFormatException e) {
                             // If color is not a valid hex code, use default green
                             embed.setColor(Color.GREEN);
