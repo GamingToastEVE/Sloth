@@ -62,12 +62,16 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         String title = event.getOption("title").getAsString();
         String description = event.getOption("description").getAsString();
         Role mentionRole = event.getOption("mention_role").getAsRole();
-        String buttonLabel = event.getOption("button_label").getAsString();
 
         // Get optional parameters
-        String buttonEmoji = null;
+        String buttonEmoji = "✅";
         if (event.getOption("button_emoji") != null) {
             buttonEmoji = event.getOption("button_emoji").getAsString();
+        }
+
+        String buttonLabel = "Verify";
+        if (event.getOption("button_label") != null) {
+            buttonLabel = event.getOption("button_label").getAsString();
         }
         
         String color = "green";
@@ -138,29 +142,35 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         event.deferReply().queue();
 
         // Send each embed with its verification button
-        for (DatabaseHandler.RulesEmbedData embedData : embedDataList) {
+        for (int i = 0; i < embedDataList.size(); i++) {
             // Create button
             Button verifyButton;
-            if (embedData.buttonEmoji != null && !embedData.buttonEmoji.isEmpty()) {
-                try {
-                    // Try to parse as custom emoji or unicode emoji
-                    Emoji emoji = Emoji.fromFormatted(embedData.buttonEmoji);
-                    verifyButton = Button.primary("rules_verify_" + embedData.id, embedData.buttonLabel).withEmoji(emoji);
-                } catch (Exception e) {
-                    // If emoji parsing fails, create button without emoji
-                    verifyButton = Button.primary("rules_verify_" + embedData.id, embedData.buttonLabel);
+            if (i == embedDataList.size() - 1) {
+                if (embedDataList.get(i).buttonEmoji != null && !embedDataList.get(i).buttonEmoji.isEmpty()) {
+                    try {
+                        // Try to parse as custom emoji or unicode emoji
+                        Emoji emoji = Emoji.fromFormatted(embedDataList.get(i).buttonEmoji);
+                        verifyButton = Button.primary("rules_verify_" + embedDataList.get(i).id, embedDataList.get(i).buttonLabel).withEmoji(emoji);
+                    } catch (Exception e) {
+                        // If emoji parsing fails, create button without emoji
+                        verifyButton = Button.primary("rules_verify_" + embedDataList.get(i).id, embedDataList.get(i).buttonLabel);
+                    }
+                } else {
+                    verifyButton = Button.primary("rules_verify_" + embedDataList.get(i).id, embedDataList.get(i).buttonLabel);
                 }
+
+                // Send embed with button
+                event.getChannel().sendMessageEmbeds(embedDataList.get(i).toEmbedBuilder().build())
+                        .setComponents(ActionRow.of(verifyButton))
+                        .queue();
             } else {
-                verifyButton = Button.primary("rules_verify_" + embedData.id, embedData.buttonLabel);
+                // Send embed without button
+                event.getChannel().sendMessageEmbeds(embedDataList.get(i).toEmbedBuilder().build()).queue();
             }
 
-            // Send embed with button
-            event.getHook().sendMessageEmbeds(embedData.toEmbedBuilder().build())
-                 .setComponents(ActionRow.of(verifyButton))
-                 .queue();
         }
 
-        event.getHook().editOriginal("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").queue();
+        //event.getHook().editOriginal("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").queue();
     }
 
     private void handleRulesVerificationButton(ButtonInteractionEvent event, String customId) {
