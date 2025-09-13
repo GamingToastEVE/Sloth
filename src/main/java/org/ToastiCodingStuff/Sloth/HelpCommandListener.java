@@ -52,6 +52,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "⚙️ **Systems** - Available modular systems\n" +
                                 "📋 **Setup** - How to configure systems\n" +
                                 "📖 **Commands** - Complete command reference\n" +
+                                "🎨 **Formatting** - Rules embed formatting guide\n" +
                                 "📜 **Legal** - Terms of Service and Privacy Policy\n" +
                                 "💡 **Support Development** - How to support the bot\n\n" +
                                 "Note: this bot is completely reworked and settings from the old version will not carry over.")
@@ -159,6 +160,9 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Ensure staff have appropriate Discord permissions\n" +
                                 "• Bot needs Admin permissions for full functionality\n" +
                                 "• Configure role-based access for tickets", false)
+                        .addField("**Formatting Rules Embeds**", 
+                                "Need help formatting your rules descriptions? Use Discord markdown!\n" +
+                                "📝 Click the 🎨 Formatting button below for a complete guide.", false)
                         .setColor(Color.CYAN)
                         .setFooter("Need help? Create a support ticket!");
 
@@ -169,8 +173,8 @@ public class HelpCommandListener extends ListenerAdapter {
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", "🎨 Formatting"),
+                        Button.primary("help_support_developement", "💡 Support Development")
                 );
                 break;
 
@@ -202,7 +206,8 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/stats-date` - Statistics for specific date", false)
                         .addField("**Rules/Verification System**", 
                                 "`/add-rules-embed` - Create rules embeds with verification\n" +
-                                "`/setup-rules` - Display rules in current channel", false)
+                                "`/setup-rules` - Display rules in current channel\n" +
+                                "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
                         .addField("**General Commands**", 
                                 "`/help` - Show this help system", false)
                         .setColor(Color.MAGENTA)
@@ -215,7 +220,7 @@ public class HelpCommandListener extends ListenerAdapter {
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_rules_formatting", "🎨 Formatting"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -280,6 +285,55 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_support_developement", "💡 Support Development"),
                         Button.link("https://github.com/GamingToastEVE/Delta", "📄 View on GitHub")
+                );
+                break;
+
+            case "rules_formatting":
+                embed.setTitle("📝 Rules Embed Formatting Guide")
+                        .setDescription("Learn how to format your rules embed descriptions using Discord markdown:\n\n")
+                        .addField("**Basic Text Formatting**", 
+                                "• `**bold text**` → **bold text**\n" +
+                                "• `*italic text*` → *italic text*\n" +
+                                "• `__underlined text__` → __underlined text__\n" +
+                                "• `~~strikethrough~~` → ~~strikethrough~~\n" +
+                                "• `||spoiler text||` → ||spoiler text||", false)
+                        .addField("**Code Formatting**", 
+                                "• `` `inline code` `` → `inline code`\n" +
+                                "• ```\\n```code block```\\n``` → Multi-line code blocks\n" +
+                                "• ```\\n```language\\ncode```\\n``` → Syntax highlighted code", false)
+                        .addField("**Lists and Structure**", 
+                                "• `• Bullet point` → Bullet lists\n" +
+                                "• `1. Numbered item` → Numbered lists\n" +
+                                "• `> Quote text` → Block quotes\n" +
+                                "• `>>> Multi-line quote` → Multi-line quotes", false)
+                        .addField("**Links and Mentions**", 
+                                "• `[Link Text](https://example.com)` → Clickable links\n" +
+                                "• `<@userid>` → User mentions\n" +
+                                "• `<#channelid>` → Channel mentions\n" +
+                                "• `<@&roleid>` → Role mentions", false)
+                        .addField("**Special Characters**", 
+                                "• `:emoji_name:` → Discord emojis\n" +
+                                "• `<:name:id>` → Custom server emojis\n" +
+                                "• `\\n` → Line breaks in descriptions\n" +
+                                "• `\\*` → Escape special characters", false)
+                        .addField("**Tips for Rules Embeds**", 
+                                "• Use **bold** for rule headers\n" +
+                                "• Use `code blocks` for examples\n" +
+                                "• Keep descriptions under 4096 characters\n" +
+                                "• Use line breaks (\\n) for better readability\n" +
+                                "• Test formatting before publishing", false)
+                        .setColor(Color.YELLOW)
+                        .setFooter("Navigate using buttons below");
+
+                actionRow = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home"),
+                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                actionRow2 = ActionRow.of(
+                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
