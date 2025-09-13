@@ -142,7 +142,7 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("ticket-setup", "Configure the ticket system for this server")
                 .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
                 .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
-                .addOption(OptionType.ROLE, "support_role", "Role that can manage tickets", false));
+                .addOption(OptionType.ROLE, "support-role", "Role that can manage tickets", false));
                 //.addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
         commands.add(Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"));
         commands.add(Commands.slash("close-ticket", "Close the current ticket")
@@ -170,9 +170,9 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
         commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
-        commands.add(Commands.slash("user-info", "View user information and statistics")
+        commands.add(Commands.slash("stats-user", "View user information and statistics")
                 .addOption(OptionType.USER, "user", "User to view information for", true));
-        commands.add(Commands.slash("user-stats-date", "View user statistics for a specific date")
+        commands.add(Commands.slash("stats-user-date", "View user statistics for a specific date")
                 .addOption(OptionType.USER, "user", "User to view statistics for", true)
                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
         return commands;

@@ -218,6 +218,7 @@ public class ModerationCommandListener extends ListenerAdapter {
                 
                 // Log moderation action
                 handler.insertModerationAction(guildId, userId, moderatorId, "UNBAN", reason, null, null);
+                // Update statistics
                 
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "UNBAN", "User ID: " + userId, moderatorName, reason);
@@ -289,6 +290,8 @@ public class ModerationCommandListener extends ListenerAdapter {
                 
                 // Update statistics
                 handler.incrementTimeoutsPerformed(guildId);
+                handler.incrementUserTimeoutsReceived(guildId, userId);
+                handler.incrementUserTimeoutsPerformed(guildId, moderatorId);
                 
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "TIMEOUT (" + minutes + "m)", targetName, moderatorName, reason);
@@ -345,6 +348,8 @@ public class ModerationCommandListener extends ListenerAdapter {
                 
                 // Update statistics
                 handler.incrementUntimeoutsPerformed(guildId);
+                handler.incrementUserUntimeoutsReceived(guildId, userId);
+                handler.incrementUserUntimeoutsPerformed(guildId, moderatorId);
                 
                 // Send to log channel if configured
                 sendToLogChannel(event, guildId, "UNTIMEOUT", targetName, moderatorName, reason);

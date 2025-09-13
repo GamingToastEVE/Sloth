@@ -30,10 +30,10 @@ public class StatisticsCommandListener extends ListenerAdapter {
             case "stats-date":
                 handleDateStatsCommand(event, guildId);
                 break;
-            case "user-info":
+            case "stats-user":
                 handleUserInfoCommand(event, guildId);
                 break;
-            case "user-stats-date":
+            case "stats-user-date":
                 handleUserStatsDateCommand(event, guildId);
                 break;
         }
@@ -91,7 +91,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
         String userId = event.getOption("user").getAsUser().getId();
         
-        EmbedBuilder embed = handler.getUserInfoEmbed(guildId, userId);
+        EmbedBuilder embed = handler.getUserInfoEmbed(event, guildId, userId);
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
