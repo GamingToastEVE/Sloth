@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import java.awt.Color;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Map;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
@@ -77,6 +78,8 @@ public class DatabaseHandler {
     }
 
     private final Connection connection;
+    private final DatabaseMigrationManager migrationManager;
+    
     public DatabaseHandler() {
         Connection connection1;
         try {
@@ -88,6 +91,7 @@ public class DatabaseHandler {
             System.err.println("Database connection error: " + e.getMessage());
         }
         this.connection = connection1;
+        this.migrationManager = new DatabaseMigrationManager(connection1);
         initializeTables();
     }
 
@@ -117,21 +121,32 @@ public class DatabaseHandler {
     }
 
     /**
-     * Initialize all database tables if they don't exist
+     * Initialize all database tables if they don't exist and run comprehensive migrations
      */
     private void initializeTables() {
         try {
-            // Check for every table if already exist, if so break the method
-            if (tablesAlreadyExist()) {
-                System.out.println("Database tables already exist. Skipping initialization.");
-                return;
-            }
-
-            
             // Enable foreign keys
             Statement stmt = connection.createStatement();
             stmt.execute("PRAGMA foreign_keys = ON;");
 
+            // Check for every table if already exist, if so apply migrations instead of full initialization
+            if (tablesAlreadyExist()) {
+                System.out.println("Database tables already exist. Running comprehensive migration check...");
+                
+                // Run the comprehensive migration system to detect and add missing columns
+                migrationManager.detectAndApplyMissingColumns();
+                
+                // Apply any missing indexes and triggers for existing tables
+                applyMissingIndexesAndTriggers();
+                
+                // Validate the final schema
+                migrationManager.validateDatabaseSchema();
+                
+                return;
+            }
+
+            // If tables don't exist, create them from scratch
+            System.out.println("Creating database tables from scratch...");
             createUsersTable();
             createWarningsTable();
             createModerationActionsTable();
@@ -146,15 +161,43 @@ public class DatabaseHandler {
             createGuildSystemsTable();
             createRulesEmbedsChannel();
             
-            // Handle statistics table migrations
+            // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
             
             // Create legacy tables for backward compatibility
             createLegacyTables();
             
+            // Run migration check to ensure everything is up to date
+            migrationManager.detectAndApplyMissingColumns();
+            
+            // Validate the final schema
+            migrationManager.validateDatabaseSchema();
+            
         } catch (SQLException e) {
             System.err.println("Error initializing database tables: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Apply any missing indexes and triggers for existing tables using the migration manager
+     */
+    private void applyMissingIndexesAndTriggers() {
+        try {
+            Map<String, DatabaseMigrationManager.TableSchema> expectedSchemas = migrationManager.getExpectedSchemas();
+            
+            for (Map.Entry<String, DatabaseMigrationManager.TableSchema> entry : expectedSchemas.entrySet()) {
+                String tableName = entry.getKey();
+                DatabaseMigrationManager.TableSchema schema = entry.getValue();
+                
+                try {
+                    migrationManager.applyIndexesAndTriggers(tableName, schema);
+                } catch (SQLException e) {
+                    System.err.println("Error applying indexes/triggers for table '" + tableName + "': " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error applying missing indexes and triggers: " + e.getMessage());
         }
     }
 
@@ -685,6 +728,53 @@ public class DatabaseHandler {
         Statement stmt = connection.createStatement();
         stmt.execute(logChannelsTable);
         stmt.execute(warnSystemTable);
+    }
+
+    /**
+     * Get the migration manager instance for advanced migration operations
+     */
+    public DatabaseMigrationManager getMigrationManager() {
+        return migrationManager;
+    }
+
+    /**
+     * Manually trigger the comprehensive migration check
+     * This can be called to check for and apply any missing columns
+     */
+    public void runMigrationCheck() {
+        try {
+            System.out.println("Manually triggering migration check...");
+            migrationManager.detectAndApplyMissingColumns();
+            applyMissingIndexesAndTriggers();
+            migrationManager.validateDatabaseSchema();
+        } catch (SQLException e) {
+            System.err.println("Error during manual migration check: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get migration history for debugging and monitoring
+     */
+    public java.util.List<java.util.Map<String, Object>> getMigrationHistory() {
+        try {
+            return migrationManager.getMigrationHistory();
+        } catch (SQLException e) {
+            System.err.println("Error getting migration history: " + e.getMessage());
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    /**
+     * Validate the current database schema against expected schemas
+     */
+    public boolean validateDatabaseSchema() {
+        try {
+            return migrationManager.validateDatabaseSchema();
+        } catch (SQLException e) {
+            System.err.println("Error validating database schema: " + e.getMessage());
+            return false;
+        }
     }
 
     public void closeConnection() {
