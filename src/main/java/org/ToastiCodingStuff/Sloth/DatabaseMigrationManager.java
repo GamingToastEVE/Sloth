@@ -632,8 +632,13 @@ public class DatabaseMigrationManager {
      */
     private void recordMigrationRun(String migrationName, String version, long executionTimeMs, boolean success) {
         try {
-            String insertMigration = "INSERT OR REPLACE INTO database_migrations " +
-                "(migration_name, version, execution_time_ms, success) VALUES (?, ?, ?, ?)";
+            String insertMigration = "INSERT INTO database_migrations " +
+                "(migration_name, version, execution_time_ms, success) VALUES (?, ?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "version = VALUES(version), " +
+                "execution_time_ms = VALUES(execution_time_ms), " +
+                "success = VALUES(success), " +
+                "applied_at = CURRENT_TIMESTAMP";
             
             try (PreparedStatement stmt = connection.prepareStatement(insertMigration)) {
                 stmt.setString(1, migrationName);
