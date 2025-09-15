@@ -193,7 +193,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createWarningsSchema() {
         return new TableSchema("warnings")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("moderator_id", "INTEGER NOT NULL")
@@ -212,7 +212,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createModerationActionsSchema() {
         return new TableSchema("moderation_actions")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("moderator_id", "INTEGER NOT NULL")
@@ -232,7 +232,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTicketsSchema() {
         return new TableSchema("tickets")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("channel_id", "INTEGER UNIQUE")
@@ -261,7 +261,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTicketMessagesSchema() {
         return new TableSchema("ticket_messages")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("ticket_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("message_id", "INTEGER NOT NULL")
@@ -277,7 +277,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildSettingsSchema() {
         return new TableSchema("guild_settings")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL UNIQUE")
             .addColumn("modlog_channel", "INTEGER")
             .addColumn("warn_threshold_kick", "INTEGER DEFAULT 5")
@@ -304,7 +304,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createRolePermissionsSchema() {
         return new TableSchema("role_permissions")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("role_id", "INTEGER NOT NULL")
             .addColumn("permission", "TEXT NOT NULL")
@@ -318,7 +318,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createBotLogsSchema() {
         return new TableSchema("bot_logs")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER")
             .addColumn("user_id", "INTEGER")
             .addColumn("event_type", "TEXT NOT NULL")
@@ -335,7 +335,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createStatisticsSchema() {
         return new TableSchema("statistics")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("date", "TEXT NOT NULL")
             .addColumn("warnings_issued", "INTEGER DEFAULT 0")
@@ -354,7 +354,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createUserStatisticsSchema() {
         return new TableSchema("user_statistics")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("date", "TEXT NOT NULL")
@@ -382,7 +382,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTemporaryDataSchema() {
         return new TableSchema("temporary_data")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("data_type", "TEXT NOT NULL")
@@ -398,7 +398,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildSystemsSchema() {
         return new TableSchema("guild_systems")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("system_type", "TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system'))")
             .addColumn("active", "INTEGER DEFAULT 1")
@@ -418,7 +418,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createRulesEmbedsChannelSchema() {
         return new TableSchema("rules_embeds_channel")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("guild_id", "INTEGER")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("title", "TEXT NOT NULL")
@@ -456,7 +456,7 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createDatabaseMigrationsSchema() {
         return new TableSchema("database_migrations")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
             .addColumn("migration_name", "TEXT NOT NULL UNIQUE")
             .addColumn("version", "TEXT NOT NULL")
             .addColumn("applied_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
@@ -563,10 +563,10 @@ public class DatabaseMigrationManager {
         Set<String> columns = new HashSet<>();
         
         try (Statement stmt = connection.createStatement()) {
-            String query = "PRAGMA table_info(" + tableName + ")";
+            String query = "SHOW COLUMNS FROM " + tableName;
             try (ResultSet rs = stmt.executeQuery(query)) {
                 while (rs.next()) {
-                    columns.add(rs.getString("name").toLowerCase());
+                    columns.add(rs.getString("Field").toLowerCase()); // MariaDB uses "Field" column name
                 }
             }
         }
@@ -614,7 +614,7 @@ public class DatabaseMigrationManager {
      */
     private void ensureMigrationsTableExists() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS database_migrations (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "migration_name TEXT NOT NULL UNIQUE, " +
             "version TEXT NOT NULL, " +
             "applied_at TEXT DEFAULT CURRENT_TIMESTAMP, " +

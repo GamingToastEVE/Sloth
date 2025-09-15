@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
     implementation("net.dv8tion:JDA:$jdaVersion")
-    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
+    implementation("org.mariadb.jdbc:mariadb-java-client:3.3.3")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
 }
 
