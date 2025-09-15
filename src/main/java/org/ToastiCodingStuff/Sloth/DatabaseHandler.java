@@ -98,10 +98,17 @@ public class DatabaseHandler {
         Connection connection1;
         try {
             // Connect to MariaDB on localhost
-            String url = "jdbc:mariadb://localhost:3306/delta_bot";
-            String user = "delta_bot";
-            String password = "delta_bot";
+            // Use environment variables for configuration, with defaults
+            String host = System.getenv().getOrDefault("DB_HOST", "localhost");
+            String port = System.getenv().getOrDefault("DB_PORT", "3306");
+            String database = System.getenv().getOrDefault("DB_NAME", "delta_bot");
+            String user = System.getenv().getOrDefault("DB_USER", "delta_bot");
+            String password = System.getenv().getOrDefault("DB_PASSWORD", "delta_bot");
+            
+            String url = String.format("jdbc:mariadb://%s:%s/%s", host, port, database);
+            System.out.println("Connecting to MariaDB database: " + url);
             connection1 = DriverManager.getConnection(url, user, password);
+            System.out.println("Successfully connected to MariaDB database");
             // Initialize database tables
 
         } catch (SQLException e) {
