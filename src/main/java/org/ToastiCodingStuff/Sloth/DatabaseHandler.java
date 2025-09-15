@@ -123,17 +123,20 @@ public class DatabaseHandler {
     /**
      * Check if database tables already exist
      */
+    /**
+     * Check if database tables already exist.
+     * This method now uses the same table list as the migration manager to ensure consistency.
+     */
     private boolean tablesAlreadyExist() {
         try {
             DatabaseMetaData meta = connection.getMetaData();
-            String[] tableNames = {
-                "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                "guild_settings", "role_permissions", "bot_logs", "statistics",
-                "temporary_data", "guilds", "guild_systems", "rules_embeds_channel"
-            };
-            for (String tableName : tableNames) {
+            // Get table names from migration manager to ensure consistency
+            Map<String, DatabaseMigrationManager.TableSchema> expectedSchemas = migrationManager.getExpectedSchemas();
+            
+            for (String tableName : expectedSchemas.keySet()) {
                 ResultSet rs = meta.getTables(null, null, tableName, null);
                 if (!rs.next()) {
+                    System.out.println("Missing table detected: " + tableName);
                     return false; // If any table does not exist, return false
                 }
             }
