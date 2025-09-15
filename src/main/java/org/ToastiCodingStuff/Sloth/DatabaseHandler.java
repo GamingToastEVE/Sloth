@@ -97,7 +97,18 @@ public class DatabaseHandler {
     public DatabaseHandler() {
         Connection connection1;
         try {
-            connection1 = DriverManager.getConnection("jdbc:sqlite:server.db");
+            // Connect to MariaDB on localhost
+            // Use environment variables for configuration, with defaults
+            String host = System.getenv().getOrDefault("DB_HOST", "localhost");
+            String port = System.getenv().getOrDefault("DB_PORT", "3306");
+            String database = System.getenv().getOrDefault("DB_NAME", "delta_bot");
+            String user = System.getenv().getOrDefault("DB_USER", "delta_bot");
+            String password = System.getenv().getOrDefault("DB_PASSWORD", "delta_bot");
+            
+            String url = String.format("jdbc:mariadb://%s:%s/%s", host, port, database);
+            System.out.println("Connecting to MariaDB database: " + url);
+            connection1 = DriverManager.getConnection(url, user, password);
+            System.out.println("Successfully connected to MariaDB database");
             // Initialize database tables
 
         } catch (SQLException e) {
@@ -154,9 +165,8 @@ public class DatabaseHandler {
      */
     private void initializeTables() {
         try {
-            // Enable foreign keys
+            // MariaDB has foreign keys enabled by default
             Statement stmt = connection.createStatement();
-            stmt.execute("PRAGMA foreign_keys = ON;");
 
             // Check for every table if already exist, if so apply migrations instead of full initialization
             if (tablesAlreadyExist()) {
@@ -236,7 +246,7 @@ public class DatabaseHandler {
      */
     private void createRulesEmbedsChannel () throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS rules_embeds_channel (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
             "title TEXT NOT NULL, " +
@@ -305,7 +315,7 @@ public class DatabaseHandler {
      */
     private void createWarningsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS warnings (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "moderator_id INTEGER NOT NULL, " +
@@ -332,7 +342,7 @@ public class DatabaseHandler {
      */
     private void createModerationActionsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS moderation_actions (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "moderator_id INTEGER NOT NULL, " +
@@ -360,7 +370,7 @@ public class DatabaseHandler {
      */
     private void createTicketsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS tickets (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "channel_id INTEGER UNIQUE, " +
@@ -401,7 +411,7 @@ public class DatabaseHandler {
      */
     private void createTicketMessagesTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS ticket_messages (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "ticket_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "message_id INTEGER NOT NULL, " +
@@ -424,7 +434,7 @@ public class DatabaseHandler {
      */
     private void createGuildSettingsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS guild_settings (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL UNIQUE, " +
             "modlog_channel INTEGER, " +
             "warn_threshold_kick INTEGER DEFAULT 5, " +
@@ -458,7 +468,7 @@ public class DatabaseHandler {
      */
     private void createRolePermissionsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS role_permissions (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "role_id INTEGER NOT NULL, " +
             "permission TEXT NOT NULL, " +
@@ -479,7 +489,7 @@ public class DatabaseHandler {
      */
     private void createBotLogsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS bot_logs (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER, " +
             "user_id INTEGER, " +
             "event_type TEXT NOT NULL, " +
@@ -501,7 +511,7 @@ public class DatabaseHandler {
      */
     private void createStatisticsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS statistics (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "date TEXT NOT NULL, " +
             "warnings_issued INTEGER DEFAULT 0, " +
@@ -525,7 +535,7 @@ public class DatabaseHandler {
      */
     private void createUserStatisticsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS user_statistics (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "date TEXT NOT NULL, " +
@@ -567,14 +577,14 @@ public class DatabaseHandler {
         Statement stmt = connection.createStatement();
         
         // Check if timeout columns already exist
-        String checkColumns = "PRAGMA table_info(statistics)";
+        String checkColumns = "SHOW COLUMNS FROM statistics";
         ResultSet rs = stmt.executeQuery(checkColumns);
         boolean hasTimeouts = false;
         boolean hasUntimeouts = false;
         boolean hasVerifications = false;
         
         while (rs.next()) {
-            String columnName = rs.getString("name");
+            String columnName = rs.getString("Field"); // MariaDB uses "Field" column name
             if ("timeouts_performed".equals(columnName)) {
                 hasTimeouts = true;
             } else if ("untimeouts_performed".equals(columnName)) {
@@ -653,13 +663,13 @@ public class DatabaseHandler {
         
         try {
             // Check existing columns in the table
-            String checkColumns = "PRAGMA table_info(" + tableName + ")";
+            String checkColumns = "SHOW COLUMNS FROM " + tableName;
             ResultSet rs = stmt.executeQuery(checkColumns);
             
             // Collect existing column names
             java.util.Set<String> existingColumns = new java.util.HashSet<>();
             while (rs.next()) {
-                existingColumns.add(rs.getString("name"));
+                existingColumns.add(rs.getString("Field")); // MariaDB uses "Field" column name
             }
             rs.close();
             
@@ -748,7 +758,7 @@ public class DatabaseHandler {
      */
     private void createTemporaryDataTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS temporary_data (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "user_id INTEGER NOT NULL, " +
             "data_type TEXT NOT NULL, " +
@@ -770,7 +780,7 @@ public class DatabaseHandler {
      */
     private void createGuildSystemsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS guild_systems (" +
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id INTEGER NOT NULL, " +
             "system_type TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system')), " +
             "active INTEGER DEFAULT 1, " +
@@ -1219,16 +1229,18 @@ public class DatabaseHandler {
 
     public void insertOrUpdateUser(String userId, String effectiveName, String discriminator, String avatarUrl) {
         try {
-            String upsertUser = "INSERT OR REPLACE INTO users (id, username, discriminator, avatar, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, " +
-                "COALESCE((SELECT created_at FROM users WHERE id = ?), CURRENT_TIMESTAMP), " +
-                "CURRENT_TIMESTAMP)";
+            String upsertUser = "INSERT INTO users (id, username, discriminator, avatar, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "username = VALUES(username), " +
+                "discriminator = VALUES(discriminator), " +
+                "avatar = VALUES(avatar), " +
+                "updated_at = CURRENT_TIMESTAMP";
             PreparedStatement stmt = connection.prepareStatement(upsertUser);
             stmt.setString(1, userId);
             stmt.setString(2, effectiveName);
             stmt.setString(3, discriminator);
             stmt.setString(4, avatarUrl);
-            stmt.setString(5, userId); // For the COALESCE subquery
             stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error inserting/updating user: " + e.getMessage());
@@ -1241,18 +1253,16 @@ public class DatabaseHandler {
      */
     public void insertOrUpdateGuild(String guildId, String guildName) {
         try {
-            String upsertGuild = "INSERT OR REPLACE INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
-                "VALUES (?, ?, " +
-                "COALESCE((SELECT prefix FROM guilds WHERE id = ?), '!'), " +
-                "COALESCE((SELECT language FROM guilds WHERE id = ?), 'de'), " +
-                "COALESCE((SELECT created_at FROM guilds WHERE id = ?), CURRENT_TIMESTAMP), " +
-                "CURRENT_TIMESTAMP, 1)";
+            String upsertGuild = "INSERT INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
+                "VALUES (?, ?, '!', 'de', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "name = VALUES(name), " +
+                "updated_at = CURRENT_TIMESTAMP, " +
+                "active = 1";
             PreparedStatement stmt = connection.prepareStatement(upsertGuild);
             stmt.setString(1, guildId);
             stmt.setString(2, guildName);
-            stmt.setString(3, guildId); // For prefix COALESCE
-            stmt.setString(4, guildId); // For language COALESCE
-            stmt.setString(5, guildId); // For created_at COALESCE
+            stmt.executeUpdate();
             stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error inserting/updating guild: " + e.getMessage());
@@ -1390,8 +1400,11 @@ public class DatabaseHandler {
      */
     public boolean activateGuildSystem(String guildId, String systemType) {
         try {
-            String activateSystem = "INSERT OR REPLACE INTO guild_systems (guild_id, system_type, active, updated_at) " +
-                "VALUES (?, ?, 1, CURRENT_TIMESTAMP)";
+            String activateSystem = "INSERT INTO guild_systems (guild_id, system_type, active, updated_at) " +
+                "VALUES (?, ?, 1, CURRENT_TIMESTAMP) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "active = 1, " +
+                "updated_at = CURRENT_TIMESTAMP";
             PreparedStatement stmt = connection.prepareStatement(activateSystem);
             stmt.setString(1, guildId);
             stmt.setString(2, systemType);
