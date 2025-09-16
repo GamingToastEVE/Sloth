@@ -12,7 +12,7 @@ import java.util.*;
  * <ul>
  *   <li><strong>Automatic Column Detection:</strong> Compares expected schemas with actual database structure</li>
  *   <li><strong>Safe Migrations:</strong> Only adds missing columns, never removes or modifies existing data</li>
- *   <li><strong>MariaDB Compatibility:</strong> Optimized for MariaDB with proper data types and constraints</li>
+ *   <li><strong>SQLite Compatibility:</strong> Handles SQLite-specific constraints like CURRENT_TIMESTAMP defaults</li>
  *   <li><strong>Migration Tracking:</strong> Records all migrations with timestamps and execution times</li>
  *   <li><strong>Schema Validation:</strong> Verifies database structure matches expected definitions</li>
  *   <li><strong>Index/Trigger Management:</strong> Applies missing indexes and triggers</li>
@@ -154,17 +154,19 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildsSchema() {
         return new TableSchema("guilds")
-            .addColumn("id", "BIGINT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("name", "VARCHAR(255) NOT NULL")
-            .addColumn("prefix", "VARCHAR(10) DEFAULT '!'")
-            .addColumn("language", "VARCHAR(5) DEFAULT 'de'")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-            .addColumn("active", "TINYINT DEFAULT 1")
+            .addColumn("id", "INTEGER PRIMARY KEY")
+            .addColumn("name", "TEXT NOT NULL")
+            .addColumn("prefix", "TEXT DEFAULT '!'")
+            .addColumn("language", "TEXT DEFAULT 'de'")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("active", "INTEGER DEFAULT 1")
             .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guilds_updated_at " +
-                "BEFORE UPDATE ON guilds " +
+                "AFTER UPDATE ON guilds " +
                 "FOR EACH ROW " +
-                "SET NEW.updated_at = CURRENT_TIMESTAMP");
+                "BEGIN " +
+                    "UPDATE guilds SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+                "END");
     }
     
     /**
@@ -172,16 +174,18 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createUsersSchema() {
         return new TableSchema("users")
-            .addColumn("id", "BIGINT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("username", "VARCHAR(255) NOT NULL")
-            .addColumn("discriminator", "VARCHAR(10)")
-            .addColumn("avatar", "VARCHAR(255)")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+            .addColumn("id", "INTEGER PRIMARY KEY")
+            .addColumn("username", "TEXT NOT NULL")
+            .addColumn("discriminator", "TEXT")
+            .addColumn("avatar", "TEXT")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addTrigger("CREATE TRIGGER IF NOT EXISTS update_users_updated_at " +
-                "BEFORE UPDATE ON users " +
+                "AFTER UPDATE ON users " +
                 "FOR EACH ROW " +
-                "SET NEW.updated_at = CURRENT_TIMESTAMP");
+                "BEGIN " +
+                    "UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+                "END");
     }
     
     /**
@@ -189,15 +193,15 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createWarningsSchema() {
         return new TableSchema("warnings")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("moderator_id", "BIGINT NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("moderator_id", "INTEGER NOT NULL")
             .addColumn("reason", "TEXT NOT NULL")
-            .addColumn("severity", "ENUM('LOW', 'MEDIUM', 'HIGH', 'SEVERE') DEFAULT 'MEDIUM'")
-            .addColumn("active", "TINYINT DEFAULT 1")
-            .addColumn("expires_at", "TIMESTAMP NULL")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
+            .addColumn("active", "INTEGER DEFAULT 1")
+            .addColumn("expires_at", "TEXT")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_active ON warnings(active)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_expires ON warnings(expires_at)");
@@ -208,16 +212,16 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createModerationActionsSchema() {
         return new TableSchema("moderation_actions")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("moderator_id", "BIGINT NOT NULL")
-            .addColumn("action_type", "ENUM('KICK', 'BAN', 'TEMP_BAN', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT') NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("moderator_id", "INTEGER NOT NULL")
+            .addColumn("action_type", "TEXT NOT NULL CHECK(action_type IN ('KICK', 'BAN', 'TEMP_BAN', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT'))")
             .addColumn("reason", "TEXT NOT NULL")
-            .addColumn("duration", "INT")
-            .addColumn("expires_at", "TIMESTAMP NULL")
-            .addColumn("active", "TINYINT DEFAULT 1")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("duration", "INTEGER")
+            .addColumn("expires_at", "TEXT")
+            .addColumn("active", "INTEGER DEFAULT 1")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_guild_user ON moderation_actions(guild_id, user_id)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_action_type ON moderation_actions(action_type)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_active_expires ON moderation_actions(active, expires_at)");
@@ -228,26 +232,28 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTicketsSchema() {
         return new TableSchema("tickets")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("channel_id", "BIGINT UNIQUE")
-            .addColumn("category", "VARCHAR(50) DEFAULT 'general'")
-            .addColumn("subject", "VARCHAR(255)")
-            .addColumn("status", "ENUM('OPEN', 'IN_PROGRESS', 'WAITING', 'CLOSED') DEFAULT 'OPEN'")
-            .addColumn("priority", "ENUM('LOW', 'MEDIUM', 'HIGH', 'URGENT') DEFAULT 'MEDIUM'")
-            .addColumn("assigned_to", "BIGINT")
-            .addColumn("closed_by", "BIGINT")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("channel_id", "INTEGER UNIQUE")
+            .addColumn("category", "TEXT DEFAULT 'general'")
+            .addColumn("subject", "TEXT")
+            .addColumn("status", "TEXT DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'IN_PROGRESS', 'WAITING', 'CLOSED'))")
+            .addColumn("priority", "TEXT DEFAULT 'MEDIUM' CHECK(priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT'))")
+            .addColumn("assigned_to", "INTEGER")
+            .addColumn("closed_by", "INTEGER")
             .addColumn("closed_reason", "TEXT")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-            .addColumn("closed_at", "TIMESTAMP NULL")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("closed_at", "TEXT")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_guild_status ON tickets(guild_id, status)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id)")
             .addTrigger("CREATE TRIGGER IF NOT EXISTS update_tickets_updated_at " +
-                "BEFORE UPDATE ON tickets " +
+                "AFTER UPDATE ON tickets " +
                 "FOR EACH ROW " +
-                "SET NEW.updated_at = CURRENT_TIMESTAMP");
+                "BEGIN " +
+                    "UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+                "END");
     }
     
     /**
@@ -255,14 +261,14 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTicketMessagesSchema() {
         return new TableSchema("ticket_messages")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("ticket_id", "INT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("message_id", "BIGINT NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("ticket_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("message_id", "INTEGER NOT NULL")
             .addColumn("content", "TEXT NOT NULL")
             .addColumn("attachments", "TEXT")
-            .addColumn("is_staff", "TINYINT DEFAULT 0")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("is_staff", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket_created ON ticket_messages(ticket_id, created_at)");
     }
     
@@ -271,24 +277,26 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildSettingsSchema() {
         return new TableSchema("guild_settings")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL UNIQUE")
-            .addColumn("modlog_channel", "BIGINT")
-            .addColumn("warn_threshold_kick", "INT DEFAULT 5")
-            .addColumn("warn_threshold_ban", "INT DEFAULT 8")
-            .addColumn("warn_expire_days", "INT DEFAULT 30")
-            .addColumn("ticket_category", "BIGINT")
-            .addColumn("ticket_channel", "BIGINT")
-            .addColumn("ticket_role", "BIGINT")
-            .addColumn("ticket_transcript", "TINYINT DEFAULT 1")
-            .addColumn("join_role", "BIGINT")
-            .addColumn("mute_role", "BIGINT")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL UNIQUE")
+            .addColumn("modlog_channel", "INTEGER")
+            .addColumn("warn_threshold_kick", "INTEGER DEFAULT 5")
+            .addColumn("warn_threshold_ban", "INTEGER DEFAULT 8")
+            .addColumn("warn_expire_days", "INTEGER DEFAULT 30")
+            .addColumn("ticket_category", "INTEGER")
+            .addColumn("ticket_channel", "INTEGER")
+            .addColumn("ticket_role", "INTEGER")
+            .addColumn("ticket_transcript", "INTEGER DEFAULT 1")
+            .addColumn("join_role", "INTEGER")
+            .addColumn("mute_role", "INTEGER")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guild_settings_updated_at " +
-                "BEFORE UPDATE ON guild_settings " +
+                "AFTER UPDATE ON guild_settings " +
                 "FOR EACH ROW " +
-                "SET NEW.updated_at = CURRENT_TIMESTAMP");
+                "BEGIN " +
+                    "UPDATE guild_settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+                "END");
     }
     
     /**
@@ -296,12 +304,12 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createRolePermissionsSchema() {
         return new TableSchema("role_permissions")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("role_id", "BIGINT NOT NULL")
-            .addColumn("permission", "VARCHAR(255) NOT NULL")
-            .addColumn("allowed", "TINYINT DEFAULT 1")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("role_id", "INTEGER NOT NULL")
+            .addColumn("permission", "TEXT NOT NULL")
+            .addColumn("allowed", "INTEGER DEFAULT 1")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_role_permissions_guild_role ON role_permissions(guild_id, role_id)");
     }
     
@@ -310,14 +318,14 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createBotLogsSchema() {
         return new TableSchema("bot_logs")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT")
-            .addColumn("user_id", "BIGINT")
-            .addColumn("event_type", "VARCHAR(100) NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER")
+            .addColumn("user_id", "INTEGER")
+            .addColumn("event_type", "TEXT NOT NULL")
             .addColumn("message", "TEXT NOT NULL")
             .addColumn("data", "TEXT")
-            .addColumn("level", "ENUM('DEBUG', 'INFO', 'WARN', 'ERROR') DEFAULT 'INFO'")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("level", "TEXT DEFAULT 'INFO' CHECK(level IN ('DEBUG', 'INFO', 'WARN', 'ERROR'))")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_bot_logs_guild_created ON bot_logs(guild_id, created_at)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_bot_logs_level_created ON bot_logs(level, created_at)");
     }
@@ -327,18 +335,18 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createStatisticsSchema() {
         return new TableSchema("statistics")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("date", "DATE NOT NULL")
-            .addColumn("warnings_issued", "INT DEFAULT 0")
-            .addColumn("kicks_performed", "INT DEFAULT 0")
-            .addColumn("bans_performed", "INT DEFAULT 0")
-            .addColumn("timeouts_performed", "INT DEFAULT 0")
-            .addColumn("untimeouts_performed", "INT DEFAULT 0")
-            .addColumn("tickets_created", "INT DEFAULT 0")
-            .addColumn("tickets_closed", "INT DEFAULT 0")
-            .addColumn("verifications_performed", "INT DEFAULT 0")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("date", "TEXT NOT NULL")
+            .addColumn("warnings_issued", "INTEGER DEFAULT 0")
+            .addColumn("kicks_performed", "INTEGER DEFAULT 0")
+            .addColumn("bans_performed", "INTEGER DEFAULT 0")
+            .addColumn("timeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("untimeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("tickets_created", "INTEGER DEFAULT 0")
+            .addColumn("tickets_closed", "INTEGER DEFAULT 0")
+            .addColumn("verifications_performed", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -346,25 +354,25 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createUserStatisticsSchema() {
         return new TableSchema("user_statistics")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("date", "DATE NOT NULL")
-            .addColumn("warnings_received", "INT DEFAULT 0")
-            .addColumn("warnings_issued", "INT DEFAULT 0")
-            .addColumn("kicks_received", "INT DEFAULT 0")
-            .addColumn("kicks_performed", "INT DEFAULT 0")
-            .addColumn("bans_received", "INT DEFAULT 0")
-            .addColumn("bans_performed", "INT DEFAULT 0")
-            .addColumn("timeouts_received", "INT DEFAULT 0")
-            .addColumn("timeouts_performed", "INT DEFAULT 0")
-            .addColumn("untimeouts_received", "INT DEFAULT 0")
-            .addColumn("untimeouts_performed", "INT DEFAULT 0")
-            .addColumn("tickets_created", "INT DEFAULT 0")
-            .addColumn("tickets_closed", "INT DEFAULT 0")
-            .addColumn("verifications_performed", "INT DEFAULT 0")
-            .addColumn("messages_sent", "INT DEFAULT 0")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("date", "TEXT NOT NULL")
+            .addColumn("warnings_received", "INTEGER DEFAULT 0")
+            .addColumn("warnings_issued", "INTEGER DEFAULT 0")
+            .addColumn("kicks_received", "INTEGER DEFAULT 0")
+            .addColumn("kicks_performed", "INTEGER DEFAULT 0")
+            .addColumn("bans_received", "INTEGER DEFAULT 0")
+            .addColumn("bans_performed", "INTEGER DEFAULT 0")
+            .addColumn("timeouts_received", "INTEGER DEFAULT 0")
+            .addColumn("timeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("untimeouts_received", "INTEGER DEFAULT 0")
+            .addColumn("untimeouts_performed", "INTEGER DEFAULT 0")
+            .addColumn("tickets_created", "INTEGER DEFAULT 0")
+            .addColumn("tickets_closed", "INTEGER DEFAULT 0")
+            .addColumn("verifications_performed", "INTEGER DEFAULT 0")
+            .addColumn("messages_sent", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_guild_user_date ON user_statistics(guild_id, user_id, date)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_date ON user_statistics(date)");
     }
@@ -374,13 +382,13 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createTemporaryDataSchema() {
         return new TableSchema("temporary_data")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("user_id", "BIGINT NOT NULL")
-            .addColumn("data_type", "VARCHAR(100) NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("user_id", "INTEGER NOT NULL")
+            .addColumn("data_type", "TEXT NOT NULL")
             .addColumn("data", "TEXT NOT NULL")
-            .addColumn("expires_at", "TIMESTAMP NOT NULL")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("expires_at", "TEXT NOT NULL")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_temporary_data_expires ON temporary_data(expires_at)")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_temporary_data_guild_user_type ON temporary_data(guild_id, user_id, data_type)");
     }
@@ -390,17 +398,19 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildSystemsSchema() {
         return new TableSchema("guild_systems")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT NOT NULL")
-            .addColumn("system_type", "ENUM('log-channel', 'warn-system', 'ticket-system', 'moderation-system') NOT NULL")
-            .addColumn("active", "TINYINT DEFAULT 1")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL")
+            .addColumn("system_type", "TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system'))")
+            .addColumn("active", "INTEGER DEFAULT 1")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)")
             .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guild_systems_updated_at " +
-                "BEFORE UPDATE ON guild_systems " +
+                "AFTER UPDATE ON guild_systems " +
                 "FOR EACH ROW " +
-                "SET NEW.updated_at = CURRENT_TIMESTAMP");
+                "BEGIN " +
+                    "UPDATE guild_systems SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
+                "END");
     }
     
     /**
@@ -408,16 +418,16 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createRulesEmbedsChannelSchema() {
         return new TableSchema("rules_embeds_channel")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "BIGINT")
-            .addColumn("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("title", "VARCHAR(255) NOT NULL")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("title", "TEXT NOT NULL")
             .addColumn("description", "TEXT NOT NULL")
             .addColumn("footer", "TEXT")
-            .addColumn("color", "VARCHAR(20) DEFAULT 'green'")
-            .addColumn("role_id", "VARCHAR(255)")
-            .addColumn("button_label", "VARCHAR(100)")
-            .addColumn("button_emoji_id", "VARCHAR(255)");
+            .addColumn("color", "TEXT DEFAULT 'green'")
+            .addColumn("role_id", "TEXT")
+            .addColumn("button_label", "TEXT")
+            .addColumn("button_emoji_id", "TEXT");
     }
     
     /**
@@ -425,8 +435,8 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createLogChannelsSchema() {
         return new TableSchema("log_channels")
-            .addColumn("guildid", "VARCHAR(255) PRIMARY KEY")
-            .addColumn("channelid", "VARCHAR(255) NOT NULL");
+            .addColumn("guildid", "TEXT PRIMARY KEY")
+            .addColumn("channelid", "TEXT NOT NULL");
     }
     
     /**
@@ -434,11 +444,11 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createWarnSystemSettingsSchema() {
         return new TableSchema("warn_system_settings")
-            .addColumn("guild_id", "VARCHAR(255) PRIMARY KEY")
-            .addColumn("max_warns", "INT NOT NULL")
-            .addColumn("minutes_muted", "INT NOT NULL")
-            .addColumn("role_id", "VARCHAR(255) NOT NULL")
-            .addColumn("warn_time_hours", "INT NOT NULL");
+            .addColumn("guild_id", "TEXT PRIMARY KEY")
+            .addColumn("max_warns", "INTEGER NOT NULL")
+            .addColumn("minutes_muted", "INTEGER NOT NULL")
+            .addColumn("role_id", "TEXT NOT NULL")
+            .addColumn("warn_time_hours", "INTEGER NOT NULL");
     }
     
     /**
@@ -446,12 +456,12 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createDatabaseMigrationsSchema() {
         return new TableSchema("database_migrations")
-            .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("migration_name", "VARCHAR(255) NOT NULL UNIQUE")
-            .addColumn("version", "VARCHAR(50) NOT NULL")
-            .addColumn("applied_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("execution_time_ms", "INT")
-            .addColumn("success", "TINYINT DEFAULT 1");
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("migration_name", "TEXT NOT NULL UNIQUE")
+            .addColumn("version", "TEXT NOT NULL")
+            .addColumn("applied_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("execution_time_ms", "INTEGER")
+            .addColumn("success", "INTEGER DEFAULT 1");
     }
     
     /**
@@ -565,7 +575,7 @@ public class DatabaseMigrationManager {
     }
     
     /**
-     * Add a single column to a table with MariaDB compatibility
+     * Add a single column to a table with special handling for SQLite constraints
      */
     private void addColumnToTable(String tableName, String columnName, String columnDefinition) throws SQLException {
         String alterQuery = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
@@ -574,34 +584,24 @@ public class DatabaseMigrationManager {
             stmt.execute(alterQuery);
             System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "'");
         } catch (SQLException e) {
-            // MariaDB-specific error handling
-            if (e.getMessage().contains("Duplicate column name")) {
-                System.out.println("Column '" + columnName + "' already exists in table '" + tableName + "' - skipping");
-                return; // Column already exists, which is fine
-            }
-            
-            // For MariaDB, CURRENT_TIMESTAMP defaults should work directly, but handle edge cases
-            if (e.getMessage().contains("Invalid default value") && columnDefinition.contains("CURRENT_TIMESTAMP")) {
-                System.out.println("Handling MariaDB timestamp default issue for column '" + columnName + "'");
+            // Handle SQLite constraint for columns with CURRENT_TIMESTAMP default
+            if (e.getMessage().contains("Cannot add a column with non-constant default")) {
+                System.out.println("Handling SQLite constraint for column '" + columnName + "' with CURRENT_TIMESTAMP default");
                 
-                // Try without the default, then set it separately
-                String modifiedDefinition = columnDefinition.replace("DEFAULT CURRENT_TIMESTAMP", "").replace("ON UPDATE CURRENT_TIMESTAMP", "");
+                // For timestamp columns, add them without default first, then update
+                String modifiedDefinition = columnDefinition.replace("DEFAULT CURRENT_TIMESTAMP", "");
                 String alterQueryNoDefault = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + modifiedDefinition;
                 
-                try (Statement stmt2 = connection.createStatement()) {
-                    stmt2.execute(alterQueryNoDefault);
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute(alterQueryNoDefault);
                     
-                    // Set default value after column creation
+                    // Update all existing rows to have the current timestamp
                     if (columnDefinition.contains("DEFAULT CURRENT_TIMESTAMP")) {
-                        String setDefaultQuery = "ALTER TABLE " + tableName + " ALTER COLUMN " + columnName + " SET DEFAULT CURRENT_TIMESTAMP";
-                        try {
-                            stmt2.execute(setDefaultQuery);
-                        } catch (SQLException defaultEx) {
-                            System.err.println("Warning: Could not set default for " + columnName + ": " + defaultEx.getMessage());
-                        }
+                        String updateQuery = "UPDATE " + tableName + " SET " + columnName + " = CURRENT_TIMESTAMP WHERE " + columnName + " IS NULL";
+                        stmt.execute(updateQuery);
                     }
                     
-                    System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "' (with MariaDB timestamp workaround)");
+                    System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "' (with SQLite constraint workaround)");
                 }
             } else {
                 throw e; // Re-throw if it's a different error
@@ -614,12 +614,12 @@ public class DatabaseMigrationManager {
      */
     private void ensureMigrationsTableExists() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS database_migrations (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "migration_name VARCHAR(255) NOT NULL UNIQUE, " +
-            "version VARCHAR(50) NOT NULL, " +
-            "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-            "execution_time_ms INT, " +
-            "success TINYINT DEFAULT 1" +
+            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
+            "migration_name TEXT NOT NULL UNIQUE, " +
+            "version TEXT NOT NULL, " +
+            "applied_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+            "execution_time_ms INTEGER, " +
+            "success INTEGER DEFAULT 1" +
             ")";
         
         try (Statement stmt = connection.createStatement()) {
