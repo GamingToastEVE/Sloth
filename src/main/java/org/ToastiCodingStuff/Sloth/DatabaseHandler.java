@@ -158,7 +158,7 @@ public class DatabaseHandler {
      * 
      * The migration system handles:
      * - Schema evolution across software versions
-     * - MariaDB-specific data types and constraints
+     * - SQLite constraints (e.g., CURRENT_TIMESTAMP defaults)
      * - Data preservation during migrations
      * - Rollback safety (additive changes only)
      * - Migration history and performance tracking
