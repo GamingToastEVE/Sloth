@@ -158,7 +158,7 @@ public class DatabaseHandler {
      * 1. Creates tables from scratch if the database is new
      * 2. Automatically detects missing columns in existing tables
      * 3. Adds missing columns while preserving existing data
-     * 4. Applies indexes and triggers that may be missing
+     * 4. Applies indexes that may be missing
      * 5. Validates the final schema against expected definitions
      * 6. Tracks all migrations for audit purposes
      * 
@@ -181,8 +181,8 @@ public class DatabaseHandler {
                 // Run the comprehensive migration system to detect and add missing columns
                 migrationManager.detectAndApplyMissingColumns();
                 
-                // Apply any missing indexes and triggers for existing tables
-                applyMissingIndexesAndTriggers();
+                // Apply any missing indexes for existing tables
+                applyMissingIndexes();
                 
                 // Validate the final schema
                 migrationManager.validateDatabaseSchema();
@@ -226,9 +226,9 @@ public class DatabaseHandler {
     }
 
     /**
-     * Apply any missing indexes and triggers for existing tables using the migration manager
+     * Apply any missing indexes for existing tables using the migration manager
      */
-    private void applyMissingIndexesAndTriggers() {
+    private void applyMissingIndexes() {
         try {
             Map<String, DatabaseMigrationManager.TableSchema> expectedSchemas = migrationManager.getExpectedSchemas();
             
@@ -237,13 +237,13 @@ public class DatabaseHandler {
                 DatabaseMigrationManager.TableSchema schema = entry.getValue();
                 
                 try {
-                    migrationManager.applyIndexesAndTriggers(tableName, schema);
+                    migrationManager.applyIndexes(tableName, schema);
                 } catch (SQLException e) {
-                    System.err.println("Error applying indexes/triggers for table '" + tableName + "': " + e.getMessage());
+                    System.err.println("Error applying indexes for table '" + tableName + "': " + e.getMessage());
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error applying missing indexes and triggers: " + e.getMessage());
+            System.err.println("Error applying missing indexes: " + e.getMessage());
         }
     }
 
@@ -420,15 +420,6 @@ public class DatabaseHandler {
             ")";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
-
-        // Create trigger for updated_at
-        String trigger = "CREATE TRIGGER IF NOT EXISTS update_guild_settings_updated_at " +
-            "AFTER UPDATE ON guild_settings " +
-            "FOR EACH ROW " +
-            "BEGIN " +
-                "UPDATE guild_settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-            "END";
-        stmt.execute(trigger);
     }
 
     /**
@@ -800,7 +791,7 @@ public class DatabaseHandler {
             System.out.println("Manually triggering migration check...");
             initializeTables();
             migrationManager.detectAndApplyMissingColumns();
-            applyMissingIndexesAndTriggers();
+            applyMissingIndexes();
             migrationManager.validateDatabaseSchema();
         } catch (SQLException e) {
             System.err.println("Error during manual migration check: " + e.getMessage());
