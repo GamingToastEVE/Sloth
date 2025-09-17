@@ -1767,15 +1767,17 @@ public class DatabaseHandler {
 
             // Spaltennamen validieren (nur erlaubte Aktionen zulassen)
             java.util.Set<String> allowedActions = java.util.Set.of(
-                "messages_sent", "commands_used", "timeouts_performed", "untimeouts_performed", "verifications_performed"
+                "messages_sent", "commands_used", "timeouts_performed", "untimeouts_performed", "verifications_performed", "untimeouts_received", "timeouts_received",
+                "bans_performed", "bans_received", "kicks_performed", "kicks_received", "warnings_issued", "warnings_received",
+                "tickets_created", "tickets_closed"
             );
             if (!allowedActions.contains(actionType)) {
                 throw new IllegalArgumentException("Ungültiger Spaltenname für Statistik: " + actionType);
             }
 
             // MariaDB-Syntax: guild_id als VARCHAR(32)
-            if (!guildExistsInStatisticsTable(guildId, currentDate)) {
-                String insertGuildQuery = "INSERT INTO statistics (guild_id, date) VALUES (?, ?)";
+            if (guildExistsInStatisticsTable(guildId, currentDate)) {
+                String insertGuildQuery = "UPDATE statistics SET " + actionType + " = " + actionType + " WHERE guild_id = ? AND date = ?";
                 PreparedStatement insertGuildStmt = connection.prepareStatement(insertGuildQuery);
                 insertGuildStmt.setString(1, guildId);
                 insertGuildStmt.setString(2, currentDate);
@@ -1889,7 +1891,9 @@ public class DatabaseHandler {
             }
 
             // UPDATE versuchen
-            String updateQuery = "UPDATE user_statistics SET " + actionType + " = " + actionType +
+            String updateQuery = null;
+            if (userExistsInUserStatistics(guildId, userId)) {
+            }updateQuery = "UPDATE user_statistics SET " + actionType + " = " + actionType +
                     " + ? WHERE guild_id = ? AND user_id = ? AND date = ?";
             PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
             updateStmt.setInt(1, 1);
@@ -1914,6 +1918,23 @@ public class DatabaseHandler {
         } catch (SQLException e) {
             System.err.println("Error updating user statistics: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private boolean userExistsInUserStatistics(String guildId, String userId) {
+        String currentDate = getCurrentDate();
+        String checkQuery = "SELECT id FROM user_statistics WHERE guild_id = ? AND user_id = ? AND date = ?";
+        try {
+            PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
+            checkStmt.setString(1, guildId);
+            checkStmt.setString(2, userId);
+            checkStmt.setString(3, currentDate);
+            ResultSet rs = checkStmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            System.err.println("Error checking user in user_statistics table: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 

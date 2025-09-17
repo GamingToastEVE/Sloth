@@ -40,7 +40,6 @@ public class GuildEventListener extends ListenerAdapter {
         String guildName = guild.getName();
         
         System.out.println("Bot left guild: " + guildName + " (ID: " + guildId + ")");
-        handler.deactivateGuild(guildId);
     }
     
     /**
