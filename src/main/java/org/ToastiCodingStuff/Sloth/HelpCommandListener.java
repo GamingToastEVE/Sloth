@@ -193,6 +193,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/ticket-panel` - Create ticket creation panel\n" +
                                 "`/close-ticket` - Close current ticket\n" +
                                 "`/assign-ticket` - Assign to staff member\n" +
+                                "`/set-ticket-priority` - Change ticket priority\n" +
                                 "`/ticket-info` - Get ticket information\n" +
                                 "`/ticket-transcript` - Generate transcript", false)
                         .addField("**Moderation System**", 
@@ -203,7 +204,9 @@ public class HelpCommandListener extends ListenerAdapter {
                         .addField("**Statistics System**", 
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
-                                "`/stats-date` - Statistics for specific date", false)
+                                "`/stats-date` - Statistics for specific date\n" +
+                                "`/user-info` - View user information and statistics\n" +
+                                "`/user-stats-date` - View user statistics for specific date", false)
                         .addField("**Rules/Verification System**", 
                                 "`/add-rules-embed` - Create rules embeds with verification\n" +
                                 "`/setup-rules` - Display rules in current channel\n" +
