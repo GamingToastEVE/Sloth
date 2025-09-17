@@ -1348,6 +1348,21 @@ public class DatabaseHandler {
     }
 
     /**
+     * Deactivate a guild when the bot leaves it
+     */
+    public void deactivateGuild(String guildId) {
+        try {
+            String query = "UPDATE guilds SET active = 0 WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.executeUpdate();
+            System.out.println("Deactivated guild: " + guildId);
+        } catch (SQLException e) {
+            System.err.println("Error deactivating guild: " + e.getMessage());
+        }
+    }
+
+    /**
      * Sync all guilds that the bot is currently in - called on startup
      */
     public void syncGuilds(java.util.List<Guild> currentGuilds) {

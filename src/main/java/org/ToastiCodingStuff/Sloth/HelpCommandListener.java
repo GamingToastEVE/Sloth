@@ -113,7 +113,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Warning history tracking", false)
                         .addField("🎫 **Ticket System**", 
                                 "• Professional support channels\n" +
-                                "• Staff assignment and priorities\n"
+                                "• Staff assignment and priorities", false)
                         .addField("📝 **Log Channel System**", 
                                 "• Dedicated logging channels\n" +
                                 "• Track server events\n" +
