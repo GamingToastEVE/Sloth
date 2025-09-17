@@ -112,8 +112,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Warning history tracking", false)
                         .addField("🎫 **Ticket System**", 
                                 "• Professional support channels\n" +
-                                "• Staff assignment and priorities\n" +
-                                "• Transcript generation", false)
+                                "• Staff assignment and priorities\n"
                         .addField("📝 **Log Channel System**", 
                                 "• Dedicated logging channels\n" +
                                 "• Track server events\n" +
@@ -194,8 +193,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/close-ticket` - Close current ticket\n" +
                                 "`/assign-ticket` - Assign to staff member\n" +
                                 "`/set-ticket-priority` - Change ticket priority\n" +
-                                "`/ticket-info` - Get ticket information\n" +
-                                "`/ticket-transcript` - Generate transcript", false)
+                                "`/ticket-info` - Get ticket information\n", false)
                         .addField("**Moderation System**", 
                                 "`/kick` `/ban` `/unban` - User management\n" +
                                 "`/timeout` `/untimeout` - Temporary restrictions\n" +
