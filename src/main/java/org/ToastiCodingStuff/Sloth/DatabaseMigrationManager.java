@@ -15,7 +15,7 @@ import java.util.*;
  *   <li><strong>SQLite Compatibility:</strong> Handles SQLite-specific constraints like CURRENT_TIMESTAMP defaults</li>
  *   <li><strong>Migration Tracking:</strong> Records all migrations with timestamps and execution times</li>
  *   <li><strong>Schema Validation:</strong> Verifies database structure matches expected definitions</li>
- *   <li><strong>Index/Trigger Management:</strong> Applies missing indexes and triggers</li>
+ *   <li><strong>Index Management:</strong> Applies missing indexes</li>
  * </ul>
  * 
  * <h2>Usage Example:</h2>
@@ -38,7 +38,7 @@ import java.util.*;
  *   <li>Define expected table schemas in {@link #getExpectedSchemas()}</li>
  *   <li>Compare expected columns with actual database columns</li>
  *   <li>Automatically add any missing columns with proper defaults</li>
- *   <li>Apply missing indexes and triggers</li>
+ *   <li>Apply missing indexes</li>
  *   <li>Record migration in tracking table for audit purposes</li>
  * </ol>
  * 
@@ -86,13 +86,11 @@ public class DatabaseMigrationManager {
         public final String tableName;
         public final Map<String, ColumnDefinition> columns;
         public final List<String> indexes;
-        public final List<String> triggers;
         
         public TableSchema(String tableName) {
             this.tableName = tableName;
             this.columns = new LinkedHashMap<>();
             this.indexes = new ArrayList<>();
-            this.triggers = new ArrayList<>();
         }
         
         public TableSchema addColumn(String name, String sqlDefinition) {
@@ -107,11 +105,6 @@ public class DatabaseMigrationManager {
         
         public TableSchema addIndex(String indexDefinition) {
             indexes.add(indexDefinition);
-            return this;
-        }
-        
-        public TableSchema addTrigger(String triggerDefinition) {
-            triggers.add(triggerDefinition);
             return this;
         }
     }
@@ -380,13 +373,7 @@ public class DatabaseMigrationManager {
             .addColumn("active", "INTEGER DEFAULT 1")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)")
-            .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guild_systems_updated_at " +
-                "AFTER UPDATE ON guild_systems " +
-                "FOR EACH ROW " +
-                "BEGIN " +
-                    "UPDATE guild_systems SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-                "END");
+            .addIndex("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)");
     }
     
     /**
@@ -656,9 +643,9 @@ public class DatabaseMigrationManager {
     }
     
     /**
-     * Apply all indexes and triggers for a table if they don't already exist
+     * Apply all indexes for a table if they don't already exist
      */
-    public void applyIndexesAndTriggers(String tableName, TableSchema schema) throws SQLException {
+    public void applyIndexes(String tableName, TableSchema schema) throws SQLException {
         // Apply indexes
         for (String indexDefinition : schema.indexes) {
             try (Statement stmt = connection.createStatement()) {
@@ -667,18 +654,6 @@ public class DatabaseMigrationManager {
                 // Index might already exist, which is fine
                 if (!e.getMessage().contains("already exists")) {
                     System.err.println("Warning: Failed to create index for table '" + tableName + "': " + e.getMessage());
-                }
-            }
-        }
-        
-        // Apply triggers
-        for (String triggerDefinition : schema.triggers) {
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute(triggerDefinition);
-            } catch (SQLException e) {
-                // Trigger might already exist, which is fine
-                if (!e.getMessage().contains("already exists")) {
-                    System.err.println("Warning: Failed to create trigger for table '" + tableName + "': " + e.getMessage());
                 }
             }
         }
