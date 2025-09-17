@@ -156,7 +156,7 @@ public class AddGuildSlashCommands {
                         .addChoice("High", "HIGH")
                         .addChoice("Urgent", "URGENT")));
         commands.add(Commands.slash("ticket-info", "Get information about the current ticket"));
-        //commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
+        commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
         return commands;
     }
 
