@@ -112,8 +112,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Warning history tracking", false)
                         .addField("🎫 **Ticket System**", 
                                 "• Professional support channels\n" +
-                                "• Staff assignment and priorities\n" +
-                                "• Transcript generation", false)
+                                "• Staff assignment and priorities\n"
                         .addField("📝 **Log Channel System**", 
                                 "• Dedicated logging channels\n" +
                                 "• Track server events\n" +
@@ -193,8 +192,8 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/ticket-panel` - Create ticket creation panel\n" +
                                 "`/close-ticket` - Close current ticket\n" +
                                 "`/assign-ticket` - Assign to staff member\n" +
-                                "`/ticket-info` - Get ticket information\n" +
-                                "`/ticket-transcript` - Generate transcript", false)
+                                "`/set-ticket-priority` - Change ticket priority\n" +
+                                "`/ticket-info` - Get ticket information\n", false)
                         .addField("**Moderation System**", 
                                 "`/kick` `/ban` `/unban` - User management\n" +
                                 "`/timeout` `/untimeout` - Temporary restrictions\n" +
@@ -203,7 +202,9 @@ public class HelpCommandListener extends ListenerAdapter {
                         .addField("**Statistics System**", 
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
-                                "`/stats-date` - Statistics for specific date", false)
+                                "`/stats-date` - Statistics for specific date\n" +
+                                "`/user-info` - View user information and statistics\n" +
+                                "`/user-stats-date` - View user statistics for specific date", false)
                         .addField("**Rules/Verification System**", 
                                 "`/add-rules-embed` - Create rules embeds with verification\n" +
                                 "`/setup-rules` - Display rules in current channel\n" +
