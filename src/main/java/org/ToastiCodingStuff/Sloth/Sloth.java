@@ -10,12 +10,12 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 public class Sloth {
     public static void main(String[] args) throws Exception {
         Dotenv dotenv = Dotenv.load();
-        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN"))
+        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
                 .build();
         api.awaitReady();
 
-        DatabaseHandler handler = new DatabaseHandler(api);
+        DatabaseHandler handler = new DatabaseHandler();
 
         // Set bot status to "Playing /help"
         api.getPresence().setActivity(Activity.playing("/help"));

@@ -158,15 +158,9 @@ public class DatabaseMigrationManager {
             .addColumn("name", "TEXT NOT NULL")
             .addColumn("prefix", "TEXT DEFAULT '!'")
             .addColumn("language", "TEXT DEFAULT 'de'")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("active", "INTEGER DEFAULT 1")
-            .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guilds_updated_at " +
-                "AFTER UPDATE ON guilds " +
-                "FOR EACH ROW " +
-                "BEGIN " +
-                    "UPDATE guilds SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-                "END");
+            .addColumn("created_at", "TEXT")
+            .addColumn("updated_at", "TEXT")
+            .addColumn("active", "INTEGER DEFAULT 1");
     }
     
     /**
@@ -179,13 +173,7 @@ public class DatabaseMigrationManager {
             .addColumn("discriminator", "TEXT")
             .addColumn("avatar", "TEXT")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addTrigger("CREATE TRIGGER IF NOT EXISTS update_users_updated_at " +
-                "AFTER UPDATE ON users " +
-                "FOR EACH ROW " +
-                "BEGIN " +
-                    "UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-                "END");
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -247,13 +235,7 @@ public class DatabaseMigrationManager {
             .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("closed_at", "TEXT")
             .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_guild_status ON tickets(guild_id, status)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id)")
-            .addTrigger("CREATE TRIGGER IF NOT EXISTS update_tickets_updated_at " +
-                "AFTER UPDATE ON tickets " +
-                "FOR EACH ROW " +
-                "BEGIN " +
-                    "UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-                "END");
+            .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id)");
     }
     
     /**
@@ -290,13 +272,7 @@ public class DatabaseMigrationManager {
             .addColumn("join_role", "INTEGER")
             .addColumn("mute_role", "INTEGER")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addTrigger("CREATE TRIGGER IF NOT EXISTS update_guild_settings_updated_at " +
-                "AFTER UPDATE ON guild_settings " +
-                "FOR EACH ROW " +
-                "BEGIN " +
-                    "UPDATE guild_settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; " +
-                "END");
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**

@@ -91,7 +91,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
         String userId = event.getOption("user").getAsUser().getId();
         
-        EmbedBuilder embed = handler.getUserInfoEmbed(event, guildId, userId);
+        EmbedBuilder embed = handler.getUserInfoEmbed(guildId, userId);
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 

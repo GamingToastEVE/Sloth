@@ -279,10 +279,6 @@ public class ModerationCommandListener extends ListenerAdapter {
                         targetMember.getUser().getDiscriminator(), 
                         targetMember.getUser().getAvatarUrl());
                 
-                handler.insertOrUpdateUser(moderatorId, moderatorName,
-                        event.getMember().getUser().getDiscriminator(),
-                        event.getMember().getUser().getAvatarUrl());
-                
                 // Log moderation action
                 String expiresAt = java.time.LocalDateTime.now().plusMinutes(minutes)
                         .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
@@ -338,10 +334,6 @@ public class ModerationCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateUser(userId, targetName, 
                         targetMember.getUser().getDiscriminator(), 
                         targetMember.getUser().getAvatarUrl());
-                
-                handler.insertOrUpdateUser(moderatorId, moderatorName,
-                        event.getMember().getUser().getDiscriminator(),
-                        event.getMember().getUser().getAvatarUrl());
                 
                 // Log moderation action
                 handler.insertModerationAction(guildId, userId, moderatorId, "UNTIMEOUT", reason, null, null);
