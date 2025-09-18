@@ -1,12 +1,12 @@
-# Delta Discord Bot
+# Sloth Discord Bot
 
-Delta is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Sloth is a comprehensive Discord moderation and management bot that helps server administrators manage their communities effectively.
 
 ## Features
 
-Delta offers several modular systems that can be independently activated per server:
+Sloth offers several features to help manage your server:
 
-### 🛡️ Moderation System
+### 🛡️ Moderation
 - Advanced user moderation capabilities
 - Automated moderation actions
 - Comprehensive logging of moderation activities
@@ -23,17 +23,17 @@ Delta offers several modular systems that can be independently activated per ser
 - Generate ticket transcripts (not possible until discord approves message content intent)
 - Customizable ticket categories and priorities
 
-### 📝 Log Channel System
+### 📝 Log Channels
 - Configure dedicated logging channels
 - Track server events and activities
 - Comprehensive audit trail
 
-### 📊 Statistics System
+### 📊 Statistics
 - Server activity statistics
 - User engagement metrics
 - Command usage tracking
 
-### 📋 Rules Embed System
+### 📋 Rules Embeds
 - Create and manage rule embeds in channels
 - Customizable rule formatting and styling
 - Easy rule distribution across your server
@@ -42,8 +42,8 @@ Delta offers several modular systems that can be independently activated per ser
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/GamingToastEVE/Delta.git
-cd Delta
+git clone https://github.com/GamingToastEVE/Sloth.git
+cd Sloth
 ```
 
 ### 2. Configure Environment Variables
@@ -55,9 +55,9 @@ TOKEN=your_discord_bot_token_here
 # Database Configuration (MariaDB)
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=delta_bot
-DB_USER=delta_bot
-DB_PASSWORD=delta_bot
+DB_NAME=sloth_bot
+DB_USER=sloth_bot
+DB_PASSWORD=sloth_bot
 ```
 
 **Important**: The bot now uses MariaDB instead of SQLite. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed database setup instructions.
@@ -74,27 +74,25 @@ DB_PASSWORD=delta_bot
 
 ## Usage
 
-Delta uses a modular system approach where server administrators can activate only the systems they need.
-
 ### Getting Help
 
-Use the `/help` command to access Delta's interactive help system. The help system provides:
-- 🏠 **Overview** - Learn about Delta's features and capabilities
-- ⚙️ **Systems** - Browse all available modular systems
+Use the `/help` command to access Sloth's interactive help system. The help system provides:
+- 🏠 **Overview** - Learn about Sloth's features and capabilities
+- ⚙️ **Commands** - Browse all available commands
 - 📋 **Setup** - Step-by-step configuration guides  
-- 📖 **Commands** - Complete command reference
+- 📖 **Reference** - Complete command reference
 
 Navigate between help sections using the interactive buttons.
 
-### Available Systems
+### Available Features
 
-#### Log Channel System
+#### Log Channels
 - `/set-log-channel` - Configure the server log channel
 - `/get-log-channel` - View current log channel
 
 #### Warning System
 - `/warn` - Issue a warning to a user
-- `/set-warn-settings` - Configure warning system settings
+- `/set-warn-settings` - Configure warning settings
 - `/get-warn-settings` - View current warning settings
 
 #### Ticket System
@@ -105,7 +103,7 @@ Navigate between help sections using the interactive buttons.
 - `/ticket-info` - Get ticket information
 - `/ticket-transcript` - Generate ticket transcript
 
-#### Moderation System
+#### Moderation
 - `/kick` - Kick a user from the server
 - `/ban` - Ban a user from the server
 - `/unban` - Unban a user from the server
@@ -114,17 +112,17 @@ Navigate between help sections using the interactive buttons.
 - `/purge` - Delete multiple messages from the channel
 - `/slowmode` - Set slowmode for the current channel
 
-#### Rules Embed System
+#### Rules Embeds
 - `/add-rules-embed` - Add a formatted rules embed to a channel
 - Supports custom formatting and styling options
 
 ## Database
 
-Delta uses MariaDB for data storage and automatically creates and manages the database that stores:
+Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
 - Guild configurations
 - User warnings and moderation history
 - Ticket information and transcripts
-- System activation status
+- Feature activation status
 - Activity statistics
 
 For detailed database setup instructions, see [DATABASE_SETUP.md](DATABASE_SETUP.md).
@@ -134,7 +132,7 @@ The bot includes an automatic migration system that handles schema updates. See 
 ## File Structure
 
 ```
-Delta/
+Sloth/
 ├── src/main/java/org/ToastiCodingStuff/Sloth/
 │   ├── Sloth.java                              # Main bot class
 │   ├── DatabaseHandler.java                    # Database operations

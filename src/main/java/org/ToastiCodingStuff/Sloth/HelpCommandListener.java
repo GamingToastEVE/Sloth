@@ -49,8 +49,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         .setDescription("Welcome to Sloth! I'm a comprehensive Discord moderation and management bot.\n\n" +
                                 "**Available Help Sections:**\n" +
                                 "🏠 **Overview** - Learn about Sloth's features\n" +
-                                "⚙️ **Systems** - Available modular systems\n" +
-                                "📋 **Setup** - How to configure systems\n" +
+                                "⚙️ **Commands** - Available commands and features\n" +
+                                "📋 **Setup** - How to configure features\n" +
                                 "📖 **Commands** - Complete command reference\n" +
                                 "🎨 **Formatting** - Rules embed formatting guide\n" +
                                 "📜 **Legal** - Terms of Service and Privacy Policy\n" +
@@ -61,9 +61,9 @@ public class HelpCommandListener extends ListenerAdapter {
 
                 actionRow = ActionRow.of(
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Reference")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
@@ -81,17 +81,17 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• **Ticket System** - Professional support channel management\n" +
                                 "• **Statistics Tracking** - Monitor server engagement\n\n" +
                                 "**Getting Started:**\n" +
-                                "1. All systems are available to use immediately\n" +
-                                "2. Configure each system using setup commands\n" +
+                                "1. All features are available to use immediately\n" +
+                                "2. Configure each feature using setup commands\n" +
                                 "3. Start managing your server more effectively!")
                         .setColor(Color.GREEN)
                         .setFooter("Navigate using buttons below");
 
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands", "📖 Reference")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
@@ -101,9 +101,9 @@ public class HelpCommandListener extends ListenerAdapter {
                 break;
 
             case "systems":
-                embed.setTitle("⚙️ Available Systems")
-                        .setDescription("Sloth offers several modular systems that can be independently activated:\n\n")
-                        .addField("🛡️ **Moderation System**", 
+                embed.setTitle("⚙️ Available Commands & Features")
+                        .setDescription("Sloth offers comprehensive moderation and management features:\n\n")
+                        .addField("🛡️ **Moderation**", 
                                 "• Kick, ban, timeout users\n" +
                                 "• Message purging and slowmode\n" +
                                 "• Comprehensive moderation logging", false)
@@ -114,20 +114,20 @@ public class HelpCommandListener extends ListenerAdapter {
                         .addField("🎫 **Ticket System**", 
                                 "• Professional support channels\n" +
                                 "• Staff assignment and priorities", false)
-                        .addField("📝 **Log Channel System**", 
+                        .addField("📝 **Log Channels**", 
                                 "• Dedicated logging channels\n" +
                                 "• Track server events\n" +
                                 "• Comprehensive audit trail", false)
-                        .addField("📊 **Statistics System**", 
+                        .addField("📊 **Statistics**", 
                                 "• Server activity tracking\n" +
                                 "• Daily and weekly reports\n" +
                                 "• Engagement metrics", false)
-                        .addField("📋 **Rules/Verification System**", 
+                        .addField("📋 **Rules/Verification**", 
                                 "• Custom rules embeds with verification buttons\n" +
                                 "• Role assignment upon verification\n" +
                                 "• Verification statistics tracking", false)
                         .setColor(Color.ORANGE)
-                        .setFooter("All systems are ready to use!");
+                        .setFooter("All features are ready to use!");
 
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
@@ -143,17 +143,17 @@ public class HelpCommandListener extends ListenerAdapter {
                 break;
 
             case "setup":
-                embed.setTitle("📋 System Setup Guide")
+                embed.setTitle("📋 Setup Guide")
                         .setDescription("Follow these steps to configure Sloth for your server:\n\n")
-                        .addField("**Step 1: Choose Systems to Configure**", 
-                                "All systems are available to use:\n" +
-                                "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
+                        .addField("**Step 1: Choose Features to Configure**", 
+                                "All features are available to use:\n" +
+                                "• Log Channels, Warnings, Tickets, Moderation, Statistics\n" +
                                 "• Configure only the ones you need", false)
-                        .addField("**Step 2: Configure Systems**", 
-                                "**Log Channel:** `/set-log-channel #channel`\n" +
+                        .addField("**Step 2: Configure Features**", 
+                                "**Log Channels:** `/set-log-channel #channel`\n" +
                                 "**Warning System:** `/set-warn-settings`\n" +
                                 "**Ticket System:** `/ticket-setup`\n" +
-                                "**Moderation:** Ready to use after activation!", false)
+                                "**Moderation:** Ready to use immediately!", false)
                         .addField("**Step 3: Create Panels (Optional)**", 
                                 "**Ticket Panel:** `/ticket-panel` - Creates user-friendly ticket creation\n" +
                                 "Place in a public channel for easy access", false)
@@ -170,8 +170,8 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_systems", "⚙️ Commands"),
+                        Button.primary("help_commands", "📖 Reference")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
@@ -220,7 +220,7 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
@@ -244,7 +244,7 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
@@ -284,14 +284,14 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_legal", "📜 Legal"),
                         Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.link("https://github.com/GamingToastEVE/Delta", "📄 View on GitHub")
+                        Button.link("https://github.com/GamingToastEVE/Sloth", "📄 View on GitHub")
                 );
                 break;
 
@@ -338,7 +338,7 @@ public class HelpCommandListener extends ListenerAdapter {
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_systems", "⚙️ Commands"),
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(

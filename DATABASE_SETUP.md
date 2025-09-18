@@ -1,6 +1,6 @@
 # Database Setup
 
-The Delta bot now uses MariaDB instead of SQLite. Follow these steps to set up the database:
+The Sloth bot now uses MariaDB instead of SQLite. Follow these steps to set up the database:
 
 ## Requirements
 
@@ -37,9 +37,9 @@ The Delta bot now uses MariaDB instead of SQLite. Follow these steps to set up t
 
 1. Create the database and user:
    ```sql
-   CREATE DATABASE delta_bot;
-   CREATE USER 'delta_bot'@'localhost' IDENTIFIED BY 'delta_bot';
-   GRANT ALL PRIVILEGES ON delta_bot.* TO 'delta_bot'@'localhost';
+   CREATE DATABASE sloth_bot;
+   CREATE USER 'sloth_bot'@'localhost' IDENTIFIED BY 'sloth_bot';
+   GRANT ALL PRIVILEGES ON sloth_bot.* TO 'sloth_bot'@'localhost';
    FLUSH PRIVILEGES;
    ```
 
@@ -49,9 +49,9 @@ The Delta bot now uses MariaDB instead of SQLite. Follow these steps to set up t
      ```
      DB_HOST=localhost
      DB_PORT=3306
-     DB_NAME=delta_bot
-     DB_USER=delta_bot
-     DB_PASSWORD=delta_bot
+     DB_NAME=sloth_bot
+     DB_USER=sloth_bot
+     DB_PASSWORD=sloth_bot
      ```
 
 ## Migration from SQLite
