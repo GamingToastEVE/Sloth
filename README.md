@@ -1,10 +1,10 @@
-# Sloth Discord Bot
+# Delta Discord Bot
 
-Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Delta is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
 
 ## Features
 
-Sloth offers several modular systems that can be independently activated per server:
+Delta offers several modular systems that can be independently activated per server:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
@@ -33,6 +33,11 @@ Sloth offers several modular systems that can be independently activated per ser
 - User engagement metrics
 - Command usage tracking
 
+### 📋 Rules Embed System
+- Create and manage rule embeds in channels
+- Customizable rule formatting and styling
+- Easy rule distribution across your server
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -42,10 +47,20 @@ cd Delta
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the root directory with your Discord bot token:
+Create a `.env` file in the root directory based on `.env.example`:
 ```env
+# Discord Bot Token
 TOKEN=your_discord_bot_token_here
+
+# Database Configuration (MariaDB)
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=delta_bot
+DB_USER=delta_bot
+DB_PASSWORD=delta_bot
 ```
+
+**Important**: The bot now uses MariaDB instead of SQLite. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed database setup instructions.
 
 ### 3. Build the Project
 ```bash
@@ -59,12 +74,12 @@ TOKEN=your_discord_bot_token_here
 
 ## Usage
 
-Sloth uses a modular system approach where server administrators can activate only the systems they need.
+Delta uses a modular system approach where server administrators can activate only the systems they need.
 
 ### Getting Help
 
-Use the `/help` command to access Sloth's interactive help system. The help system provides:
-- 🏠 **Overview** - Learn about Sloth's features and capabilities
+Use the `/help` command to access Delta's interactive help system. The help system provides:
+- 🏠 **Overview** - Learn about Delta's features and capabilities
 - ⚙️ **Systems** - Browse all available modular systems
 - 📋 **Setup** - Step-by-step configuration guides  
 - 📖 **Commands** - Complete command reference
@@ -99,33 +114,45 @@ Navigate between help sections using the interactive buttons.
 - `/purge` - Delete multiple messages from the channel
 - `/slowmode` - Set slowmode for the current channel
 
+#### Rules Embed System
+- `/add-rules-embed` - Add a formatted rules embed to a channel
+- Supports custom formatting and styling options
+
 ## Database
 
-Sloth automatically creates and manages an SQLite database (`server.db`) that stores:
+Delta uses MariaDB for data storage and automatically creates and manages the database that stores:
 - Guild configurations
 - User warnings and moderation history
 - Ticket information and transcripts
 - System activation status
 - Activity statistics
 
+For detailed database setup instructions, see [DATABASE_SETUP.md](DATABASE_SETUP.md).
+
+The bot includes an automatic migration system that handles schema updates. See [MIGRATION_SYSTEM.md](MIGRATION_SYSTEM.md) for more information about the migration capabilities.
+
 ## File Structure
 
 ```
-Sloth/
+Delta/
 ├── src/main/java/org/ToastiCodingStuff/Sloth/
-│   ├── Sloth.java                          # Main bot class
-│   ├── DatabaseHandler.java                # Database operations
-│   ├── AddGuildSlashCommands.java          # Command registration
-│   ├── SystemManagementCommandListener.java # System activation
-│   ├── TicketCommandListener.java          # Ticket system
-│   ├── WarnCommandListener.java            # Warning system
-│   ├── ModerationCommandListener.java      # Moderation system
-│   ├── LogChannelSlashCommandListener.java # Logging system
-│   ├── StatisticsCommandListener.java      # Statistics tracking
-│   └── GuildEventListener.java             # Guild event handling
-├── build.gradle.kts                        # Build configuration
-├── .env                                     # Environment variables (create this)
-└── README.md                               # This file
+│   ├── Sloth.java                              # Main bot class
+│   ├── DatabaseHandler.java                    # Database operations
+│   ├── DatabaseMigrationManager.java           # Database schema migrations
+│   ├── AddGuildSlashCommands.java              # Command registration
+│   ├── HelpCommandListener.java                # Help system
+│   ├── TicketCommandListener.java              # Ticket system
+│   ├── WarnCommandListener.java                # Warning system
+│   ├── ModerationCommandListener.java          # Moderation system
+│   ├── LogChannelSlashCommandListener.java     # Logging system
+│   ├── StatisticsCommandListener.java          # Statistics tracking
+│   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
+│   └── GuildEventListener.java                 # Guild event handling
+├── build.gradle.kts                            # Build configuration
+├── .env.example                                 # Environment variables template
+├── DATABASE_SETUP.md                           # Database setup guide
+├── MIGRATION_SYSTEM.md                         # Migration system documentation
+└── README.md                                   # This file
 ```
 
 ## Development
@@ -166,3 +193,6 @@ This project is developed by gamingtoasti. Please refer to the Terms of Service 
 ## Support
 
 For support, please create a ticket using the bot's ticket system or open an issue in this repository.
+
+- Support Server: https://discord.gg/dQT53fD8M5
+- Discord: **gamingtoasti**
