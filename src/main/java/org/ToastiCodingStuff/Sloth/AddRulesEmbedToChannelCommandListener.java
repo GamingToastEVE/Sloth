@@ -4,19 +4,25 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.text.TextInput;
+import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
+import net.dv8tion.jda.api.interactions.modals.Modal;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
 public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
     private final DatabaseHandler handler;
+    private HashMap<String, String> guildAndRoleIDs = new HashMap<>();
 
     public AddRulesEmbedToChannelCommandListener(DatabaseHandler handler) {
         this.handler = handler;
@@ -63,6 +69,101 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
     }
 
     @Override
+    public void onModalInteraction (ModalInteractionEvent event) {
+        // Get required parameters
+        event.getModalId();
+        if (!event.getModalId().equals("rules_modal_creator")) {
+            return; // Not our modal
+        }
+
+        if (event.getGuild() == null) {
+            event.reply("❌ This command can only be used in a server!").setEphemeral(true).queue();
+            return;
+        }
+        String title = Objects.requireNonNull(event.getValue("rules_title")).getAsString();
+        String description = Objects.requireNonNull(event.getValue("rules_description")).getAsString();
+        Role mentionRole = event.getGuild().getRoleById(guildAndRoleIDs.get(event.getGuild().getId()));
+
+        // Get optional parameters
+        String buttonEmoji = "✅";
+        if (event.getValue("button_emoji") != null) {
+            buttonEmoji = event.getValue("button_emoji").getAsString();
+        }
+
+        String buttonLabel = "Verify";
+        if (event.getValue("button_label") != null) {
+            buttonLabel = event.getValue("button_label").getAsString();
+        }
+
+        String color = "green";
+        if (event.getValue("color") != null) {
+            color = event.getValue("color").getAsString();
+        }
+
+        String footer = null;
+        if (event.getValue("footer") != null) {
+            footer = event.getValue("footer").getAsString();
+        }
+
+        // Validate inputs with formatting awareness
+        String titleValidation = validateTextWithFormatting(title, "Title", 256);
+        if (titleValidation != null) {
+            event.reply(titleValidation + getFormattingHelpText()).setEphemeral(true).queue();
+            return;
+        }
+
+        String descriptionValidation = validateTextWithFormatting(description, "Description", 4096);
+        if (descriptionValidation != null) {
+            event.reply(descriptionValidation).setEphemeral(true).queue();
+            return;
+        }
+
+        if (buttonLabel.length() > 80) {
+            event.reply("❌ Button label must be 80 characters or less!").setEphemeral(true).queue();
+            return;
+        }
+
+        // Validate footer if provided
+        if (footer != null && !footer.isEmpty()) {
+            String footerValidation = validateTextWithFormatting(footer, "Footer", 2048);
+            if (footerValidation != null) {
+                event.reply(footerValidation).setEphemeral(true).queue();
+                return;
+            }
+        }
+
+        // Add to database
+        boolean success = handler.addRulesEmbedToDatabase(
+                Objects.requireNonNull(event.getGuild()).getId(),
+                title,
+                description,
+                footer,
+                color,
+                mentionRole.getId(),
+                buttonLabel,
+                buttonEmoji
+        );
+
+        if (success) {
+            String successMessage = "✅ Successfully added rules embed to the database!\n" +
+                    "📋 **Title:** " + title + "\n" +
+                    "🎭 **Role:** " + mentionRole.getAsMention() + "\n" +
+                    "🔘 **Button:** " + buttonLabel + "\n" +
+                    "Use `/setup-rules` in a channel to display the rules with verification buttons.";
+
+            // Add formatting info if description or footer contains formatting
+            if (containsFormattingCharacters(description) ||
+                    (footer != null && containsFormattingCharacters(footer))) {
+                successMessage += "\n\n✨ **Formatting detected!** Your embed will display with Discord markdown formatting.";
+            }
+
+            event.reply(successMessage).setEphemeral(true).queue();
+        } else {
+            event.reply("❌ Failed to add rules embed to database. Please try again or contact an administrator.").setEphemeral(true).queue();
+        }
+    }
+
+    @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
 
@@ -72,6 +173,27 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
                 break;
             case "setup-rules":
                 handleSetupRulesCommand(event, guildId);
+                break;
+            case "remove-rules-embed":
+                handleRemoveEmbedCommand(event, guildId);
+                break;
+            case "list-rules-embeds":
+                List<DatabaseHandler.RulesEmbedData> embeds = handler.getAllRulesEmbedDataFromDatabase(guildId);
+                if (embeds.isEmpty()) {
+                    event.reply("❌ No rules embeds found in the database! Use `/add-rules-embed` to create some first.").setEphemeral(true).queue();
+                    return;
+                }
+
+                StringBuilder embedList = new StringBuilder("📋 **Current Rules Embeds in Database:**\n");
+                for (DatabaseHandler.RulesEmbedData embedData : embeds) {
+                    embedList.append("• ID: ").append(embedData.id)
+                             .append(" | Title: ").append(embedData.title)
+                             .append(" | Role ID: ").append(embedData.roleId)
+                             .append("\n");
+                }
+                event.reply(embedList.toString()).setEphemeral(true).queue();
+                break;
+            default:
                 break;
         }
     }
@@ -99,88 +221,53 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             return;
         }
 
-        // Get required parameters
-        String title = event.getOption("title").getAsString();
-        String description = event.getOption("description").getAsString();
-        Role mentionRole = Objects.requireNonNull(event.getOption("role_to_give")).getAsRole();
-
-        // Get optional parameters
-        String buttonEmoji = "✅";
-        if (event.getOption("button_emoji") != null) {
-            buttonEmoji = event.getOption("button_emoji").getAsString();
-        }
-
-        String buttonLabel = "Verify";
-        if (event.getOption("button_label") != null) {
-            buttonLabel = event.getOption("button_label").getAsString();
-        }
-        
-        String color = "green";
-        if (event.getOption("color") != null) {
-            color = event.getOption("color").getAsString();
-        }
-        
-        String footer = null;
-        if (event.getOption("footer") != null) {
-            footer = event.getOption("footer").getAsString();
-        }
-
-        // Validate inputs with formatting awareness
-        String titleValidation = validateTextWithFormatting(title, "Title", 256);
-        if (titleValidation != null) {
-            event.reply(titleValidation + getFormattingHelpText()).setEphemeral(true).queue();
+        if (event.getOption("role_to_give") == null) {
+            event.reply("❌ You must specify a role to assign upon verification!").setEphemeral(true).queue();
             return;
         }
-        
-        String descriptionValidation = validateTextWithFormatting(description, "Description", 4096);
-        if (descriptionValidation != null) {
-            event.reply(descriptionValidation).setEphemeral(true).queue();
-            return;
-        }
-        
-        if (buttonLabel.length() > 80) {
-            event.reply("❌ Button label must be 80 characters or less!").setEphemeral(true).queue();
-            return;
-        }
-        
-        // Validate footer if provided
-        if (footer != null && !footer.isEmpty()) {
-            String footerValidation = validateTextWithFormatting(footer, "Footer", 2048);
-            if (footerValidation != null) {
-                event.reply(footerValidation).setEphemeral(true).queue();
-                return;
-            }
-        }
+        String roleID = Objects.requireNonNull(event.getOption("role_to_give")).getAsString();
+        setGuildAndRoleIDs(event.getGuild().getId(), roleID);
 
-        // Add to database
-        boolean success = handler.addRulesEmbedToDatabase(
-            guildId, 
-            title, 
-            description, 
-            footer, 
-            color, 
-            mentionRole.getId(), 
-            buttonLabel, 
-            buttonEmoji
-        );
+        TextInput title = TextInput.create("rules_title", "Title", TextInputStyle.SHORT)
+                .setPlaceholder("Server Rules")
+                .setRequired(true)
+                .setMaxLength(256)
+                .build();
+        TextInput description = TextInput.create("rules_description", "Description", TextInputStyle.PARAGRAPH)
+                .setPlaceholder("Here you can type in the rules and use formatting!")
+                .setRequired(true)
+                .setMaxLength(4000)
+                .build();
 
-        if (success) {
-            String successMessage = "✅ Successfully added rules embed to the database!\n" +
-                       "📋 **Title:** " + title + "\n" +
-                       "🎭 **Role:** " + mentionRole.getAsMention() + "\n" +
-                       "🔘 **Button:** " + buttonLabel + "\n" +
-                       "Use `/setup-rules` in a channel to display the rules with verification buttons.";
-            
-            // Add formatting info if description or footer contains formatting
-            if (containsFormattingCharacters(description) || 
-                (footer != null && containsFormattingCharacters(footer))) {
-                successMessage += "\n\n✨ **Formatting detected!** Your embed will display with Discord markdown formatting.";
-            }
-            
-            event.reply(successMessage).setEphemeral(true).queue();
-        } else {
-            event.reply("❌ Failed to add rules embed to database. Please try again or contact an administrator.").setEphemeral(true).queue();
-        }
+        TextInput footer = TextInput.create("rules_footer", "Footer", TextInputStyle.SHORT)
+                .setPlaceholder("Footer text (optional)")
+                .setRequired(false)
+                .setMaxLength(2048)
+                .build();
+
+        TextInput buttonLabel = TextInput.create("rules_button_label", "Button Label", TextInputStyle.SHORT)
+                .setPlaceholder("Verify")
+                .setRequired(false)
+                .setMaxLength(80)
+                .build();
+
+        TextInput buttonEmoji = TextInput.create("rules_button_emoji", "Button Emoji", TextInputStyle.SHORT)
+                .setPlaceholder("✅")
+                .setRequired(false)
+                .setMaxLength(32)
+                .build();
+
+        Modal rulesModal = Modal.create("rules_modal_creator", "Create Custom Rules Embed")
+                .addActionRows(
+                        ActionRow.of(title),
+                        ActionRow.of(description),
+                        ActionRow.of(footer),
+                        ActionRow.of(buttonLabel),
+                        ActionRow.of(buttonEmoji)
+                )
+                .build();
+
+        event.replyModal(rulesModal).queue();
     }
 
     private void handleSetupRulesCommand(SlashCommandInteractionEvent event, String guildId) {
@@ -227,10 +314,30 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             }
 
         }
-
         event.reply("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").setEphemeral(true).queue();
-
         //event.getHook().editOriginal("✅ Successfully set up " + embedDataList.size() + " rules embed(s) in this channel!").queue();
+    }
+
+    private void handleRemoveEmbedCommand(SlashCommandInteractionEvent event, String guildId) {
+        // Check if user has permission to manage server
+        Member member = event.getMember();
+        if (member == null || !member.hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("❌ You need the **Manage Server** permission to use this command!").setEphemeral(true).queue();
+            return;
+        }
+
+        if (event.getOption("embed_id") == null) {
+            event.reply("❌ You must specify the ID of the embed to remove!").setEphemeral(true).queue();
+            return;
+        }
+        String embedId = Objects.requireNonNull(event.getOption("embed_id")).getAsString();
+
+        boolean success = handler.removeRulesEmbedFromDatabase(guildId, embedId);
+        if (success) {
+            event.reply("✅ Successfully removed the rules embed with ID " + embedId + " from the database!").setEphemeral(true).queue();
+        } else {
+            event.reply("❌ Failed to remove the rules embed. Please ensure the ID is correct and try again.").setEphemeral(true).queue();
+        }
     }
 
     private void handleRulesVerificationButton(ButtonInteractionEvent event, String customId) {
@@ -277,5 +384,15 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
             System.err.println("Error in rules verification button: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public HashMap<String, String> getGuildAndRoleIDs() {
+        return guildAndRoleIDs;
+    }
+
+    public void setGuildAndRoleIDs(String guildId, String roleId) {
+        HashMap<String, String> guildAndRoleIDs = getGuildAndRoleIDs();
+        guildAndRoleIDs.put(guildId, roleId);
+        this.guildAndRoleIDs = guildAndRoleIDs;
     }
 }

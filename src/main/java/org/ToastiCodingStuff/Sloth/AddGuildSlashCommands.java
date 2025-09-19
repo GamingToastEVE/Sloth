@@ -78,13 +78,11 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> commands = new ArrayList<>();
         commands.add(Commands.slash("setup-rules", "Sets up the rules in the current channel"));
         commands.add(Commands.slash("add-rules-embed", "Adds a rules embed to the database (max 3)")
-                .addOption(OptionType.STRING, "title", "Title of the embed (plain text only)", true)
-                .addOption(OptionType.STRING, "description", "Description of the embed (supports Discord markdown formatting)", true)
                 .addOption(OptionType.ROLE, "role_to_give", "Role to give members after pressing the verify button", true)
-                .addOption(OptionType.STRING, "button_label", "Label for the verify button (no label, no button)", false)
-                .addOption(OptionType.STRING, "button_emoji", "Emoji for the verify button (optional)", false)
-                .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false)
-                .addOption(OptionType.STRING, "footer", "Footer text of the embed (supports Discord markdown formatting)", false));
+                .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false));
+        commands.add(Commands.slash("list-rules-embeds", "Lists all rules embeds in this server"));
+        commands.add(Commands.slash("remove-rules-embed", "Removes a rules embed from the database")
+                .addOption(OptionType.INTEGER, "embed_id", "ID of the embed to remove", true));
         return commands;
     }
 

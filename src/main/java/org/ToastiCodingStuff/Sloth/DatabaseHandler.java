@@ -12,6 +12,8 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 public class DatabaseHandler {
 
+
+
     /**
      * Data class to hold complete rules embed information
      */
@@ -396,6 +398,19 @@ public class DatabaseHandler {
             ")";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
+    }
+
+    public boolean removeRulesEmbedFromDatabase(String guildId, String embedId) {
+        String deleteQuery = "DELETE FROM rules_embeds_channel WHERE guild_id = ? AND id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(deleteQuery)) {
+            pstmt.setString(1, guildId);
+            pstmt.setInt(2, Integer.parseInt(embedId));
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("Error removing rules embed from database: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
