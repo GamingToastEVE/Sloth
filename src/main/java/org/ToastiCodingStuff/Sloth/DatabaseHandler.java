@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import java.awt.Color;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Map;
 
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -915,10 +916,13 @@ public class DatabaseHandler {
             PreparedStatement pstmt = connection.prepareStatement(query);
             pstmt.setString(1, guildID);
             ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
+            while (rs.next()) {
                 roleId = rs.getString("role_id");
-                System.out.println("Found role ID: " + roleId);
+                if (!roleId.equals("0")) {
+                    break;
+                }
             }
+            return roleId;
         } catch (SQLException e) {
             System.err.println("Error getting role ID from rules embed: " + e.getMessage());
             e.printStackTrace();
@@ -2360,7 +2364,8 @@ public class DatabaseHandler {
     /**
      * Get moderation statistics for a guild for a specific date using embeds
      */
-    public EmbedBuilder getModerationStatisticsForDateEmbed(String guildId, String date) {
+    public EmbedBuilder getModerationStatisticsForDateEmbed(String guildId) {
+        String date = getCurrentDate();
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle("📊 Moderation Statistics")
                 .setDescription("Statistics for " + date)
@@ -2369,9 +2374,17 @@ public class DatabaseHandler {
 
         try {
             // Get counts from moderation_actions table
-            String query = "SELECT action_type, COUNT(*) as count FROM moderation_actions " +
-                    "WHERE guild_id = ? AND DATE(created_at) = ? " +
-                    "GROUP BY action_type ORDER BY action_type";
+            ArrayList<String> actionTypes = new ArrayList<>();
+            actionTypes.add("warnings_issued");
+            actionTypes.add("kicks_performed");
+            actionTypes.add("bans_performed");
+            actionTypes.add("timeouts_performed");
+            actionTypes.add("untimeouts_performed");
+            actionTypes.add("tickets_created");
+            actionTypes.add("tickets_closed");
+            actionTypes.add("verifications_performed");
+
+            String query = "SELECT warnings_issued, kicks_performed, bans_performed, timeouts_performed, untimeouts_performed, tickets_created, tickets_closed, verifications_performed FROM statistics WHERE guild_id = ? AND date = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
             stmt.setString(2, date);
@@ -2380,51 +2393,52 @@ public class DatabaseHandler {
             boolean hasData = false;
             StringBuilder moderationStats = new StringBuilder();
 
-            while (rs.next()) {
-                hasData = true;
-                String actionType = rs.getString("action_type");
-                int count = rs.getInt("count");
-                String emoji = getModerationEmoji(actionType);
-                moderationStats.append(emoji).append(" ").append(actionType).append(": ").append(count).append("\n");
-            }
+            System.out.println("Abfrage von Statistiken für Guild: " + guildId + ", Datum: " + date);
 
-            // Get ticket statistics
-            String ticketQuery = "SELECT " +
-                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(created_at) = ?) as tickets_created, " +
-                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(closed_at) = ?) as tickets_closed";
-            PreparedStatement ticketStmt = connection.prepareStatement(ticketQuery);
-            ticketStmt.setString(1, guildId);
-            ticketStmt.setString(2, date);
-            ticketStmt.setString(3, guildId);
-            ticketStmt.setString(4, date);
-            ResultSet ticketRs = ticketStmt.executeQuery();
-
-            if (ticketRs.next()) {
-                int ticketsCreated = ticketRs.getInt("tickets_created");
-                int ticketsClosed = ticketRs.getInt("tickets_closed");
-                
-                if (ticketsCreated > 0 || ticketsClosed > 0) {
+            if (rs.next()) {
+                int warnings = rs.getInt("warnings_issued");
+                int kicks = rs.getInt("kicks_performed");
+                int bans = rs.getInt("bans_performed");
+                int timeouts = rs.getInt("timeouts_performed");
+                int untimeouts = rs.getInt("untimeouts_performed");
+                int ticketsCreated = rs.getInt("tickets_created");
+                int ticketsClosed = rs.getInt("tickets_closed");
+                int verifications = rs.getInt("verifications_performed");
+                if (warnings > 0) {
+                    moderationStats.append("⚠️ Warnings Issued: ").append(warnings).append("\n");
                     hasData = true;
-                    moderationStats.append("🎫 TICKETS_CREATED: ").append(ticketsCreated).append("\n");
-                    moderationStats.append("🔒 TICKETS_CLOSED: ").append(ticketsClosed).append("\n");
+                }
+                if (kicks > 0) {
+                    moderationStats.append("🦶 Kicks Performed: ").append(kicks).append("\n");
+                    hasData = true;
+                }
+                if (bans > 0) {
+                    moderationStats.append("🔨 Bans Performed: ").append(bans).append("\n");
+                    hasData = true;
+                }
+                if (timeouts > 0) {
+                    moderationStats.append("⏱️ Timeouts Performed: ").append(timeouts).append("\n");
+                    hasData = true;
+                }
+                if (untimeouts > 0) {
+                    moderationStats.append("⏰ Untimeouts Performed: ").append(untimeouts).append("\n");
+                    hasData = true;
+                }
+                if (ticketsCreated > 0) {
+                    moderationStats.append("🎫 Tickets Created: ").append(ticketsCreated).append("\n");
+                    hasData = true;
+                }
+                if (ticketsClosed > 0) {
+                    moderationStats.append("✅ Tickets Closed: ").append(ticketsClosed).append("\n");
+                    hasData = true;
+                }
+                if (verifications > 0) {
+                    moderationStats.append("✅ Verifications Performed: ").append(verifications).append("\n");
+                    hasData = true;
                 }
             }
 
-            // Get verification statistics
-            String verificationQuery = "SELECT verifications_performed FROM statistics WHERE guild_id = ? AND date = ?";
-            PreparedStatement verificationStmt = connection.prepareStatement(verificationQuery);
-            verificationStmt.setString(1, guildId);
-            verificationStmt.setString(2, date);
-            ResultSet verificationRs = verificationStmt.executeQuery();
-
-            if (verificationRs.next()) {
-                int verificationsPerformed = verificationRs.getInt("verifications_performed");
-                
-                if (verificationsPerformed > 0) {
-                    hasData = true;
-                    moderationStats.append("✅ VERIFICATIONS_PERFORMED: ").append(verificationsPerformed).append("\n");
-                }
-            }
+            System.out.println("Moderation Aktionen gefunden: " + (hasData ? "Ja" : "Nein"));
 
             if (hasData) {
                 embed.addField("Moderation Actions", moderationStats.toString(), false);
@@ -2445,7 +2459,7 @@ public class DatabaseHandler {
      * Get moderation statistics for today using embeds
      */
     public EmbedBuilder getTodaysModerationStatisticsEmbed(String guildId) {
-        return getModerationStatisticsForDateEmbed(guildId, getCurrentDate());
+        return getModerationStatisticsForDateEmbed(guildId);
     }
 
     public EmbedBuilder getUserModerationStatisticsEmbed(String guildId, String userId) {
@@ -2497,115 +2511,87 @@ public class DatabaseHandler {
     /**
      * Get moderation statistics for the last 7 days using embeds
      */
-    public EmbedBuilder getWeeklyModerationStatisticsEmbed(String guildId) {
+    public EmbedBuilder getWeeklyModerationStatisticsEmbed(String guildId, String afterDate) {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle("📊 Weekly Moderation Statistics")
-                .setDescription("Statistics for the last 7 days")
+                .setDescription("Statistics for all days with date \">" + afterDate + "\"")
                 .setColor(Color.BLUE)
                 .setTimestamp(java.time.Instant.now());
 
-        try {
-            // Get daily breakdown
-            String dailyQuery = "SELECT DATE(created_at) as date, action_type, COUNT(*) as count " +
-                    "FROM moderation_actions " +
-                    "WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days') " +
-                    "GROUP BY DATE(created_at), action_type " +
-                    "ORDER BY date DESC, action_type";
-            PreparedStatement dailyStmt = connection.prepareStatement(dailyQuery);
-            dailyStmt.setString(1, guildId);
-            ResultSet dailyRs = dailyStmt.executeQuery();
+        System.out.println("Hole wöchentliche Moderations-Statistiken für Guild: " + guildId + " ab Datum (exklusiv): " + afterDate);
 
-            StringBuilder dailyBreakdown = new StringBuilder();
-            String currentDate = "";
+        StringBuilder dailyBreakdown = new StringBuilder();
+        int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTimeouts = 0, totalUntimeouts = 0, totalTicketsCreated = 0, totalTicketsClosed = 0, totalVerifications = 0;
+
+        try {
+            String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, timeouts_performed, " +
+                    "untimeouts_performed, tickets_created, tickets_closed, verifications_performed " +
+                    "FROM statistics WHERE guild_id = ? AND date > ? ORDER BY date ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, afterDate);
+            ResultSet rs = stmt.executeQuery();
+
             boolean hasData = false;
 
-            while (dailyRs.next()) {
+            while (rs.next()) {
                 hasData = true;
-                String date = dailyRs.getString("date");
-                String actionType = dailyRs.getString("action_type");
-                int count = dailyRs.getInt("count");
+                String day = rs.getString("date");
+                int warnings = rs.getInt("warnings_issued");
+                int kicks = rs.getInt("kicks_performed");
+                int bans = rs.getInt("bans_performed");
+                int timeouts = rs.getInt("timeouts_performed");
+                int untimeouts = rs.getInt("untimeouts_performed");
+                int ticketsCreated = rs.getInt("tickets_created");
+                int ticketsClosed = rs.getInt("tickets_closed");
+                int verifications = rs.getInt("verifications_performed");
 
-                if (!date.equals(currentDate)) {
-                    if (!currentDate.isEmpty()) {
-                        dailyBreakdown.append("\n");
-                    }
-                    dailyBreakdown.append("**").append(date).append(":**\n");
-                    currentDate = date;
-                }
-                
-                String emoji = getModerationEmoji(actionType);
-                dailyBreakdown.append(emoji).append(" ").append(count).append(" ");
-            }
+                totalWarnings += warnings;
+                totalKicks += kicks;
+                totalBans += bans;
+                totalTimeouts += timeouts;
+                totalUntimeouts += untimeouts;
+                totalTicketsCreated += ticketsCreated;
+                totalTicketsClosed += ticketsClosed;
+                totalVerifications += verifications;
 
-            // Get total counts
-            String totalQuery = "SELECT action_type, COUNT(*) as count FROM moderation_actions " +
-                    "WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days') " +
-                    "GROUP BY action_type ORDER BY count DESC";
-            PreparedStatement totalStmt = connection.prepareStatement(totalQuery);
-            totalStmt.setString(1, guildId);
-            ResultSet totalRs = totalStmt.executeQuery();
+                System.out.println("Tag: " + day + ", Warnungen: " + warnings + ", Kicks: " + kicks + ", Bans: " + bans +
+                        ", Timeouts: " + timeouts + ", Untimeouts: " + untimeouts +
+                        ", Tickets Erstellt: " + ticketsCreated + ", Tickets Geschlossen: " + ticketsClosed +
+                        ", Verifizierungen: " + verifications);
 
-            StringBuilder totalStats = new StringBuilder();
-            while (totalRs.next()) {
-                String actionType = totalRs.getString("action_type");
-                int count = totalRs.getInt("count");
-                String emoji = getModerationEmoji(actionType);
-                totalStats.append(emoji).append(" ").append(actionType).append(": ").append(count).append("\n");
-            }
-
-            // Get ticket statistics for the week
-            String weeklyTicketQuery = "SELECT " +
-                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(created_at) >= DATE('now', '-7 days')) as tickets_created, " +
-                    "(SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND DATE(closed_at) >= DATE('now', '-7 days')) as tickets_closed";
-            PreparedStatement weeklyTicketStmt = connection.prepareStatement(weeklyTicketQuery);
-            weeklyTicketStmt.setString(1, guildId);
-            weeklyTicketStmt.setString(2, guildId);
-            ResultSet weeklyTicketRs = weeklyTicketStmt.executeQuery();
-
-            if (weeklyTicketRs.next()) {
-                int ticketsCreated = weeklyTicketRs.getInt("tickets_created");
-                int ticketsClosed = weeklyTicketRs.getInt("tickets_closed");
-                
-                if (ticketsCreated > 0 || ticketsClosed > 0) {
-                    hasData = true;
-                    totalStats.append("🎫 TICKETS_CREATED: ").append(ticketsCreated).append("\n");
-                    totalStats.append("🔒 TICKETS_CLOSED: ").append(ticketsClosed).append("\n");
-                }
-            }
-
-            // Get weekly verification statistics
-            String weeklyVerificationQuery = "SELECT SUM(verifications_performed) as total_verifications " +
-                    "FROM statistics WHERE guild_id = ? AND date >= DATE('now', '-7 days')";
-            PreparedStatement weeklyVerificationStmt = connection.prepareStatement(weeklyVerificationQuery);
-            weeklyVerificationStmt.setString(1, guildId);
-            ResultSet weeklyVerificationRs = weeklyVerificationStmt.executeQuery();
-
-            if (weeklyVerificationRs.next()) {
-                int totalVerifications = weeklyVerificationRs.getInt("total_verifications");
-                
-                if (totalVerifications > 0) {
-                    hasData = true;
-                    totalStats.append("✅ VERIFICATIONS_PERFORMED: ").append(totalVerifications).append("\n");
-                }
+                dailyBreakdown.append("**").append(day).append("**\n")
+                        .append("⚠️ ").append(warnings)
+                        .append(" | 🦶 ").append(kicks)
+                        .append(" | 🔨 ").append(bans)
+                        .append(" | ⏱️ ").append(timeouts)
+                        .append(" | ⏰ ").append(untimeouts)
+                        .append(" | 🎫 ").append(ticketsCreated)
+                        .append(" | ✅ ").append(ticketsClosed)
+                        .append(" | ✔️ ").append(verifications)
+                        .append("\n\n");
             }
 
             if (hasData) {
-                if (dailyBreakdown.length() > 0) {
-                    // Split into chunks if too long
-                    String dailyContent = dailyBreakdown.toString();
-                    if (dailyContent.length() > 1024) {
-                        dailyContent = dailyContent.substring(0, 1000) + "...\n*(truncated)*";
-                    }
-                    embed.addField("Daily Breakdown", dailyContent, false);
+                String dailyContent = dailyBreakdown.toString();
+                if (dailyContent.length() > 1024) {
+                    dailyContent = dailyContent.substring(0, 1000) + "...\n*(gekürzt)*";
                 }
-                
-                if (totalStats.length() > 0) {
-                    embed.addField("Weekly Totals", totalStats.toString(), true);
-                }
-            } else {
-                embed.addField("No Activity", "No moderation actions found for the last 7 days", false);
-            }
+                embed.addField("Daily Breakdown", dailyContent.isEmpty() ? "Keine Tagesdaten." : dailyContent, false);
 
+                StringBuilder totals = new StringBuilder()
+                        .append("⚠️ Warnings: ").append(totalWarnings).append("\n")
+                        .append("🦶 Kicks: ").append(totalKicks).append("\n")
+                        .append("🔨 Bans: ").append(totalBans).append("\n")
+                        .append("⏱️ Timeouts: ").append(totalTimeouts).append("\n")
+                        .append("⏰ Untimeouts: ").append(totalUntimeouts).append("\n")
+                        .append("🎫 Tickets Created: ").append(totalTicketsCreated).append("\n")
+                        .append("✅ Tickets Closed: ").append(totalTicketsClosed).append("\n")
+                        .append("✔️ Verifications: ").append(totalVerifications);
+                embed.addField("Totals", totals.toString(), true);
+            } else {
+                embed.addField("No Activity", "Keine Aktionen für Datum > " + afterDate, false);
+            }
         } catch (SQLException e) {
             System.err.println("Error getting weekly moderation statistics: " + e.getMessage());
             e.printStackTrace();

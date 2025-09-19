@@ -57,7 +57,9 @@ public class StatisticsCommandListener extends ListenerAdapter {
             return;
         }
 
-        EmbedBuilder embed = handler.getWeeklyModerationStatisticsEmbed(guildId);
+        String currentDate = LocalDate.now().minusDays(7).toString(); // Get date 7 days ago
+
+        EmbedBuilder embed = handler.getWeeklyModerationStatisticsEmbed(guildId, currentDate);
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
@@ -78,7 +80,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
             return;
         }
 
-        EmbedBuilder embed = handler.getModerationStatisticsForDateEmbed(guildId, dateString);
+        EmbedBuilder embed = handler.getModerationStatisticsForDateEmbed(guildId);
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
