@@ -103,7 +103,7 @@ public class DatabaseHandler {
             // Use environment variables for configuration, with defaults
             String host = System.getenv().getOrDefault("DB_HOST", "localhost");
             String port = System.getenv().getOrDefault("DB_PORT", "3306");
-            String database = System.getenv().getOrDefault("DB_NAME", "Sloth");
+            String database = System.getenv().getOrDefault("DB_NAME", "sloth");
             String user = System.getenv().getOrDefault("DB_USER", "root");
             String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
             
