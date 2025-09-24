@@ -33,9 +33,6 @@ public class StatisticsCommandListener extends ListenerAdapter {
             case "stats-user":
                 handleUserInfoCommand(event, guildId);
                 break;
-            case "stats-user-date":
-                handleUserStatsDateCommand(event, guildId);
-                break;
         }
     }
 
@@ -92,30 +89,22 @@ public class StatisticsCommandListener extends ListenerAdapter {
         }
 
         String userId = event.getOption("user").getAsUser().getId();
+
+        if (event.getOption("date") != null) {
+            String dateString = event.getOption("date").getAsString();
+            // Validate date format
+            try {
+                LocalDate.parse(dateString);
+            } catch (DateTimeParseException e) {
+                event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+                return;
+            }
+            EmbedBuilder embed = handler.getUserStatisticsForDateEmbed(guildId, userId, dateString);
+            event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+            return;
+        }
         
         EmbedBuilder embed = handler.getUserInfoEmbed(guildId, userId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
-    }
-
-    private void handleUserStatsDateCommand(SlashCommandInteractionEvent event, String guildId) {
-        // Check if user has moderate members permission
-        if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view user statistics.").setEphemeral(true).queue();
-            return;
-        }
-
-        String userId = event.getOption("user").getAsUser().getId();
-        String dateString = event.getOption("date").getAsString();
-        
-        // Validate date format
-        try {
-            LocalDate.parse(dateString);
-        } catch (DateTimeParseException e) {
-            event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
-            return;
-        }
-
-        EmbedBuilder embed = handler.getUserStatisticsForDateEmbed(guildId, userId, dateString);
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 }

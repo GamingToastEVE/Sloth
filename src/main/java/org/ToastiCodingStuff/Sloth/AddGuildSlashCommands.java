@@ -36,6 +36,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getModerationCommands());
         allCommands.addAll(getStatisticsCommands());
         allCommands.addAll(getRuleCommands());
+        allCommands.addAll(getJustVerifyButtonCommand());
 
         return allCommands;
     }
@@ -68,6 +69,17 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("set-log-channel", "Sets the log channel.")
                 .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true));
         commands.add(Commands.slash("get-log-channel", "gets the log channel"));
+        return commands;
+    }
+
+    private List<SlashCommandData> getJustVerifyButtonCommand() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("send-just-verify-button", "Sends a message with a button that gives a role"));
+        commands.add(Commands.slash("remove-just-verify-button", "Removes the Just Verify Button embed from the current channel"));
+        commands.add(Commands.slash("add-just-verify-button", "Adds a Just Verify Button embed to the database (max 3)")
+                .addOption(OptionType.ROLE, "role-to-give", "Role to give members after pressing the verify button", true)
+                .addOption(OptionType.ROLE, "role-to-remove", "Role to remove from members after pressing the verify button", false)
+                .addOption(OptionType.STRING, "button-label", "Name of the button", false));
         return commands;
     }
 
@@ -154,7 +166,7 @@ public class AddGuildSlashCommands {
                         .addChoice("High", "HIGH")
                         .addChoice("Urgent", "URGENT")));
         commands.add(Commands.slash("ticket-info", "Get information about the current ticket"));
-        commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
+        //commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
         return commands;
     }
 
@@ -169,10 +181,8 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
         commands.add(Commands.slash("stats-user", "View user information and statistics")
-                .addOption(OptionType.USER, "user", "User to view information for", true));
-        commands.add(Commands.slash("stats-user-date", "View user statistics for a specific date")
-                .addOption(OptionType.USER, "user", "User to view statistics for", true)
-                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
+                .addOption(OptionType.USER, "user", "User to view information for", true)
+                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false));
         return commands;
     }
 

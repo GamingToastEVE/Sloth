@@ -2,17 +2,16 @@ package org.ToastiCodingStuff.Sloth;
 
 import java.awt.Color;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Map;
+import java.util.*;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.interactions.components.ItemComponent;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 public class DatabaseHandler {
-
-
 
     /**
      * Data class to hold complete rules embed information
@@ -104,7 +103,7 @@ public class DatabaseHandler {
             // Use environment variables for configuration, with defaults
             String host = System.getenv().getOrDefault("DB_HOST", "localhost");
             String port = System.getenv().getOrDefault("DB_PORT", "3306");
-            String database = System.getenv().getOrDefault("DB_NAME", "sloth");
+            String database = System.getenv().getOrDefault("DB_NAME", "Sloth");
             String user = System.getenv().getOrDefault("DB_USER", "root");
             String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
             
@@ -138,7 +137,7 @@ public class DatabaseHandler {
             String[] tableNames = {
                 "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
                 "guild_settings", "role_permissions", "bot_logs", "statistics",
-                "temporary_data", "guilds", "guild_systems", "rules_embeds_channel"
+                "temporary_data", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics"
             };
             for (String tableName : tableNames) {
                 ResultSet rs = meta.getTables(null, null, tableName, null);
@@ -209,6 +208,7 @@ public class DatabaseHandler {
             createTemporaryDataTable();
             createGuildSystemsTable();
             createRulesEmbedsChannel();
+            createJustVerifyButtonTable();
             
             // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
@@ -328,6 +328,20 @@ public class DatabaseHandler {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_active ON warnings(active)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_expires ON warnings(expires_at)");
+    }
+
+    private void createJustVerifyButtonTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS just_verify_button (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "guild_id VARCHAR(32) UNIQUE NOT NULL, " +
+            "role_to_give_id VARCHAR(32) NOT NULL, " +
+            "role_to_remove_id VARCHAR(32), " +
+            "button_label VARCHAR(64) DEFAULT 'Verify', " +
+            "button_emoji_id VARCHAR(64), " +
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
+            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
     }
 
     /**
@@ -2687,5 +2701,174 @@ public class DatabaseHandler {
                 }
             }
         }
+    }
+
+    public String getJustVerifyButtonRoleToGiveID(String guildId) {
+        String query = "SELECT role_to_give_id FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String roleId = rs.getString("role_to_give_id");
+                System.out.println("Just Verify Button Role ID for guild " + guildId + ": " + roleId);
+                return roleId;
+            } else {
+                System.out.println("No Just Verify Button Role ID found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Just Verify Button Role ID: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getJustVerifyButtonRoleToRemoveID(String guildId) {
+        String query = "SELECT role_to_remove_id FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String roleId = rs.getString("role_to_remove_id");
+                System.out.println("Just Verify Button Role to Remove ID for guild " + guildId + ": " + roleId);
+                return roleId;
+            } else {
+                System.out.println("No Just Verify Button Role to Remove ID found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Just Verify Button Role to Remove ID: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getJustVerifyButtonLabel (String guildId) {
+        String query = "SELECT button_label FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String label = rs.getString("button_label");
+                System.out.println("Just Verify Button Label for guild " + guildId + ": " + label);
+                return label != null ? label : "✅ Verify!";
+            } else {
+                System.out.println("No Just Verify Button Label found for guild " + guildId);
+                return "Verify";
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Just Verify Button Label: " + e.getMessage());
+            e.printStackTrace();
+            return "Verify";
+        }
+    }
+
+    public String getJustVerifyButtonEmojiID (String guildId) {
+        String query = "SELECT button_emoji_id FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String emojiId = rs.getString("button_emoji_id");
+                System.out.println("Just Verify Button Emoji ID for guild " + guildId + ": " + emojiId);
+                return emojiId;
+            } else {
+                System.out.println("No Just Verify Button Emoji ID found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Just Verify Button Emoji ID: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public boolean isJustVerifyButton(String guildId) {
+        String query = "SELECT * FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                System.out.println("Just Verify Button Enabled for guild " + guildId + ": " + true);
+                return true;
+            } else {
+                System.out.println("No Just Verify Button setting found for guild " + guildId);
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Just Verify Button setting: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public void setJustVerifyButton(String guildId, String roleToGiveId, String roleToRemoveId, String buttonLabel, String buttonEmojiId) {
+        if (!isJustVerifyButton(guildId)) {
+            String query = "INSERT INTO just_verify_button (guild_id, role_to_give_id, role_to_remove_id, button_label, button_emoji_id) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE guild_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, guildId);
+                pstmt.setString(2, roleToGiveId);
+                pstmt.setString(3, roleToRemoveId);
+                pstmt.setString(4, buttonLabel);
+                pstmt.setString(5, buttonEmojiId);
+                pstmt.setString(6, guildId);
+                pstmt.executeUpdate();
+                System.out.println("Just Verify Button entry created/updated for guild " + guildId);
+            } catch (SQLException e) {
+                System.err.println("Error setting Just Verify Button entry: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            String query = "UPDATE just_verify_button SET role_to_give_id = ?, role_to_remove_id = ?, button_label = ?, button_emoji_id = ? WHERE guild_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, roleToGiveId);
+                pstmt.setString(2, roleToRemoveId);
+                pstmt.setString(3, buttonLabel);
+                pstmt.setString(4, buttonEmojiId);
+                pstmt.setString(5, guildId);
+                int rowsAffected = pstmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Just Verify Button entry updated for guild " + guildId);
+                } else {
+                    System.out.println("No Just Verify Button entry found to update for guild " + guildId);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error updating Just Verify Button entry: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+    public void removeJustVerifyButton(String guildId) {
+        String query = "DELETE FROM just_verify_button WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Just Verify Button entry removed for guild " + guildId);
+            } else {
+                System.out.println("No Just Verify Button entry found to remove for guild " + guildId);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error removing Just Verify Button entry: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public Button createJustVerifyButton(String roleToGiveID, String roleToRemoveID, String buttonLabel, String buttonEmoji) {
+        Button button;
+        if (buttonEmoji != null && !buttonEmoji.isEmpty()) {
+            // Check if it's a custom emoji (ID) or a Unicode emoji
+            if (buttonEmoji.matches("\\d+")) {
+                // Custom emoji by ID
+                button = Button.primary("just_verify", "✅ Verify!");
+            } else {
+                // Unicode emoji
+                button = Button.primary("just_verify", "✅ Verify!");
+            }
+        } else {
+            // No emoji
+            button = Button.primary("just_verify", "✅ Verify!");
+        }
+        return button;
     }
 }
