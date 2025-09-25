@@ -234,7 +234,7 @@ public class HelpCommandListener extends ListenerAdapter {
                 embed.setTitle("💡 Support Development")
                         .setDescription("Sloth is free to use, but development and hosting incur costs.\n\n" +
                                 "**Ways to Support:**\n" +
-                                "• **Donate:** https://https://ko-fi.com/gamingtoast27542\n + " +
+                                "• **Donate:** https://ko-fi.com/gamingtoast27542\n" +
                                 "• **Feedback:** Join our [Support Server](https://discord.gg/dQT53fD8M5) to share ideas and report issues.\n" +
                                 "• **Spread the Word:** Recommend Sloth to other server admins.\n" +
                                 "\nEvery bit of support helps keep Sloth running and improving!" +
@@ -291,7 +291,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_commands", "📖 Commands"),
                         Button.primary("help_legal", "📜 Legal"),
                         Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.link("https://github.com/GamingToastEVE/Delta", "📄 View on GitHub")
+                        Button.link("https://github.com/GamingToastEVE/Sloth", "📄 View on GitHub")
                 );
                 break;
 
