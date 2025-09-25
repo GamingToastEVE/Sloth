@@ -176,6 +176,7 @@ public class AddGuildSlashCommands {
      */
     private List<SlashCommandData> getStatisticsCommands() {
         List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("stats", "View lifetime server moderation statistics"));
         commands.add(Commands.slash("stats-today", "View today's server moderation statistics"));
         commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
         commands.add(Commands.slash("stats-date", "View server statistics for a specific date")

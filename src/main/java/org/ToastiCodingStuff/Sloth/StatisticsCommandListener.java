@@ -33,7 +33,20 @@ public class StatisticsCommandListener extends ListenerAdapter {
             case "stats-user":
                 handleUserInfoCommand(event, guildId);
                 break;
+            case "stats":
+                handleStatsCommand(event, guildId);
         }
+    }
+
+    private void handleStatsCommand (SlashCommandInteractionEvent event, String guildId) {
+        // Check if user has moderate members permission
+        if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
+            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            return;
+        }
+
+        EmbedBuilder embed = handler.getLifetimeModerationStatisticsEmbed(guildId);
+        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleTodayStatsCommand(SlashCommandInteractionEvent event, String guildId) {

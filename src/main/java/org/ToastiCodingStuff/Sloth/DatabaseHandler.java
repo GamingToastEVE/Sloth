@@ -13,6 +13,63 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 public class DatabaseHandler {
 
+    public EmbedBuilder getLifetimeModerationStatisticsEmbed(String guildId) {
+        String query = "SELECT " +
+                "SUM(warnings_issued) AS total_warnings, " +
+                "SUM(kicks_performed) AS total_kicks, " +
+                "SUM(bans_performed) AS total_bans, " +
+                "SUM(timeouts_performed) AS total_timeouts, " +
+                "SUM(untimeouts_performed) AS total_untimeouts, " +
+                "SUM(tickets_created) AS total_tickets_created, " +
+                "SUM(tickets_closed) AS total_tickets_closed, " +
+                "SUM(verifications_performed) AS total_verifications " +
+                "FROM statistics WHERE guild_id = ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                int totalWarnings = rs.getInt("total_warnings");
+                int totalKicks = rs.getInt("total_kicks");
+                int totalBans = rs.getInt("total_bans");
+                int totalTimeouts = rs.getInt("total_timeouts");
+                int totalUntimeouts = rs.getInt("total_untimeouts");
+                int totalTicketsCreated = rs.getInt("total_tickets_created");
+                int totalTicketsClosed = rs.getInt("total_tickets_closed");
+                int totalVerifications = rs.getInt("total_verifications");
+
+                EmbedBuilder embed = new EmbedBuilder();
+                embed.setTitle("Lifetime Moderation Statistics");
+                embed.setColor(Color.BLUE);
+                embed.addField("Total Warnings Issued", String.valueOf(totalWarnings), true);
+                embed.addField("Total Kicks Performed", String.valueOf(totalKicks), true);
+                embed.addField("Total Bans Performed", String.valueOf(totalBans), true);
+                embed.addField("Total Timeouts Performed", String.valueOf(totalTimeouts), true);
+                embed.addField("Total Untimeouts Performed", String.valueOf(totalUntimeouts), true);
+                embed.addField("Total Tickets Created", String.valueOf(totalTicketsCreated), true);
+                embed.addField("Total Tickets Closed", String.valueOf(totalTicketsClosed), true);
+                embed.addField("Total Verifications Performed", String.valueOf(totalVerifications), true);
+
+                return embed;
+            } else {
+                EmbedBuilder embed = new EmbedBuilder();
+                embed.setTitle("Lifetime Moderation Statistics");
+                embed.setColor(Color.BLUE);
+                embed.setDescription("No statistics available for this guild.");
+                return embed;
+            }
+        }
+        catch (SQLException e) {
+            System.err.println("Error fetching lifetime moderation statistics: " + e.getMessage());
+            EmbedBuilder embed = new EmbedBuilder();
+            embed.setTitle("Lifetime Moderation Statistics");
+            embed.setColor(Color.RED);
+            embed.setDescription("An error occurred while fetching statistics.");
+            return embed;
+        }
+    }
+
     /**
      * Data class to hold complete rules embed information
      */
