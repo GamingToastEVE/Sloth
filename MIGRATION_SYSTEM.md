@@ -1,6 +1,6 @@
 # Database Migration System - Usage Examples
 
-This document demonstrates how to use the comprehensive database migration system implemented in the Delta Discord Bot.
+This document demonstrates how to use the comprehensive database migration system implemented in the Sloth Bot.
 
 ## Overview
 
