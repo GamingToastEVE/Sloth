@@ -1,10 +1,10 @@
-# Delta Discord Bot
+# Sloth Bot
 
-Delta is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
+Sloth is a comprehensive Discord moderation and management bot that provides multiple systems to help server administrators manage their communities effectively.
 
 ## Features
 
-Delta offers several modular systems that can be independently activated per server:
+Sloth offers several modular systems that can be independently activated per server:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
@@ -42,8 +42,8 @@ Delta offers several modular systems that can be independently activated per ser
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/GamingToastEVE/Delta.git
-cd Delta
+git clone https://github.com/GamingToastEVE/Sloth.git
+cd Sloth
 ```
 
 ### 2. Configure Environment Variables
@@ -74,12 +74,12 @@ DB_PASSWORD=delta_bot
 
 ## Usage
 
-Delta uses a modular system approach where server administrators can activate only the systems they need.
+Sloth uses a modular system approach where server administrators can activate only the systems they need.
 
 ### Getting Help
 
-Use the `/help` command to access Delta's interactive help system. The help system provides:
-- 🏠 **Overview** - Learn about Delta's features and capabilities
+Use the `/help` command to access Sloth's interactive help system. The help system provides:
+- 🏠 **Overview** - Learn about Sloth's features and capabilities
 - ⚙️ **Systems** - Browse all available modular systems
 - 📋 **Setup** - Step-by-step configuration guides  
 - 📖 **Commands** - Complete command reference
@@ -120,7 +120,7 @@ Navigate between help sections using the interactive buttons.
 
 ## Database
 
-Delta uses MariaDB for data storage and automatically creates and manages the database that stores:
+Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
 - Guild configurations
 - User warnings and moderation history
 - Ticket information and transcripts
@@ -134,7 +134,7 @@ The bot includes an automatic migration system that handles schema updates. See 
 ## File Structure
 
 ```
-Delta/
+Sloth/
 ├── src/main/java/org/ToastiCodingStuff/Sloth/
 │   ├── Sloth.java                              # Main bot class
 │   ├── DatabaseHandler.java                    # Database operations
