@@ -79,7 +79,8 @@ public class AddGuildSlashCommands {
         commands.add(Commands.slash("add-just-verify-button", "Adds a Just Verify Button embed to the database (max 3)")
                 .addOption(OptionType.ROLE, "role-to-give", "Role to give members after pressing the verify button", true)
                 .addOption(OptionType.ROLE, "role-to-remove", "Role to remove from members after pressing the verify button", false)
-                .addOption(OptionType.STRING, "button-label", "Name of the button", false));
+                .addOption(OptionType.STRING, "button-label", "Name of the button", false)
+                .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false));
         return commands;
     }
 

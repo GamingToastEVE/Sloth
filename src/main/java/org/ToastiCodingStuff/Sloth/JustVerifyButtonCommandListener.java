@@ -86,7 +86,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         String roleToGiveID = handler.getJustVerifyButtonRoleToGiveID(guildId);
         String roleToRemoveID = handler.getJustVerifyButtonRoleToRemoveID(guildId);
         String buttonLabel = handler.getJustVerifyButtonLabel(guildId);
-        String buttonEmoji = null;
+        String buttonEmoji = handler.getJustVerifyButtonEmojiID(guildId);
 
         if (roleToGiveID == null) {
             event.reply("❌ No Just Verify button configured for this server. Please set it up first.").setEphemeral(true).queue();

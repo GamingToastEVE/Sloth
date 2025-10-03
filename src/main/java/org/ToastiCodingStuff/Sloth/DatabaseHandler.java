@@ -2913,14 +2913,10 @@ public class DatabaseHandler {
 
     public Button createJustVerifyButton(String roleToGiveID, String roleToRemoveID, String buttonLabel, String buttonEmoji) {
         Button button;
-        if (buttonEmoji != null && !buttonEmoji.isEmpty()) {
-            // Check if it's a custom emoji (ID) or a Unicode emoji
-            if (buttonEmoji.matches("\\d+")) {
-                // Custom emoji by ID
-                button = Button.primary("just_verify", "✅ Verify!");
-            } else {
-                // Unicode emoji
-                button = Button.primary("just_verify", "✅ Verify!");
+        if (buttonLabel != null) {
+            button = Button.primary("just_verify", buttonLabel);
+            if (buttonEmoji != null) {
+                button = button.withEmoji(Emoji.fromFormatted(buttonEmoji));
             }
         } else {
             // No emoji
