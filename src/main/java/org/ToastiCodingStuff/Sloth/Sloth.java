@@ -28,7 +28,6 @@ public class Sloth {
         api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new AddRulesEmbedToChannelCommandListener(handler));
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
-        api.addEventListener(new SelectRolesCommandListener(handler));
 
 
         api.addEventListener(new HelpCommandListener());

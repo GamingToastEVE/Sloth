@@ -138,8 +138,6 @@ public class DatabaseMigrationManager {
         schemas.put("log_channels", createLogChannelsSchema());
         schemas.put("warn_system_settings", createWarnSystemSettingsSchema());
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
-        schemas.put("select_roles_messages", createSelectRolesMessagesSchema());
-        schemas.put("select_roles_options", createSelectRolesOptionsSchema());
         
         return schemas;
     }
@@ -427,39 +425,6 @@ public class DatabaseMigrationManager {
             .addColumn("applied_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("execution_time_ms", "INTEGER")
             .addColumn("success", "INTEGER DEFAULT 1");
-    }
-    
-    /**
-     * Define the select_roles_messages table schema
-     */
-    private TableSchema createSelectRolesMessagesSchema() {
-        return new TableSchema("select_roles_messages")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "INTEGER NOT NULL")
-            .addColumn("message_id", "INTEGER NOT NULL")
-            .addColumn("channel_id", "INTEGER NOT NULL")
-            .addColumn("type", "TEXT NOT NULL CHECK(type IN ('reactions', 'dropdown', 'buttons'))")
-            .addColumn("title", "TEXT")
-            .addColumn("description", "TEXT")
-            .addColumn("ephemeral", "INTEGER DEFAULT 0")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_select_roles_guild ON select_roles_messages(guild_id)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_select_roles_message ON select_roles_messages(message_id)");
-    }
-    
-    /**
-     * Define the select_roles_options table schema
-     */
-    private TableSchema createSelectRolesOptionsSchema() {
-        return new TableSchema("select_roles_options")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("message_id", "INTEGER NOT NULL")
-            .addColumn("role_id", "INTEGER NOT NULL")
-            .addColumn("label", "TEXT")
-            .addColumn("description", "TEXT")
-            .addColumn("emoji", "TEXT")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_select_roles_options_message ON select_roles_options(message_id)");
     }
     
     /**
