@@ -37,6 +37,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getStatisticsCommands());
         allCommands.addAll(getRuleCommands());
         allCommands.addAll(getJustVerifyButtonCommand());
+        allCommands.addAll(getSelectRolesCommands());
 
         return allCommands;
     }
@@ -102,8 +103,6 @@ public class AddGuildSlashCommands {
                 .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
         commands.add(Commands.slash("delete-select-roles-message", "Deletes a select roles message and its configuration")
                 .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message to delete", true));
-        commands.add(Commands.slash("remove-select-role", "Removes a role option from the select roles message")
-                .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
         return commands;
     }
 
