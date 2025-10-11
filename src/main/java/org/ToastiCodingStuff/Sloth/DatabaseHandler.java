@@ -316,8 +316,7 @@ public class DatabaseHandler {
             "color VARCHAR(32) DEFAULT 'green', " +
             "role_id VARCHAR(32), " +
             "button_label VARCHAR(64), " +
-            "button_emoji_id VARCHAR(64), " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE)";
+            "button_emoji_id VARCHAR(64))";
 
         java.sql.Statement stmt = connection.createStatement();
         stmt.execute(createTable);
@@ -325,7 +324,6 @@ public class DatabaseHandler {
     private void createGuildsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS guilds (" +
             "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "discord_id VARCHAR(32) UNIQUE NOT NULL, " +
             "name VARCHAR(255) NOT NULL, " +
             "prefix VARCHAR(16) DEFAULT '!', " +
             "language VARCHAR(8) DEFAULT 'de', " +

@@ -128,12 +128,8 @@ public class DatabaseMigrationManager {
         schemas.put("tickets", createTicketsSchema());
         schemas.put("ticket_messages", createTicketMessagesSchema());
         schemas.put("guild_settings", createGuildSettingsSchema());
-        schemas.put("role_permissions", createRolePermissionsSchema());
-        schemas.put("bot_logs", createBotLogsSchema());
         schemas.put("statistics", createStatisticsSchema());
         schemas.put("user_statistics", createUserStatisticsSchema());
-        schemas.put("temporary_data", createTemporaryDataSchema());
-        schemas.put("guild_systems", createGuildSystemsSchema());
         schemas.put("rules_embeds_channel", createRulesEmbedsChannelSchema());
         schemas.put("log_channels", createLogChannelsSchema());
         schemas.put("warn_system_settings", createWarnSystemSettingsSchema());
@@ -258,34 +254,6 @@ public class DatabaseMigrationManager {
     }
     
     /**
-     * Define the role_permissions table schema
-     */
-    private TableSchema createRolePermissionsSchema() {
-        return new TableSchema("role_permissions")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "INTEGER NOT NULL")
-            .addColumn("role_id", "INTEGER NOT NULL")
-            .addColumn("permission", "TEXT NOT NULL")
-            .addColumn("allowed", "INTEGER DEFAULT 1")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
-    }
-    
-    /**
-     * Define the bot_logs table schema
-     */
-    private TableSchema createBotLogsSchema() {
-        return new TableSchema("bot_logs")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "INTEGER")
-            .addColumn("user_id", "INTEGER")
-            .addColumn("event_type", "TEXT NOT NULL")
-            .addColumn("message", "TEXT NOT NULL")
-            .addColumn("data", "TEXT")
-            .addColumn("level", "TEXT DEFAULT 'INFO' CHECK(level IN ('DEBUG', 'INFO', 'WARN', 'ERROR'))")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
-    }
-    
-    /**
      * Define the statistics table schema
      */
     private TableSchema createStatisticsSchema() {
@@ -328,34 +296,7 @@ public class DatabaseMigrationManager {
             .addColumn("messages_sent", "INTEGER DEFAULT 0")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
-    
-    /**
-     * Define the temporary_data table schema
-     */
-    private TableSchema createTemporaryDataSchema() {
-        return new TableSchema("temporary_data")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "INTEGER NOT NULL")
-            .addColumn("user_id", "INTEGER NOT NULL")
-            .addColumn("data_type", "TEXT NOT NULL")
-            .addColumn("data", "TEXT NOT NULL")
-            .addColumn("expires_at", "TEXT NOT NULL")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
-    }
-    
-    /**
-     * Define the guild_systems table schema
-     */
-    private TableSchema createGuildSystemsSchema() {
-        return new TableSchema("guild_systems")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("guild_id", "INTEGER NOT NULL")
-            .addColumn("system_type", "TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system'))")
-            .addColumn("active", "INTEGER DEFAULT 1")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
-    }
-    
+
     /**
      * Define the rules_embeds_channel table schema
      */
