@@ -16,11 +16,14 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("add-just-verify-button")) {
+            handler.insertOrUpdateGlobalStatistic("add-just-verify-button");
             handleJustVerifyButtonCommand(event);
         }
         else if (event.getName().equals("remove-verify-button")) {
+            handler.insertOrUpdateGlobalStatistic("remove-verify-button");
             handleJustVerifyButtonRemove(event);
         } else if (event.getName().equals("send-just-verify-button")) {
+            handler.insertOrUpdateGlobalStatistic("send-just-verify-button");
             handleSendJustVerifyButtonCommand(event);
         }
     }

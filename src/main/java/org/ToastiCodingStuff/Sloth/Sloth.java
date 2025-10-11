@@ -30,7 +30,7 @@ public class Sloth {
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
         api.addEventListener(new OnGuildLeaveListener(handler));
 
-        api.addEventListener(new HelpCommandListener());
+        api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
         
         // Register all system commands globally

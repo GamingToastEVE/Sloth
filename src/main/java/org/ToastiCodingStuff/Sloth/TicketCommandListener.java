@@ -33,24 +33,31 @@ public class TicketCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "ticket-setup":
+                handler.insertOrUpdateGlobalStatistic("ticket-setup");
                 handleTicketSetup(event, guildId);
                 break;
             case "ticket-panel":
+                handler.insertOrUpdateGlobalStatistic("ticket-panel");
                 handleTicketPanel(event, guildId);
                 break;
             case "close-ticket":
+                handler.insertOrUpdateGlobalStatistic("close-ticket");
                 handleCloseTicket(event, guildId);
                 break;
             case "assign-ticket":
+                handler.insertOrUpdateGlobalStatistic("assign-ticket");
                 handleAssignTicket(event, guildId);
                 break;
             case "set-ticket-priority":
+                handler.insertOrUpdateGlobalStatistic("set-ticket-priority");
                 handleSetTicketPriority(event, guildId);
                 break;
             case "ticket-info":
+                handler.insertOrUpdateGlobalStatistic("ticket-info");
                 handleTicketInfo(event, guildId);
                 break;
             case "ticket-transcript":
+                handler.insertOrUpdateGlobalStatistic("ticket-transcript");
                 handleTicketTranscript(event, guildId);
                 break;
         }

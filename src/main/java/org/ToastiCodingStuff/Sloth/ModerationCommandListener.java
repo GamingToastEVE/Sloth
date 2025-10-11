@@ -27,24 +27,31 @@ public class ModerationCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "kick":
+                handler.insertOrUpdateGlobalStatistic("kick");
                 handleKickCommand(event, guildId);
                 break;
             case "ban":
+                handler.insertOrUpdateGlobalStatistic("ban");
                 handleBanCommand(event, guildId);
                 break;
             case "unban":
+                handler.insertOrUpdateGlobalStatistic("unban");
                 handleUnbanCommand(event, guildId);
                 break;
             case "timeout":
+                handler.insertOrUpdateGlobalStatistic("timeout");
                 handleTimeoutCommand(event, guildId);
                 break;
             case "untimeout":
+                handler.insertOrUpdateGlobalStatistic("untimeout");
                 handleUntimeoutCommand(event, guildId);
                 break;
             case "purge":
+                handler.insertOrUpdateGlobalStatistic("purge");
                 handlePurgeCommand(event, guildId);
                 break;
             case "slowmode":
+                handler.insertOrUpdateGlobalStatistic("slowmode");
                 handleSlowmodeCommand(event, guildId);
                 break;
         }

@@ -22,18 +22,23 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "stats-today":
+                handler.insertOrUpdateGlobalStatistic("stats-today");
                 handleTodayStatsCommand(event, guildId);
                 break;
             case "stats-week":
+                handler.insertOrUpdateGlobalStatistic("stats-week");
                 handleWeeklyStatsCommand(event, guildId);
                 break;
             case "stats-date":
+                handler.insertOrUpdateGlobalStatistic("stats-date");
                 handleDateStatsCommand(event, guildId);
                 break;
             case "stats-user":
+                handler.insertOrUpdateGlobalStatistic("stats-user");
                 handleUserInfoCommand(event, guildId);
                 break;
             case "stats":
+                handler.insertOrUpdateGlobalStatistic("stats");
                 handleStatsCommand(event, guildId);
         }
     }

@@ -24,12 +24,15 @@ public class WarnCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "warn":
+                handler.insertOrUpdateGlobalStatistic("warn");
                 handleWarnCommand(event, guildId);
                 break;
             case "set-warn-settings":
+                handler.insertOrUpdateGlobalStatistic("set-warn-settings");
                 handleSetWarnSettingsCommand(event, guildId);
                 break;
             case "get-warn-settings":
+                handler.insertOrUpdateGlobalStatistic("get-warn-settings");
                 handleGetWarnSettingsCommand(event, guildId);
                 break;
         }

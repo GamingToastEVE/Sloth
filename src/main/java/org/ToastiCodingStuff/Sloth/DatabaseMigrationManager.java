@@ -134,6 +134,7 @@ public class DatabaseMigrationManager {
         schemas.put("log_channels", createLogChannelsSchema());
         schemas.put("warn_system_settings", createWarnSystemSettingsSchema());
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
+        schemas.put("global_statistics", createGlobalStatisticsSchema());
         
         return schemas;
     }
@@ -346,6 +347,17 @@ public class DatabaseMigrationManager {
             .addColumn("applied_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("execution_time_ms", "INTEGER")
             .addColumn("success", "INTEGER DEFAULT 1");
+    }
+    
+    /**
+     * Define the global_statistics table schema
+     */
+    private TableSchema createGlobalStatisticsSchema() {
+        return new TableSchema("global_statistics")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("command", "TEXT NOT NULL UNIQUE")
+            .addColumn("number", "INTEGER DEFAULT 0")
+            .addColumn("last_used", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
