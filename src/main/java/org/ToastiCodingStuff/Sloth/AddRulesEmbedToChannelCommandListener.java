@@ -169,15 +169,19 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "add-rules-embed":
+                handler.insertOrUpdateGlobalStatistic("add-rules-embed");
                 handleAddRulesEmbedCommand(event, guildId);
                 break;
             case "setup-rules":
+                handler.insertOrUpdateGlobalStatistic("setup-rules");
                 handleSetupRulesCommand(event, guildId);
                 break;
             case "remove-rules-embed":
+                handler.insertOrUpdateGlobalStatistic("remove-rules-embed");
                 handleRemoveEmbedCommand(event, guildId);
                 break;
             case "list-rules-embeds":
+                handler.insertOrUpdateGlobalStatistic("list-rules-embeds");
                 List<DatabaseHandler.RulesEmbedData> embeds = handler.getAllRulesEmbedDataFromDatabase(guildId);
                 if (embeds.isEmpty()) {
                     event.reply("❌ No rules embeds found in the database! Use `/add-rules-embed` to create some first.").setEphemeral(true).queue();

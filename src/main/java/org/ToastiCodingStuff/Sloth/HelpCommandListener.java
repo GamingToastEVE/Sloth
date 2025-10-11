@@ -11,9 +11,16 @@ import java.awt.*;
 
 public class HelpCommandListener extends ListenerAdapter {
 
+    private final DatabaseHandler handler;
+
+    public HelpCommandListener(DatabaseHandler handler) {
+        this.handler = handler;
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("help")) {
+            handler.insertOrUpdateGlobalStatistic("help");
             handleHelpCommand(event);
         }
     }

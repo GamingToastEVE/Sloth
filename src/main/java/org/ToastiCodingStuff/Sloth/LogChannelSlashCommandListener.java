@@ -15,6 +15,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction (SlashCommandInteractionEvent event) {
         if (event.getName().equals("set-log-channel")) {
+            handler.insertOrUpdateGlobalStatistic("set-log-channel");
             Channel channel = event.getOption("logchannel").getAsChannel();
             String channelID = handler.setLogChannel(event.getGuild().getId(), channel.getId());
             if (!channelID.equals("Error")) {
@@ -24,6 +25,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
             }
         }
         if (event.getName().equals("get-log-channel")) {
+            handler.insertOrUpdateGlobalStatistic("get-log-channel");
             if (handler.hasLogChannel(event.getGuild().getId())) {
                 Channel channel = event.getGuild().getTextChannelById(handler.getLogChannelID(event.getGuild().getId()));
                 event.reply("Log Channel set to: " + channel.getAsMention()).queue();
