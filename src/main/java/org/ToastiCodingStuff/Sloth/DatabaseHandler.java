@@ -1837,6 +1837,39 @@ public class DatabaseHandler {
         updateStatistics(guildId, "verifications_performed");
     }
 
+    // GLOBAL STATISTICS FUNCTIONS
+
+    /**
+     * Insert or update global command statistics
+     * This method tracks how many times each command has been used globally
+     */
+    public void insertOrUpdateGlobalStatistic(String command) {
+        try {
+            String currentTimestamp = java.time.Instant.now().toString();
+
+            // Try to update existing record
+            String updateQuery = "UPDATE global_statistics SET number = number + 1, last_used = ? WHERE command = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setString(1, currentTimestamp);
+            updateStmt.setString(2, command);
+            
+            int rowsUpdated = updateStmt.executeUpdate();
+
+            // If no record exists, insert new one
+            if (rowsUpdated == 0) {
+                String insertQuery = "INSERT INTO global_statistics (command, number, last_used) VALUES (?, ?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, command);
+                insertStmt.setInt(2, 1);
+                insertStmt.setString(3, currentTimestamp);
+                insertStmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error updating global statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     // USER STATISTICS FUNCTIONS
 
     /**
