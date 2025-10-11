@@ -135,7 +135,8 @@ public class DatabaseMigrationManager {
         schemas.put("warn_system_settings", createWarnSystemSettingsSchema());
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
         schemas.put("global_statistics", createGlobalStatisticsSchema());
-        
+        schemas.put("just_verify_button", createJustVerifyButtonSchema());
+
         return schemas;
     }
     
@@ -152,7 +153,17 @@ public class DatabaseMigrationManager {
             .addColumn("updated_at", "TEXT")
             .addColumn("active", "INTEGER DEFAULT 1");
     }
-    
+
+    private TableSchema createJustVerifyButtonSchema() {
+        return new TableSchema("just_verify_button")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "INTEGER NOT NULL UNIQUE")
+            .addColumn("role_to_give", "INTEGER")
+            .addColumn("role_to_remove", "INTEGER")
+            .addColumn("button_label", "TEXT DEFAULT 'Verify'")
+            .addColumn("button_emoji_id", "TEXT");
+    }
+
     /**
      * Define the users table schema
      */
@@ -359,7 +370,7 @@ public class DatabaseMigrationManager {
             .addColumn("number", "INTEGER DEFAULT 0")
             .addColumn("last_used", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
-    
+
     /**
      * Core algorithm to detect and apply missing columns.
      * This method compares expected schemas with actual database schemas

@@ -4,6 +4,8 @@ import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -29,6 +31,7 @@ public class Sloth {
         api.addEventListener(new AddRulesEmbedToChannelCommandListener(handler));
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
         api.addEventListener(new OnGuildLeaveListener(handler));
+        api.addEventListener(new GlobalCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -59,6 +62,14 @@ public class Sloth {
         java.util.List<net.dv8tion.jda.api.interactions.commands.build.SlashCommandData> allCommands = new java.util.ArrayList<>();
         allCommands.addAll(commandProvider.getAllCommands());
         allCommands.add(Commands.slash("help", "Show help and documentation for Sloth bot"));
+
+        Guild testServer = api.getGuildById("1169699077986988112");
+
+        if (testServer == null) {
+            System.out.println("Test server not found. Skipping test server command registration.");
+        } else {
+            testServer.updateCommands().addCommands(Commands.slash("global-stats", "Show global bot statistics")).queue();
+        }
 
         for (SlashCommandData command : allCommands) {
             System.out.println(" - " + command.getName());

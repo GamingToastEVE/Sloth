@@ -160,7 +160,7 @@ public class DatabaseHandler {
             // Use environment variables for configuration, with defaults
             String host = System.getenv().getOrDefault("DB_HOST", "localhost");
             String port = System.getenv().getOrDefault("DB_PORT", "3306");
-            String database = System.getenv().getOrDefault("DB_NAME", "test");
+            String database = System.getenv().getOrDefault("DB_NAME", "sloth");
             String user = System.getenv().getOrDefault("DB_USER", "root");
             String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
             
@@ -1332,6 +1332,7 @@ public class DatabaseHandler {
             for (Guild guild : currentGuilds) {
                 String guildId = guild.getId();
                 String guildName = guild.getName();
+                System.out.println("Syncing guild: " + guildName + " (" + guildId + ")");
 
                 // INSERT ... ON DUPLICATE KEY UPDATE verwenden statt Trigger
                 String upsertQuery = "INSERT INTO guilds (id, name) VALUES (?, ?) " +
@@ -2615,6 +2616,40 @@ public class DatabaseHandler {
             case "UNTIMEOUT": return "⏰";
             default: return "⚖️";
         }
+    }
+
+    public EmbedBuilder getGlobalStats () {
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle("🌐 Global Bot Statistics")
+                .setColor(Color.MAGENTA)
+                .setTimestamp(java.time.Instant.now());
+
+        try {
+            String query = "SELECT * FROM global_statistics";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            ResultSet rs = stmt.executeQuery();
+
+            if (!rs.next()) {
+                EmbedBuilder embedNothing = new EmbedBuilder()
+                        .setTitle("🌐 Global Bot Statistics")
+                        .setColor(Color.RED)
+                        .setDescription("No global statistics found.")
+                        .setTimestamp(java.time.Instant.now());
+                return embedNothing;
+            }
+
+            while (rs.next()) {
+                String command = rs.getString("command");
+                int count = rs.getInt("count");
+                embed.addField("ActionType: " + command, "Total Uses: " + count, true);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting global statistics: " + e.getMessage());
+            e.printStackTrace();
+            embed.setDescription("Error retrieving global statistics.");
+        }
+
+        return embed;
     }
 
 
