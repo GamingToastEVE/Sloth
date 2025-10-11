@@ -160,7 +160,7 @@ public class DatabaseHandler {
             // Use environment variables for configuration, with defaults
             String host = System.getenv().getOrDefault("DB_HOST", "localhost");
             String port = System.getenv().getOrDefault("DB_PORT", "3306");
-            String database = System.getenv().getOrDefault("DB_NAME", "sloth");
+            String database = System.getenv().getOrDefault("DB_NAME", "test");
             String user = System.getenv().getOrDefault("DB_USER", "root");
             String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
             
@@ -169,7 +169,7 @@ public class DatabaseHandler {
             connection1 = DriverManager.getConnection(url, user, password);
             System.out.println("Successfully connected to MariaDB database");
             connection1.setAutoCommit(true);
-            if (connection1.getAutoCommit() == true) {
+            if (connection1.getAutoCommit()) {
                 System.out.println("Auto-commit is enabled");
             } else {
                 System.out.println("Auto-commit is disabled");
@@ -193,8 +193,7 @@ public class DatabaseHandler {
             DatabaseMetaData meta = connection.getMetaData();
             String[] tableNames = {
                 "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                "guild_settings", "role_permissions", "bot_logs", "statistics",
-                "temporary_data", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics"
+                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics"
             };
             for (String tableName : tableNames) {
                 ResultSet rs = meta.getTables(null, null, tableName, null);
@@ -258,12 +257,8 @@ public class DatabaseHandler {
             createTicketsTable();
             createTicketMessagesTable();
             createGuildSettingsTable();
-            createRolePermissionsTable();
-            createBotLogsTable();
             createStatisticsTable();
             createUserStatisticsTable();
-            createTemporaryDataTable();
-            createGuildSystemsTable();
             createRulesEmbedsChannel();
             createJustVerifyButtonTable();
             
@@ -322,8 +317,7 @@ public class DatabaseHandler {
             "role_id VARCHAR(32), " +
             "button_label VARCHAR(64), " +
             "button_emoji_id VARCHAR(64), " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE)";
 
         java.sql.Statement stmt = connection.createStatement();
         stmt.execute(createTable);
@@ -337,8 +331,7 @@ public class DatabaseHandler {
             "language VARCHAR(8) DEFAULT 'de', " +
             "created_at DATETIME, " +
             "updated_at DATETIME, " +
-            "active TINYINT(1) DEFAULT 1" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "active TINYINT(1) DEFAULT 1)";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -354,8 +347,7 @@ public class DatabaseHandler {
             "discriminator VARCHAR(8), " +
             "avatar VARCHAR(512), " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -370,21 +362,12 @@ public class DatabaseHandler {
                 "user_id VARCHAR(32) NOT NULL, " +
                 "moderator_id VARCHAR(32) NOT NULL, " +
                 "reason TEXT NOT NULL, " +
-                "severity ENUM('LOW', 'MEDIUM', 'HIGH', 'SEVERE') DEFAULT 'MEDIUM', " +
+                "severity VARCHAR(255), " +
                 "active TINYINT(1) DEFAULT 1, " +
                 "expires_at DATETIME, " +
-                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-                "FOREIGN KEY (user_id) REFERENCES users(user_id), " +
-                "FOREIGN KEY (moderator_id) REFERENCES users(user_id)" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
-
-        // Indizes erstellen
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_active ON warnings(active)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_warnings_expires ON warnings(expires_at)");
     }
 
     private void createJustVerifyButtonTable() throws SQLException {
@@ -394,9 +377,7 @@ public class DatabaseHandler {
             "role_to_give_id VARCHAR(32) NOT NULL, " +
             "role_to_remove_id VARCHAR(32), " +
             "button_label VARCHAR(64) DEFAULT 'Verify', " +
-            "button_emoji_id VARCHAR(64), " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "button_emoji_id VARCHAR(64))";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -410,16 +391,12 @@ public class DatabaseHandler {
                 "guild_id VARCHAR(32) NOT NULL, " +
                 "user_id VARCHAR(32) NOT NULL, " +
                 "moderator_id VARCHAR(32) NOT NULL, " +
-                "action_type ENUM('KICK', 'BAN', 'TEMP_BAN', 'UNBAN', 'WARN', 'TIMEOUT', 'UNTIMEOUT') NOT NULL, " +
+                "action_type VARCHAR(255)," +
                 "reason TEXT NOT NULL, " +
                 "duration INT, " +
                 "expires_at DATETIME, " +
                 "active TINYINT(1) DEFAULT 1, " +
-                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-                "FOREIGN KEY (user_id) REFERENCES users(user_id), " +
-                "FOREIGN KEY (moderator_id) REFERENCES users(user_id)" +
-                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -434,19 +411,14 @@ public class DatabaseHandler {
                     "channel_id BIGINT UNIQUE, " +
                     "category VARCHAR(64) DEFAULT 'general', " +
                     "subject VARCHAR(255), " +
-                    "status ENUM('OPEN', 'IN_PROGRESS', 'WAITING', 'CLOSED') DEFAULT 'OPEN', " +
-                    "priority ENUM('LOW', 'MEDIUM', 'HIGH', 'URGENT') DEFAULT 'MEDIUM', " +
-                    "assigned_to INT, " +
-                    "closed_by INT, " +
+                    "status VARCHAR(255) DEFAULT 'OPEN', " +
+                    "priority VARCHAR(255) DEFAULT 'MEDIUM', " +
+                    "assigned_to BIGINT(20), " +
+                    "closed_by BIGINT(20), " +
                     "closed_reason TEXT, " +
                     "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                    "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                    "closed_at DATETIME, " +
-                    "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
-                    "FOREIGN KEY (user_id) REFERENCES users(id), " +
-                    "FOREIGN KEY (assigned_to) REFERENCES users(id), " +
-                    "FOREIGN KEY (closed_by) REFERENCES users(id)" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+                    "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                    "closed_at DATETIME)";
                 Statement stmt = connection.createStatement();
                 stmt.execute(createTable);
             }
@@ -463,10 +435,82 @@ public class DatabaseHandler {
             "content TEXT NOT NULL, " +
             "attachments TEXT, " +
             "is_staff INTEGER DEFAULT 0, " +
-            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE, " +
-            "FOREIGN KEY (user_id) REFERENCES users(id)" +
-            ")";
+            "created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create guild_settings table
+     */
+    private void createGuildSettingsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS guild_settings (" +
+                "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL UNIQUE, " +
+                "modlog_channel VARCHAR(32), " +
+                "warn_threshold_kick INTEGER DEFAULT 5, " +
+                "warn_threshold_ban INTEGER DEFAULT 8, " +
+                "warn_expire_days INTEGER DEFAULT 30, " +
+                "ticket_category VARCHAR(32), " +
+                "ticket_channel VARCHAR(32), " +
+                "ticket_role VARCHAR(32), " +
+                "ticket_transcript INTEGER DEFAULT 1, " +
+                "join_role VARCHAR(32), " +
+                "mute_role VARCHAR(32), " +
+                "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create statistics table
+     */
+    private void createStatisticsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS statistics (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL, " +
+                "user_id VARCHAR(32), " +
+                "date DATE NOT NULL, " +
+                "warnings_issued INT DEFAULT 0, " +
+                "kicks_performed INT DEFAULT 0, " +
+                "bans_performed INT DEFAULT 0, " +
+                "timeouts_performed INT DEFAULT 0, " +
+                "untimeouts_performed INT DEFAULT 0, " +
+                "tickets_created INT DEFAULT 0, " +
+                "tickets_closed INT DEFAULT 0, " +
+                "verifications_performed INT DEFAULT 0, " +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                "UNIQUE(guild_id, user_id, date))";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create user_statistics table
+     */
+    private void createUserStatisticsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS user_statistics (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL, " +
+                "user_id VARCHAR(32) NOT NULL, " +
+                "date DATE NOT NULL, " +
+                "warnings_received INT DEFAULT 0, " +
+                "warnings_issued INT DEFAULT 0, " +
+                "kicks_received INT DEFAULT 0, " +
+                "kicks_performed INT DEFAULT 0, " +
+                "bans_received INT DEFAULT 0, " +
+                "bans_performed INT DEFAULT 0, " +
+                "timeouts_received INT DEFAULT 0, " +
+                "timeouts_performed INT DEFAULT 0, " +
+                "untimeouts_received INT DEFAULT 0, " +
+                "untimeouts_performed INT DEFAULT 0, " +
+                "tickets_created INT DEFAULT 0, " +
+                "tickets_closed INT DEFAULT 0, " +
+                "verifications_performed INT DEFAULT 0, " +
+                "messages_sent INT DEFAULT 0, " +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                "UNIQUE(guild_id, user_id, date))";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -485,128 +529,6 @@ public class DatabaseHandler {
     }
 
     /**
-     * Create guild_settings table
-     */
-    private void createGuildSettingsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS guild_settings (" +
-            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL UNIQUE, " +
-            "modlog_channel VARCHAR(32), " +
-            "warn_threshold_kick INTEGER DEFAULT 5, " +
-            "warn_threshold_ban INTEGER DEFAULT 8, " +
-            "warn_expire_days INTEGER DEFAULT 30, " +
-            "ticket_category VARCHAR(32), " +
-            "ticket_channel VARCHAR(32), " +
-            "ticket_role VARCHAR(32), " +
-            "ticket_transcript INTEGER DEFAULT 1, " +
-            "join_role VARCHAR(32), " +
-            "mute_role VARCHAR(32), " +
-            "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
-            "updated_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE" +
-            ")";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    /**
-     * Create role_permissions table
-     */
-    private void createRolePermissionsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS role_permissions (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "role_id VARCHAR(32) NOT NULL, " +
-            "permission TEXT NOT NULL, " +
-            "allowed TINYINT(1) DEFAULT 1, " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(id) ON DELETE CASCADE, " +
-            "UNIQUE(guild_id, role_id, permission)" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-
-        // Index erstellen
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_role_permissions_guild_role ON role_permissions(guild_id, role_id)");
-    }
-
-    /**
-     * Create bot_logs table
-     */
-    private void createBotLogsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS bot_logs (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32), " +
-            "user_id VARCHAR(32), " +
-            "event_type VARCHAR(64) NOT NULL, " +
-            "message TEXT NOT NULL, " +
-            "data TEXT, " +
-            "level ENUM('DEBUG', 'INFO', 'WARN', 'ERROR') DEFAULT 'INFO', " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    /**
-     * Create statistics table
-     */
-    private void createStatisticsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS statistics (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "user_id VARCHAR(32), " +
-            "date DATE NOT NULL, " +
-            "warnings_issued INT DEFAULT 0, " +
-            "kicks_performed INT DEFAULT 0, " +
-            "bans_performed INT DEFAULT 0, " +
-            "timeouts_performed INT DEFAULT 0, " +
-            "untimeouts_performed INT DEFAULT 0, " +
-            "tickets_created INT DEFAULT 0, " +
-            "tickets_closed INT DEFAULT 0, " +
-            "verifications_performed INT DEFAULT 0, " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-            "FOREIGN KEY (user_id) REFERENCES users(user_id), " +
-            "UNIQUE(guild_id, user_id, date)" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    /**
-     * Create user_statistics table
-     */
-    private void createUserStatisticsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS user_statistics (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "user_id VARCHAR(32) NOT NULL, " +
-            "date DATE NOT NULL, " +
-            "warnings_received INT DEFAULT 0, " +
-            "warnings_issued INT DEFAULT 0, " +
-            "kicks_received INT DEFAULT 0, " +
-            "kicks_performed INT DEFAULT 0, " +
-            "bans_received INT DEFAULT 0, " +
-            "bans_performed INT DEFAULT 0, " +
-            "timeouts_received INT DEFAULT 0, " +
-            "timeouts_performed INT DEFAULT 0, " +
-            "untimeouts_received INT DEFAULT 0, " +
-            "untimeouts_performed INT DEFAULT 0, " +
-            "tickets_created INT DEFAULT 0, " +
-            "tickets_closed INT DEFAULT 0, " +
-            "verifications_performed INT DEFAULT 0, " +
-            "messages_sent INT DEFAULT 0, " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-            "FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE, " +
-            "UNIQUE(guild_id, user_id, date)" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    /**
      * Migrate existing statistics table to add timeout and verification columns
      * Note: This method is kept for backward compatibility. 
      * New migrations should use updateTableColumns() for a more generic approach.
@@ -615,7 +537,7 @@ public class DatabaseHandler {
         Statement stmt = connection.createStatement();
 
         // Prüfe, ob die Spalten bereits existieren
-        String checkColumns = "SHOW COLUMNS FROM statistics";
+        String checkColumns = "SHOW COLUMNS FROM statistics FROM sloth";
         ResultSet rs = stmt.executeQuery(checkColumns);
         boolean hasTimeouts = false;
         boolean hasUntimeouts = false;
@@ -799,54 +721,13 @@ public class DatabaseHandler {
     }
 
     /**
-     * Create temporary_data table
-     */
-    private void createTemporaryDataTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS temporary_data (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "user_id VARCHAR(32) NOT NULL, " +
-            "data_type VARCHAR(64) NOT NULL, " +
-            "data TEXT NOT NULL, " +
-            "expires_at DATETIME NOT NULL, " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-            "FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    /**
-     * Create guild_systems table
-     */
-    private void createGuildSystemsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS guild_systems (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "system_type VARCHAR(64) NOT NULL, " +
-            "active TINYINT(1) DEFAULT 1, " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-            "FOREIGN KEY (guild_id) REFERENCES guilds(discord_id) ON DELETE CASCADE, " +
-            "UNIQUE(guild_id, system_type)" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-
-        // Index erstellen
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)");
-    }
-
-    /**
      * Create legacy tables for backward compatibility
      */
     private void createLegacyTables() throws SQLException {
         // Erstelle log_channels Tabelle (MariaDB-Syntax, VARCHAR für IDs)
         String logChannelsTable = "CREATE TABLE IF NOT EXISTS log_channels (" +
             "guildid VARCHAR(32) PRIMARY KEY, " +
-            "channelid VARCHAR(32) NOT NULL" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "channelid VARCHAR(32) NOT NULL)";
 
         // Erstelle warn_system_settings Tabelle (MariaDB-Syntax, VARCHAR für IDs)
         String warnSystemTable = "CREATE TABLE IF NOT EXISTS warn_system_settings (" +
@@ -854,8 +735,7 @@ public class DatabaseHandler {
             "max_warns INT NOT NULL, " +
             "minutes_muted INT NOT NULL, " +
             "role_id VARCHAR(32) NOT NULL, " +
-            "warn_time_hours INT NOT NULL" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+            "warn_time_hours INT NOT NULL)";
 
         Statement stmt = connection.createStatement();
         stmt.execute(logChannelsTable);
@@ -1212,7 +1092,7 @@ public class DatabaseHandler {
 
     public int getActiveWarningsCount(String guildID, String userID) {
         try {
-            String query = "SELECT COUNT(*) as count FROM warnings WHERE guild_id = ? AND user_id = ? AND active = 1 AND (expires_at IS NULL OR expires_at > NOW())";
+            String query = "SELECT COUNT(*) as count FROM warnings WHERE guild_id = ? AND user_id = ? AND active = 1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildID);
             stmt.setString(2, userID);
@@ -1348,7 +1228,7 @@ public class DatabaseHandler {
     public String getGuildPrefix(String guildId) {
         try {
             // MariaDB-Syntax: IDs als VARCHAR(32)
-            String query = "SELECT prefix FROM guilds WHERE discord_id = ? AND active = 1";
+            String query = "SELECT prefix FROM guilds WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
             ResultSet rs = stmt.executeQuery();
@@ -1371,7 +1251,7 @@ public class DatabaseHandler {
     public String getGuildLanguage(String guildId) {
         try {
             // MariaDB-Syntax: IDs als VARCHAR(32)
-            String query = "SELECT language FROM guilds WHERE discord_id = ? AND active = 1";
+            String query = "SELECT language FROM guilds WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
             ResultSet rs = stmt.executeQuery();
@@ -1394,7 +1274,7 @@ public class DatabaseHandler {
     public boolean updateGuildPrefix(String guildId, String prefix) {
         try {
             // MariaDB-Syntax: guildId ist VARCHAR(32)
-            String updatePrefix = "UPDATE guilds SET prefix = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ? AND active = 1";
+            String updatePrefix = "UPDATE guilds SET prefix = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(updatePrefix);
             stmt.setString(1, prefix != null ? prefix : "!");
             stmt.setString(2, guildId);
@@ -1414,7 +1294,7 @@ public class DatabaseHandler {
     public boolean updateGuildLanguage(String guildId, String language) {
         try {
             // MariaDB-Syntax: guildId ist VARCHAR(32)
-            String updateLanguage = "UPDATE guilds SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ? AND active = 1";
+            String updateLanguage = "UPDATE guilds SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(updateLanguage);
             stmt.setString(1, language != null ? language : "de");
             stmt.setString(2, guildId);
@@ -1640,13 +1520,13 @@ public class DatabaseHandler {
     public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority, String username, String discriminator, String avatarUrl) {
         try {
             // Sicherstellen, dass die Guild in der Tabelle existiert (MariaDB: discord_id als VARCHAR(32))
-            String checkGuildQuery = "SELECT discord_id FROM guilds WHERE discord_id = ?";
+            String checkGuildQuery = "SELECT id FROM guilds WHERE id = ?";
             PreparedStatement checkGuildStmt = connection.prepareStatement(checkGuildQuery);
             checkGuildStmt.setString(1, guildId);
             ResultSet guildResult = checkGuildStmt.executeQuery();
 
             if (!guildResult.next()) {
-                String insertGuildQuery = "INSERT INTO guilds (discord_id) VALUES (?)";
+                String insertGuildQuery = "INSERT INTO guilds (id) VALUES (?)";
                 PreparedStatement insertGuildStmt = connection.prepareStatement(insertGuildQuery);
                 insertGuildStmt.setString(1, guildId);
                 insertGuildStmt.executeUpdate();

@@ -182,10 +182,7 @@ public class DatabaseMigrationManager {
             .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
             .addColumn("active", "INTEGER DEFAULT 1")
             .addColumn("expires_at", "TEXT")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_active ON warnings(active)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_warnings_expires ON warnings(expires_at)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -202,10 +199,7 @@ public class DatabaseMigrationManager {
             .addColumn("duration", "INTEGER")
             .addColumn("expires_at", "TEXT")
             .addColumn("active", "INTEGER DEFAULT 1")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_guild_user ON moderation_actions(guild_id, user_id)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_action_type ON moderation_actions(action_type)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_moderation_active_expires ON moderation_actions(active, expires_at)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -226,9 +220,7 @@ public class DatabaseMigrationManager {
             .addColumn("closed_reason", "TEXT")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
             .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("closed_at", "TEXT")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_guild_status ON tickets(guild_id, status)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets(user_id)");
+            .addColumn("closed_at", "TEXT");
     }
     
     /**
@@ -243,8 +235,7 @@ public class DatabaseMigrationManager {
             .addColumn("content", "TEXT NOT NULL")
             .addColumn("attachments", "TEXT")
             .addColumn("is_staff", "INTEGER DEFAULT 0")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket_created ON ticket_messages(ticket_id, created_at)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -263,9 +254,7 @@ public class DatabaseMigrationManager {
             .addColumn("ticket_role", "INTEGER")
             .addColumn("ticket_transcript", "INTEGER DEFAULT 1")
             .addColumn("join_role", "INTEGER")
-            .addColumn("mute_role", "INTEGER")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            .addColumn("mute_role", "INTEGER");
     }
     
     /**
@@ -278,8 +267,7 @@ public class DatabaseMigrationManager {
             .addColumn("role_id", "INTEGER NOT NULL")
             .addColumn("permission", "TEXT NOT NULL")
             .addColumn("allowed", "INTEGER DEFAULT 1")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_role_permissions_guild_role ON role_permissions(guild_id, role_id)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -294,9 +282,7 @@ public class DatabaseMigrationManager {
             .addColumn("message", "TEXT NOT NULL")
             .addColumn("data", "TEXT")
             .addColumn("level", "TEXT DEFAULT 'INFO' CHECK(level IN ('DEBUG', 'INFO', 'WARN', 'ERROR'))")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_bot_logs_guild_created ON bot_logs(guild_id, created_at)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_bot_logs_level_created ON bot_logs(level, created_at)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -314,8 +300,7 @@ public class DatabaseMigrationManager {
             .addColumn("untimeouts_performed", "INTEGER DEFAULT 0")
             .addColumn("tickets_created", "INTEGER DEFAULT 0")
             .addColumn("tickets_closed", "INTEGER DEFAULT 0")
-            .addColumn("verifications_performed", "INTEGER DEFAULT 0")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+            .addColumn("verifications_performed", "INTEGER DEFAULT 0");
     }
     
     /**
@@ -341,9 +326,7 @@ public class DatabaseMigrationManager {
             .addColumn("tickets_closed", "INTEGER DEFAULT 0")
             .addColumn("verifications_performed", "INTEGER DEFAULT 0")
             .addColumn("messages_sent", "INTEGER DEFAULT 0")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_guild_user_date ON user_statistics(guild_id, user_id, date)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_user_statistics_date ON user_statistics(date)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -357,9 +340,7 @@ public class DatabaseMigrationManager {
             .addColumn("data_type", "TEXT NOT NULL")
             .addColumn("data", "TEXT NOT NULL")
             .addColumn("expires_at", "TEXT NOT NULL")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_temporary_data_expires ON temporary_data(expires_at)")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_temporary_data_guild_user_type ON temporary_data(guild_id, user_id, data_type)");
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
@@ -372,8 +353,7 @@ public class DatabaseMigrationManager {
             .addColumn("system_type", "TEXT NOT NULL CHECK(system_type IN ('log-channel', 'warn-system', 'ticket-system', 'moderation-system'))")
             .addColumn("active", "INTEGER DEFAULT 1")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
-            .addIndex("CREATE INDEX IF NOT EXISTS idx_guild_systems_guild_active ON guild_systems(guild_id, active)");
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
     
     /**
