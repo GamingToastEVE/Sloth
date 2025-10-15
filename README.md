@@ -20,7 +20,8 @@ Sloth offers several modular systems that can be independently activated per ser
 ### 🎫 Ticket System
 - Create support ticket channels
 - Assign tickets to staff members
-- Generate ticket transcripts (not possible until discord approves message content intent)
+- Set ticket priorities
+- Generate ticket transcripts (pending Discord message content intent approval)
 - Customizable ticket categories and priorities
 
 ### 📝 Log Channel System
@@ -31,12 +32,26 @@ Sloth offers several modular systems that can be independently activated per ser
 ### 📊 Statistics System
 - Server activity statistics
 - User engagement metrics
-- Command usage tracking
+- Daily, weekly, and lifetime statistics tracking
+- Individual user statistics
+- Date-specific statistics queries
 
 ### 📋 Rules Embed System
 - Create and manage rule embeds in channels
 - Customizable rule formatting and styling
 - Easy rule distribution across your server
+
+### ✅ Verification System
+- Create verification buttons for new members
+- Automatic role assignment upon verification
+- Customizable verification messages
+- Multiple verification setups per server
+
+### 🎭 Role Selection System
+- Create interactive role selection menus
+- Allow users to self-assign roles
+- Customizable role options with descriptions
+- Multiple role selection messages per server
 
 ## Setup
 
@@ -50,14 +65,14 @@ cd Sloth
 Create a `.env` file in the root directory based on `.env.example`:
 ```env
 # Discord Bot Token
-TOKEN=your_discord_bot_token_here
+TOKEN_TEST=your_discord_bot_token_here
 
 # Database Configuration (MariaDB)
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=delta_bot
-DB_USER=delta_bot
-DB_PASSWORD=delta_bot
+DB_NAME=sloth
+DB_USER=sloth
+DB_PASSWORD=your_secure_password_here
 ```
 
 **Important**: The bot now uses MariaDB instead of SQLite. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed database setup instructions.
@@ -102,8 +117,9 @@ Navigate between help sections using the interactive buttons.
 - `/ticket-panel` - Create a ticket creation panel
 - `/close-ticket` - Close a ticket
 - `/assign-ticket` - Assign ticket to staff member
+- `/set-ticket-priority` - Change the priority of the current ticket
 - `/ticket-info` - Get ticket information
-- `/ticket-transcript` - Generate ticket transcript
+- `/ticket-transcript` - Generate ticket transcript (not yet available - pending Discord message content intent approval)
 
 #### Moderation System
 - `/kick` - Kick a user from the server
@@ -115,8 +131,29 @@ Navigate between help sections using the interactive buttons.
 - `/slowmode` - Set slowmode for the current channel
 
 #### Rules Embed System
-- `/add-rules-embed` - Add a formatted rules embed to a channel
+- `/setup-rules` - Set up rules in the current channel
+- `/add-rules-embed` - Add a formatted rules embed to the database (max 3)
+- `/list-rules-embeds` - List all rules embeds in the server
+- `/remove-rules-embed` - Remove a rules embed from the database
 - Supports custom formatting and styling options
+
+#### Verification System
+- `/send-just-verify-button` - Send a verification button message in the current channel
+- `/add-just-verify-button` - Add a verification button configuration to the database (max 3)
+- `/remove-just-verify-button` - Remove a verification button embed from the current channel
+
+#### Role Selection System
+- `/create-select-roles` - Create a role selection message in the current channel
+- `/add-select-role` - Add a role option to the role selection message
+- `/remove-select-role` - Remove a role option from the role selection message
+- `/delete-select-roles-message` - Delete a role selection message and its configuration
+
+#### Statistics System
+- `/stats` - View lifetime server moderation statistics
+- `/stats-today` - View today's server moderation statistics
+- `/stats-week` - View this week's server moderation statistics
+- `/stats-date` - View server statistics for a specific date
+- `/stats-user` - View user information and statistics
 
 ## Database
 
