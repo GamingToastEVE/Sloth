@@ -184,7 +184,10 @@ Sloth/
 │   ├── LogChannelSlashCommandListener.java     # Logging system
 │   ├── StatisticsCommandListener.java          # Statistics tracking
 │   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
-│   └── GuildEventListener.java                 # Guild event handling
+│   ├── JustVerifyButtonCommandListener.java    # Verification system
+│   ├── GuildEventListener.java                 # Guild event handling
+│   ├── GlobalCommandListener.java              # Global command handling
+│   └── OnGuildLeaveListener.java               # Guild leave events
 ├── build.gradle.kts                            # Build configuration
 ├── .env.example                                 # Environment variables template
 ├── DATABASE_SETUP.md                           # Database setup guide
