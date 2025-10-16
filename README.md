@@ -143,12 +143,6 @@ Navigate between help sections using the interactive buttons.
 - `/add-just-verify-button` - Add a verification button configuration to the database (max 3)
 - `/remove-just-verify-button` - Remove a verification button embed from the current channel
 
-#### Role Selection System
-- `/create-select-roles` - Create a role selection message in the current channel
-- `/add-select-role` - Add a role option to the role selection message
-- `/remove-select-role` - Remove a role option from the role selection message
-- `/delete-select-roles-message` - Delete a role selection message and its configuration
-
 #### Statistics System
 - `/stats` - View lifetime server moderation statistics
 - `/stats-today` - View today's server moderation statistics
