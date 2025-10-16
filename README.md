@@ -52,6 +52,7 @@ Sloth offers several modular systems that can be independently activated per ser
 - Allow users to self-assign roles
 - Customizable role options with descriptions
 - Multiple role selection messages per server
+- WIP
 
 ## Setup
 
