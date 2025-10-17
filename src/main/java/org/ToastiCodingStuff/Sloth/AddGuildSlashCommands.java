@@ -37,6 +37,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getStatisticsCommands());
         allCommands.addAll(getRuleCommands());
         allCommands.addAll(getJustVerifyButtonCommand());
+        allCommands.addAll(getSelectRolesCommands());
 
         return allCommands;
     }
@@ -87,23 +88,18 @@ public class AddGuildSlashCommands {
     private List<SlashCommandData> getSelectRolesCommands () {
         List<SlashCommandData> commands = new ArrayList<>();
         commands.add(Commands.slash("create-select-roles", "Creates a select roles message in the current channel")
-                .addOption(OptionType.STRING, "type", "Type of select roles (reactions, dropdown or buttons)", true)
                 .addOption(OptionType.STRING, "title", "Title of the embed", false)
-                .addOption(OptionType.STRING, "description", "Description of the embed", false)
-                .addOption(OptionType.BOOLEAN, "ephemeral", "Whether the role selection is ephemeral", false));
+                .addOption(OptionType.STRING, "description", "Description of the embed", false));
         commands.add(Commands.slash("add-select-role", "Adds a role option to the select roles message")
                 .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message", true)
                 .addOption(OptionType.ROLE, "role", "Role to add as an option", true)
                 .addOption(OptionType.STRING, "label", "Label for the role option", false)
-                .addOption(OptionType.STRING, "description", "Description for the role option", false)
-                .addOption(OptionType.STRING, "emoji", "Emoji for the role option", false));
+                .addOption(OptionType.STRING, "description", "Description for the role option", false));
         commands.add(Commands.slash("remove-select-role", "Removes a role option from the select roles message")
                 .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message", true)
                 .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
         commands.add(Commands.slash("delete-select-roles-message", "Deletes a select roles message and its configuration")
                 .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message to delete", true));
-        commands.add(Commands.slash("remove-select-role", "Removes a role option from the select roles message")
-                .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
         return commands;
     }
 
