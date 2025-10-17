@@ -193,7 +193,7 @@ public class DatabaseHandler {
             DatabaseMetaData meta = connection.getMetaData();
             String[] tableNames = {
                 "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics"
+                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "select_roles_messages", "select_roles_options"
             };
             for (String tableName : tableNames) {
                 ResultSet rs = meta.getTables(null, null, tableName, null);
@@ -261,6 +261,8 @@ public class DatabaseHandler {
             createUserStatisticsTable();
             createRulesEmbedsChannel();
             createJustVerifyButtonTable();
+            createSelectRolesMessagesTable();
+            createSelectRolesOptionsTable();
             
             // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
@@ -376,6 +378,37 @@ public class DatabaseHandler {
             "role_to_remove_id VARCHAR(32), " +
             "button_label VARCHAR(64) DEFAULT 'Verify', " +
             "button_emoji_id VARCHAR(64))";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create select_roles_messages table
+     */
+    private void createSelectRolesMessagesTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS select_roles_messages (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "guild_id VARCHAR(32) NOT NULL, " +
+            "channel_id VARCHAR(32) NOT NULL, " +
+            "message_id VARCHAR(32), " +
+            "title VARCHAR(255), " +
+            "description TEXT, " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+    }
+
+    /**
+     * Create select_roles_options table
+     */
+    private void createSelectRolesOptionsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS select_roles_options (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "message_id INT NOT NULL, " +
+            "role_id VARCHAR(32) NOT NULL, " +
+            "label VARCHAR(100) NOT NULL, " +
+            "description VARCHAR(255), " +
+            "FOREIGN KEY (message_id) REFERENCES select_roles_messages(id) ON DELETE CASCADE)";
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
@@ -2869,5 +2902,193 @@ public class DatabaseHandler {
             button = Button.primary("just_verify", "✅ Verify!");
         }
         return button;
+    }
+
+    // ==================== SELECT ROLES METHODS ====================
+
+    /**
+     * Create a new select roles message entry in the database
+     * @return The auto-generated ID of the message entry, or -1 if failed
+     */
+    public int createSelectRolesMessage(String guildId, String channelId, String title, String description) {
+        String query = "INSERT INTO select_roles_messages (guild_id, channel_id, title, description) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, channelId);
+            pstmt.setString(3, title);
+            pstmt.setString(4, description);
+            pstmt.executeUpdate();
+            
+            ResultSet rs = pstmt.getGeneratedKeys();
+            if (rs.next()) {
+                int id = rs.getInt(1);
+                System.out.println("Select roles message created with ID: " + id);
+                return id;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error creating select roles message: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    /**
+     * Update the Discord message ID for a select roles message
+     */
+    public void updateSelectRolesMessageId(int dbId, String discordMessageId) {
+        String query = "UPDATE select_roles_messages SET message_id = ? WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, discordMessageId);
+            pstmt.setInt(2, dbId);
+            pstmt.executeUpdate();
+            System.out.println("Updated select roles message ID: " + dbId + " with Discord message ID: " + discordMessageId);
+        } catch (SQLException e) {
+            System.err.println("Error updating select roles message ID: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Add a role option to a select roles message
+     * @return The auto-generated ID of the option, or -1 if failed
+     */
+    public int addSelectRoleOption(int messageId, String roleId, String label, String description) {
+        String query = "INSERT INTO select_roles_options (message_id, role_id, label, description) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setInt(1, messageId);
+            pstmt.setString(2, roleId);
+            pstmt.setString(3, label);
+            pstmt.setString(4, description);
+            pstmt.executeUpdate();
+            
+            ResultSet rs = pstmt.getGeneratedKeys();
+            if (rs.next()) {
+                int id = rs.getInt(1);
+                System.out.println("Select role option created with ID: " + id);
+                return id;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error adding select role option: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    /**
+     * Remove a role option from a select roles message
+     */
+    public void removeSelectRoleOption(int messageId, String roleId) {
+        String query = "DELETE FROM select_roles_options WHERE message_id = ? AND role_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, messageId);
+            pstmt.setString(2, roleId);
+            int rowsAffected = pstmt.executeUpdate();
+            System.out.println("Removed " + rowsAffected + " role option(s) from message ID: " + messageId);
+        } catch (SQLException e) {
+            System.err.println("Error removing select role option: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get all role options for a select roles message
+     */
+    public List<SelectRoleOption> getSelectRoleOptions(int messageId) {
+        List<SelectRoleOption> options = new ArrayList<>();
+        String query = "SELECT id, role_id, label, description FROM select_roles_options WHERE message_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, messageId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                options.add(new SelectRoleOption(
+                    rs.getInt("id"),
+                    rs.getString("role_id"),
+                    rs.getString("label"),
+                    rs.getString("description")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting select role options: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return options;
+    }
+
+    /**
+     * Get select roles message by database ID
+     */
+    public SelectRolesMessage getSelectRolesMessage(int dbId) {
+        String query = "SELECT guild_id, channel_id, message_id, title, description FROM select_roles_messages WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, dbId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new SelectRolesMessage(
+                    dbId,
+                    rs.getString("guild_id"),
+                    rs.getString("channel_id"),
+                    rs.getString("message_id"),
+                    rs.getString("title"),
+                    rs.getString("description")
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting select roles message: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Delete a select roles message and all its options
+     */
+    public void deleteSelectRolesMessage(int dbId) {
+        String query = "DELETE FROM select_roles_messages WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, dbId);
+            int rowsAffected = pstmt.executeUpdate();
+            System.out.println("Deleted select roles message with ID: " + dbId + " (affected " + rowsAffected + " rows)");
+        } catch (SQLException e) {
+            System.err.println("Error deleting select roles message: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Data class for select role options
+     */
+    public static class SelectRoleOption {
+        public final int id;
+        public final String roleId;
+        public final String label;
+        public final String description;
+
+        public SelectRoleOption(int id, String roleId, String label, String description) {
+            this.id = id;
+            this.roleId = roleId;
+            this.label = label;
+            this.description = description;
+        }
+    }
+
+    /**
+     * Data class for select roles messages
+     */
+    public static class SelectRolesMessage {
+        public final int id;
+        public final String guildId;
+        public final String channelId;
+        public final String messageId;
+        public final String title;
+        public final String description;
+
+        public SelectRolesMessage(int id, String guildId, String channelId, String messageId, String title, String description) {
+            this.id = id;
+            this.guildId = guildId;
+            this.channelId = channelId;
+            this.messageId = messageId;
+            this.title = title;
+            this.description = description;
+        }
     }
 }
