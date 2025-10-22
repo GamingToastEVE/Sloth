@@ -37,9 +37,9 @@ The Sloth bot now uses MariaDB instead of SQLite. Follow these steps to set up t
 
 1. Create the database and user:
    ```sql
-   CREATE DATABASE delta_bot;
-   CREATE USER 'delta_bot'@'localhost' IDENTIFIED BY 'delta_bot';
-   GRANT ALL PRIVILEGES ON delta_bot.* TO 'delta_bot'@'localhost';
+   CREATE DATABASE sloth;
+   CREATE USER 'sloth'@'localhost' IDENTIFIED BY 'your_secure_password_here';
+   GRANT ALL PRIVILEGES ON sloth.* TO 'sloth'@'localhost';
    FLUSH PRIVILEGES;
    ```
 
@@ -47,11 +47,12 @@ The Sloth bot now uses MariaDB instead of SQLite. Follow these steps to set up t
    - Copy `.env.example` to `.env`
    - Modify the database settings in `.env` if needed:
      ```
+     TOKEN_TEST=your_discord_bot_token_here
      DB_HOST=localhost
      DB_PORT=3306
-     DB_NAME=delta_bot
-     DB_USER=delta_bot
-     DB_PASSWORD=delta_bot
+     DB_NAME=sloth
+     DB_USER=sloth
+     DB_PASSWORD=your_secure_password_here
      ```
 
 ## Migration from SQLite

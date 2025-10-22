@@ -3,12 +3,12 @@ package org.ToastiCodingStuff.Sloth;
 import java.awt.Color;
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.interactions.components.ItemComponent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 public class DatabaseHandler {
@@ -193,7 +193,7 @@ public class DatabaseHandler {
             DatabaseMetaData meta = connection.getMetaData();
             String[] tableNames = {
                 "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics, role_select, role_select_embeds"
+                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics"
             };
             for (String tableName : tableNames) {
                 ResultSet rs = meta.getTables(null, null, tableName, null);
@@ -261,8 +261,6 @@ public class DatabaseHandler {
             createUserStatisticsTable();
             createRulesEmbedsChannel();
             createJustVerifyButtonTable();
-            createSelectRolesTable();
-            createSelectRolesEmbedsTable();
             
             // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
@@ -302,35 +300,6 @@ public class DatabaseHandler {
         } catch (Exception e) {
             System.err.println("Error applying missing indexes: " + e.getMessage());
         }
-    }
-
-    private void createSelectRolesTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS role_select (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "role_id VARCHAR(32) NOT NULL, " +
-            "label VARCHAR(64) NOT NULL, " +
-            "description VARCHAR(255), " +
-            "emoji_id VARCHAR(64), " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
-    }
-
-    private void createSelectRolesEmbedsTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS role_select_embeds (" +
-            "id INT PRIMARY KEY AUTO_INCREMENT, " +
-            "guild_id VARCHAR(32) NOT NULL, " +
-            "channel_id VARCHAR(32) NOT NULL, " +
-            "message_id VARCHAR(32) NOT NULL, " +
-            "display_type VARCHAR(32) NOT NULL DEFAULT 'BUTTON', " +
-            "title VARCHAR(255) NOT NULL, " +
-            "description TEXT NOT NULL, " +
-            "footer TEXT, " +
-            "color VARCHAR(32) DEFAULT 'blue', " +
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
     }
 
     /**
@@ -1877,10 +1846,12 @@ public class DatabaseHandler {
      */
     public void insertOrUpdateGlobalStatistic(String command) {
         try {
+            String currentTimestamp = java.time.Instant.now().toString();
+
             // Try to update existing record
             String updateQuery = "UPDATE global_statistics SET number = number + 1, last_used = ? WHERE command = ?";
             PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
-            updateStmt.setString(1, getCurrentDate());
+            updateStmt.setString(1, currentTimestamp);
             updateStmt.setString(2, command);
             
             int rowsUpdated = updateStmt.executeUpdate();
@@ -1891,7 +1862,7 @@ public class DatabaseHandler {
                 PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
                 insertStmt.setString(1, command);
                 insertStmt.setInt(2, 1);
-                insertStmt.setString(3, getCurrentDate());
+                insertStmt.setString(3, currentTimestamp);
                 insertStmt.executeUpdate();
             }
         } catch (SQLException e) {
@@ -2658,13 +2629,19 @@ public class DatabaseHandler {
             PreparedStatement stmt = connection.prepareStatement(query);
             ResultSet rs = stmt.executeQuery();
 
+            if (!rs.next()) {
+                EmbedBuilder embedNothing = new EmbedBuilder()
+                        .setTitle("🌐 Global Bot Statistics")
+                        .setColor(Color.RED)
+                        .setDescription("No global statistics found.")
+                        .setTimestamp(java.time.Instant.now());
+                return embedNothing;
+            }
+
             while (rs.next()) {
                 String command = rs.getString("command");
-                int count = rs.getInt("number");
-                System.out.println("Anzahl: " + count);
-                String lastUsed = rs.getTimestamp("last_used").toString();
-                embed.addField("Command Name: " + command, "Total Uses: " + count, false);
-                embed.addField("Last Used", lastUsed != null ? lastUsed : "Never", false);
+                int count = rs.getInt("count");
+                embed.addField("ActionType: " + command, "Total Uses: " + count, true);
             }
         } catch (SQLException e) {
             System.err.println("Error getting global statistics: " + e.getMessage());
@@ -2892,266 +2869,5 @@ public class DatabaseHandler {
             button = Button.primary("just_verify", "✅ Verify!");
         }
         return button;
-    }
-    public void updateGuildActivityStatus(List<Guild> guilds) {
-        String query = "SELECT * FROM guilds";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            ResultSet rs = pstmt.executeQuery();
-            Set<String> activeGuildIds = guilds.stream().map(Guild::getId).collect(Collectors.toSet());
-
-            while (rs.next()) {
-                String guildId = rs.getString("id");
-                boolean isActive = rs.getBoolean("active");
-
-                if (activeGuildIds.contains(guildId) && !isActive) {
-                    // Guild is now active but marked as inactive in DB
-                    String updateQuery = "UPDATE guilds SET active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-                    try (PreparedStatement updatePstmt = connection.prepareStatement(updateQuery)) {
-                        updatePstmt.setString(1, guildId);
-                        updatePstmt.executeUpdate();
-                        System.out.println("Marked guild " + guildId + " as active.");
-                    }
-                } else if (!activeGuildIds.contains(guildId) && isActive) {
-                    // Guild is no longer active but marked as active in DB
-                    String updateQuery = "UPDATE guilds SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-                    try (PreparedStatement updatePstmt = connection.prepareStatement(updateQuery)) {
-                        updatePstmt.setString(1, guildId);
-                        updatePstmt.executeUpdate();
-                        System.out.println("Marked guild " + guildId + " as inactive.");
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("Error updating guild activity status: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    public boolean isRoleAlreadyAdded (String guildId, String roleSelectId) {
-        String query = "SELECT * FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, roleSelectId);
-            ResultSet rs = pstmt.executeQuery();
-            return rs.next();
-        } catch (SQLException e) {
-            System.err.println("Error checking if role select is already added: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public int addRoleSelectToGuild (String guildId, String roleSelectId, String emojiId, String description) {
-        if (!isRoleAlreadyAdded(guildId, roleSelectId)) {
-            String query = "INSERT INTO role_select (guild_id, role_id, description,emoji_id) VALUES (?, ?, ?, ?) RETURNING id";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-                pstmt.setString(1, guildId);
-                pstmt.setString(2, roleSelectId);
-                pstmt.setString(3, description);
-                pstmt.setString(4, emojiId);
-                int set = pstmt.executeUpdate();
-                System.out.println("Role select " + roleSelectId + " added to guild " + guildId);
-                return set;
-
-            } catch (SQLException e) {
-                System.err.println("Error adding role select to guild: " + e.getMessage());
-                e.printStackTrace();
-                return 0;
-            }
-        } else {
-            System.out.println("Role select " + roleSelectId + " is already added to guild " + guildId);
-            return 0;
-        }
-    }
-
-    public boolean removeRoleSelectFromGuild (String guildId, String roleSelectId) {
-        if (isRoleAlreadyAdded(guildId, roleSelectId)) {
-            String query = "DELETE FROM role_select WHERE guild_id = ? AND role_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-                pstmt.setString(1, guildId);
-                pstmt.setString(2, roleSelectId);
-                int rowsAffected = pstmt.executeUpdate();
-                if (rowsAffected > 0) {
-                    System.out.println("Role select " + roleSelectId + " removed from guild " + guildId);
-                    return true;
-                } else {
-                    System.out.println("No role select " + roleSelectId + " found to remove from guild " + guildId);
-                    return false;
-                }
-            } catch (SQLException e) {
-                System.err.println("Error removing role select from guild: " + e.getMessage());
-                e.printStackTrace();
-                return false;
-            }
-        } else {
-            System.out.println("Role select " + roleSelectId + " is not added to guild " + guildId);
-            return false;
-        }
-    }
-
-    public int getRoleSelectID (String guildId, String roleSelectId) {
-        String query = "SELECT id FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, roleSelectId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                int id = rs.getInt("id");
-                System.out.println("Role Select ID for guild " + guildId + " and role select " + roleSelectId + ": " + id);
-                return id;
-            } else {
-                System.out.println("No Role Select ID found for guild " + guildId + " and role select " + roleSelectId);
-                return -1;
-            }
-        } catch (SQLException e) {
-            System.err.println("Error getting Role Select ID: " + e.getMessage());
-            e.printStackTrace();
-            return -1;
-        }
-    }
-
-    public boolean addSelectRolesEmbed (String guildId, String channelId, String messageId, String description) {
-        String query = "INSERT INTO select_roles_embeds (guild_id, channel_id, message_id) VALUES (?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, channelId);
-            pstmt.setString(3, messageId);
-            pstmt.executeUpdate();
-            System.out.println("Select Roles Embed added for guild " + guildId);
-            return true;
-        } catch (SQLException e) {
-            System.err.println("Error adding Select Roles Embed: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public boolean addEmbedToDatabase (String guildId, String channelId, String messageId, String displayType, String title, String description, String footer, String color) {
-        if (displayType.equalsIgnoreCase("BUTTON")) {
-            displayType = "REACTION";
-        } else if (displayType.equalsIgnoreCase("SELECT_MENU")) {
-            displayType = "SELECT-MENU";
-        } else {
-            displayType = "BUTTON"; // Default to BUTTON if invalid
-        }
-        String query = "INSERT INTO role_select_embeds (guild_id, channel_id, message_id, display_type, title, description, footer, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, channelId);
-            pstmt.setString(3, messageId);
-            pstmt.setString(4, displayType);
-            pstmt.setString(5, title);
-            pstmt.setString(6, description);
-            pstmt.setString(7, footer);
-            pstmt.setString(8, color);
-            pstmt.executeUpdate();
-            System.out.println("Role Select Embed added for guild " + guildId);
-            return true;
-        } catch (SQLException e) {
-            System.err.println("Error adding Role Select Embed: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public boolean removeEmbedFromDatabase (String guildId, String messageId) {
-        String query = "DELETE FROM role_select_embeds WHERE guild_id = ? AND message_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, messageId);
-            int rowsAffected = pstmt.executeUpdate();
-            if (rowsAffected > 0) {
-                System.out.println("Role Select Embed removed for guild " + guildId);
-                return true;
-            } else {
-                System.out.println("No Role Select Embed found to remove for guild " + guildId);
-                return false;
-            }
-        } catch (SQLException e) {
-            System.err.println("Error removing Role Select Embed: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public List<String> getAllRoleSelectForGuild (String guildId) {
-        List<String> embedMessageIds = new ArrayList<>();
-        String query = "SELECT role_id FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                String messageId = rs.getString("message_id");
-                embedMessageIds.add(messageId);
-            }
-            System.out.println("Fetched Role Select Embeds for guild " + guildId);
-        } catch (SQLException e) {
-            System.err.println("Error fetching Role Select Embeds: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return embedMessageIds;
-    }
-
-    public String getRoleSelectDescription(String id, String id1) {
-        String query = "SELECT description FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, id);
-            pstmt.setString(2, id1);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                String description = rs.getString("description");
-                System.out.println("Role Select Description for guild " + id + " and role select " + id1 + ": " + description);
-                return description;
-            } else {
-                System.out.println("No Role Select Description found for guild " + id + " and role select " + id1);
-                return null;
-            }
-        } catch (SQLException e) {
-            System.err.println("Error getting Role Select Description: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    public String getRoleSelectEmoji(String guildId, String roleSelectId) {
-        String query = "SELECT emoji FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, roleSelectId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                String emojiId = rs.getString("emoji");
-                System.out.println("Role Select Emoji for guild " + guildId + " and role select " + roleSelectId + ": " + emojiId);
-                return emojiId;
-            } else {
-                System.out.println("No Role Select Emoji found for guild " + guildId + " and role select " + roleSelectId);
-                return null;
-            }
-        } catch (SQLException e) {
-            System.err.println("Error getting Role Select Emoji: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    public String getRoleSelectRoleIDByEmoji (String guildId, String emoji) {
-        String query = "SELECT role_id FROM role_select WHERE guild_id = ? AND emoji_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setString(1, guildId);
-            pstmt.setString(2, emoji);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                String roleId = rs.getString("role_select_id");
-                System.out.println("Role Select Role ID for guild " + guildId + " and emoji " + emoji + ": " + roleId);
-                return roleId;
-            } else {
-                System.out.println("No Role Select Role ID found for guild " + guildId + " and emoji " + emoji);
-                return null;
-            }
-        } catch (SQLException e) {
-            System.err.println("Error getting Role Select Role ID by Emoji: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
     }
 }
