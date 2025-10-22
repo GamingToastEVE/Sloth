@@ -7,7 +7,7 @@ Terms of Service for Sloth
 
 Last updated: 30.8.25
 
-These Terms of Service ("Terms") govern the use of the Discord bot Sloth Bot ("the Bot"), provided by gamingtoasti ("we", "us", or "our"). By inviting or using the Bot, you agree to these Terms.
+These Terms of Service ("Terms") govern the use of the Discord bot [Bot Name] ("the Bot"), provided by [Your Name/Entity] ("we", "us", or "our"). By inviting or using the Bot, you agree to these Terms.
 
 1. Eligibility
 
