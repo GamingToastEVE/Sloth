@@ -85,9 +85,9 @@ public class Sloth {
 
         // Register each command globally
         //guild.updateCommands().addCommands(allCommands).queue();
-        //api.updateCommands().addCommands(allCommands).queue();
+        api.updateCommands().addCommands(allCommands).queue();
         assert testServer != null;
-        testServer.updateCommands().addCommands(allCommands).queue();
+        //testServer.updateCommands().addCommands(allCommands).queue();
 
         System.out.println("Finished registering " + allCommands.size() + " global commands");
     }

@@ -75,10 +75,7 @@ public class AddGuildSlashCommands {
 
     private List<SlashCommandData> getSelectRolesCommands() {
         List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("send-select-roles", "Sends a select roles message in the current channel")
-                .addOption(OptionType.CHANNEL, "channel", "Channel to send the select roles message in", false)
-                .addOption(OptionType.STRING, "title", "Title of the select roles embed", false)
-                .addOption(OptionType.STRING, "description", "Description of the select roles embed", false));
+        commands.add(Commands.slash("send-select-roles", "Sends a select roles message in the current channel"));
         commands.add(Commands.slash("add-select-role", "Adds a role to the select roles message")
                 .addOption(OptionType.ROLE, "role", "Role to add to the select roles message", true)
                 .addOption(OptionType.STRING, "description", "Description for the role in the select menu", false)

@@ -309,7 +309,7 @@ public class DatabaseHandler {
             "id INT PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id VARCHAR(32) NOT NULL, " +
             "role_id VARCHAR(32) NOT NULL, " +
-            "label VARCHAR(64) NOT NULL, " +
+            "label VARCHAR(64), " +
             "description VARCHAR(255), " +
             "emoji_id VARCHAR(64), " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
@@ -2941,26 +2941,26 @@ public class DatabaseHandler {
         }
     }
 
-    public int addRoleSelectToGuild (String guildId, String roleSelectId, String emojiId, String description) {
+    public boolean addRoleSelectToGuild (String guildId, String roleSelectId, String description, String emojiId) {
         if (!isRoleAlreadyAdded(guildId, roleSelectId)) {
-            String query = "INSERT INTO role_select (guild_id, role_id, description,emoji_id) VALUES (?, ?, ?, ?) RETURNING id";
+            String query = "INSERT INTO role_select (guild_id, role_id, description,emoji_id) VALUES (?, ?, ?, ?)";
             try (PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, guildId);
                 pstmt.setString(2, roleSelectId);
                 pstmt.setString(3, description);
                 pstmt.setString(4, emojiId);
-                int set = pstmt.executeUpdate();
+                pstmt.executeUpdate();
                 System.out.println("Role select " + roleSelectId + " added to guild " + guildId);
-                return set;
+                return true;
 
             } catch (SQLException e) {
                 System.err.println("Error adding role select to guild: " + e.getMessage());
                 e.printStackTrace();
-                return 0;
+                return false;
             }
         } else {
             System.out.println("Role select " + roleSelectId + " is already added to guild " + guildId);
-            return 0;
+            return false;
         }
     }
 
@@ -3076,12 +3076,12 @@ public class DatabaseHandler {
 
     public List<String> getAllRoleSelectForGuild (String guildId) {
         List<String> embedMessageIds = new ArrayList<>();
-        String query = "SELECT role_id FROM role_select_embeds WHERE guild_id = ?";
+        String query = "SELECT role_id FROM role_select WHERE guild_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                String messageId = rs.getString("message_id");
+                String messageId = rs.getString("role_id");
                 embedMessageIds.add(messageId);
             }
             System.out.println("Fetched Role Select Embeds for guild " + guildId);
@@ -3114,13 +3114,13 @@ public class DatabaseHandler {
     }
 
     public String getRoleSelectEmoji(String guildId, String roleSelectId) {
-        String query = "SELECT emoji FROM role_select WHERE guild_id = ? AND role_id = ?";
+        String query = "SELECT emoji_id FROM role_select WHERE guild_id = ? AND role_id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, roleSelectId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                String emojiId = rs.getString("emoji");
+                String emojiId = rs.getString("emoji_id");
                 System.out.println("Role Select Emoji for guild " + guildId + " and role select " + roleSelectId + ": " + emojiId);
                 return emojiId;
             } else {
@@ -3141,7 +3141,7 @@ public class DatabaseHandler {
             pstmt.setString(2, emoji);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                String roleId = rs.getString("role_select_id");
+                String roleId = rs.getString("role_id");
                 System.out.println("Role Select Role ID for guild " + guildId + " and emoji " + emoji + ": " + roleId);
                 return roleId;
             } else {
