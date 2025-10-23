@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
@@ -35,8 +36,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             handler.insertOrUpdateGlobalStatistic("add-select-role");
             handleAddSelectRole(event);
         }
-        if (event.getName().equals("send-select-role")) {
-            handler.insertOrUpdateGlobalStatistic("send-select-role");
+        if (event.getName().equals("send-select-roles")) {
+            handler.insertOrUpdateGlobalStatistic("send-select-roles");
             handleSendSelectRole(event);
         }
     }
@@ -69,6 +70,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             Role role = event.getGuild().getRoleById(roleId);
             if (role != null) {
                 Objects.requireNonNull(event.getMember()).getGuild().removeRoleFromMember(event.getMember(), role).queue();
+
             }
         }
     }
@@ -109,6 +111,28 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         }
     }
 
+    @Override
+    public void onStringSelectInteraction (StringSelectInteractionEvent event) {
+        if (event.getSelectMenu().getId().equals("role_select_dropdown")) {
+            String guildId = Objects.requireNonNull(event.getGuild()).getId();
+            List<String> selectedRoleIds = event.getValues();
+            List<String> allRoleIds = handler.getAllRoleSelectForGuild(guildId);
+
+            // Add selected roles
+            for (String roleId : selectedRoleIds) {
+                Role role = event.getGuild().getRoleById(roleId);
+                if (role != null && !Objects.requireNonNull(event.getMember()).getRoles().contains(role)) {
+                    event.getGuild().addRoleToMember(event.getMember(), role).queue();
+                    event.reply("Added role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                }
+                if (role != null && Objects.requireNonNull(event.getMember()).getRoles().contains(role)) {
+                    event.getGuild().removeRoleFromMember(event.getMember(), role).queue();
+                    event.reply("Removed role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                }
+            }
+        }
+    }
+
     private void handleRemoveSelectRole(SlashCommandInteractionEvent event, Role role) {
         handler.removeRoleSelectFromGuild(Objects.requireNonNull(event.getGuild()).getId(), role.getId());
         event.reply("Removed role " + role.getAsMention() + " from the select role list.").setEphemeral(true).queue();
@@ -117,15 +141,15 @@ public class SelectRolesCommandListener extends ListenerAdapter {
     private void handleAddSelectRole(SlashCommandInteractionEvent event) {
         Role role = Objects.requireNonNull(event.getOption("role")).getAsRole();
         String description = "No description provided.";
-        String emoji = "❔";
+        String emoji = "✅";
         if (event.getOption("description") != null) {
             description = Objects.requireNonNull(event.getOption("description")).getAsString();
         }
         if (event.getOption("emoji") != null) {
-            emoji = Objects.requireNonNull(event.getOption("emoji")).getAsString();
+            emoji = Objects.requireNonNull(event.getOption("emoji").getAsString());
         }
         handler.addRoleSelectToGuild(Objects.requireNonNull(event.getGuild()).getId(), role.getId(), description, emoji);
-        event.reply("Added role " + role.getAsMention() + "with emoji " + emoji + "and description: " + description + " to the select role) list.").setEphemeral(true).queue();
+        event.reply("Added role " + role.getAsMention() + "with emoji " + emoji + " and description: " + description + " to the select role) list.").setEphemeral(true).queue();
     }
 
     private void handleSendSelectRole(SlashCommandInteractionEvent event) {
@@ -151,7 +175,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         List<String> emojiList = new ArrayList<>();
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle("Select Your Roles");
-        StringBuilder description = new StringBuilder("React with the corresponding emoji to get the role:\"n\n");
+        StringBuilder description = new StringBuilder("React with the corresponding emoji to get the role:\n");
         embedBuilder.setDescription(description);
         for (String roleInfo : roleList) {
             Role role = guild.getRoleById(roleInfo);
@@ -165,6 +189,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         assert mChannel != null;
         Message message = mChannel.sendMessageEmbeds(embedBuilder.build()).complete();
         for (String emoji : emojiList) {
+            Emoji emj = Emoji.fromFormatted(emoji);
+            System.out.println(emj + "; " + emj.getName());
             message.addReaction(Emoji.fromFormatted(emoji)).queue();
         }
     }
