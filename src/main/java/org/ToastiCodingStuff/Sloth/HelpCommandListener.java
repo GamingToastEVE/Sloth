@@ -190,36 +190,41 @@ public class HelpCommandListener extends ListenerAdapter {
             case "commands":
                 embed.setTitle("📖 Command Reference")
                         .setDescription("Complete list of available commands by system:\n\n")
-                        .addField("**Log Channel System**", 
+                        .addField("**Log Channel System**",
                                 "`/set-log-channel` - Configure logging channel\n" +
                                 "`/get-log-channel` - View current log channel", false)
-                        .addField("**Warning System**", 
+                        .addField("**Warning System**",
                                 "`/warn` - Issue warning to user\n" +
                                 "`/set-warn-settings` - Configure warning thresholds\n" +
                                 "`/get-warn-settings` - View warning configuration", false)
-                        .addField("**Ticket System**", 
+                        .addField("**Ticket System**",
                                 "`/ticket-setup` - Configure ticket system\n" +
                                 "`/ticket-panel` - Create ticket creation panel\n" +
                                 "`/close-ticket` - Close current ticket\n" +
                                 "`/assign-ticket` - Assign to staff member\n" +
                                 "`/set-ticket-priority` - Change ticket priority\n" +
                                 "`/ticket-info` - Get ticket information\n", false)
-                        .addField("**Moderation System**", 
+                        .addField("**Moderation System**",
                                 "`/kick` `/ban` `/unban` - User management\n" +
                                 "`/timeout` `/untimeout` - Temporary restrictions\n" +
                                 "`/purge` - Delete multiple messages\n" +
                                 "`/slowmode` - Set channel slowmode", false)
-                        .addField("**Statistics System**", 
+                        .addField("**Statistics System**",
                                 "`/stats-today` - Today's server statistics\n" +
                                 "`/stats-week` - Weekly statistics\n" +
                                 "`/stats-date` - Statistics for specific date\n" +
                                 "`/user-info` - View user information and statistics\n" +
                                 "`/user-stats-date` - View user statistics for specific date", false)
-                        .addField("**Rules/Verification System**", 
+                        .addField("**Select Roles System**",
+                                "`/add-select-role` - Add role to selection list\n" +
+                                "`/remove-select-role` - Remove role from selection list\n" +
+                                "`/send-select-roles` - Send role selection interface\n" +
+                                "*Supports reactions, dropdowns, and buttons*", false)
+                        .addField("**Rules/Verification System**",
                                 "`/add-rules-embed` - Create rules embeds with verification\n" +
                                 "`/setup-rules` - Display rules in current channel\n" +
                                 "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
-                        .addField("**General Commands**", 
+                        .addField("**General Commands**",
                                 "`/help` - Show this help system", false)
                         .setColor(Color.MAGENTA)
                         .setFooter("All commands require appropriate permissions");

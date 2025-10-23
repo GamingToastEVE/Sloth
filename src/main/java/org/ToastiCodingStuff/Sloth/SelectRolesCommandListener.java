@@ -1,6 +1,7 @@
 package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
@@ -29,14 +30,17 @@ public class SelectRolesCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("remove-select-role")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("remove-select-role");
             handleRemoveSelectRole(event, Objects.requireNonNull(event.getOption("role")).getAsRole());
         }
         if (event.getName().equals("add-select-role")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("add-select-role");
             handleAddSelectRole(event);
         }
         if (event.getName().equals("send-select-roles")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("send-select-roles");
             handleSendSelectRole(event);
         }
@@ -116,7 +120,6 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         if (event.getSelectMenu().getId().equals("role_select_dropdown")) {
             String guildId = Objects.requireNonNull(event.getGuild()).getId();
             List<String> selectedRoleIds = event.getValues();
-            List<String> allRoleIds = handler.getAllRoleSelectForGuild(guildId);
 
             // Add selected roles
             for (String roleId : selectedRoleIds) {
