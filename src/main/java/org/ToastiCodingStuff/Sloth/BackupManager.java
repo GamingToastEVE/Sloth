@@ -18,11 +18,12 @@ import java.util.concurrent.TimeUnit;
  * Creates backups every 24 hours and maintains up to 3 most recent backups.
  */
 public class BackupManager {
-    private static final String BACKUP_DIR = "/backups";
+    private static final String DEFAULT_BACKUP_DIR = "/backups";
     private static final int MAX_BACKUPS = 3;
     private static final long BACKUP_INTERVAL_HOURS = 24;
     
     private final ScheduledExecutorService scheduler;
+    private final String backupDir;
     private final String dbHost;
     private final String dbPort;
     private final String dbName;
@@ -40,6 +41,7 @@ public class BackupManager {
      */
     public BackupManager(String dbHost, String dbPort, String dbName, String dbUser, String dbPassword) {
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
+        this.backupDir = System.getenv().getOrDefault("BACKUP_DIR", DEFAULT_BACKUP_DIR);
         this.dbHost = dbHost;
         this.dbPort = dbPort;
         this.dbName = dbName;
@@ -88,12 +90,12 @@ public class BackupManager {
      * Ensures the backup directory exists, creating it if necessary.
      */
     private void ensureBackupDirectoryExists() {
-        File backupDir = new File(BACKUP_DIR);
-        if (!backupDir.exists()) {
-            if (backupDir.mkdirs()) {
-                System.out.println("Created backup directory: " + BACKUP_DIR);
+        File backupDirectory = new File(backupDir);
+        if (!backupDirectory.exists()) {
+            if (backupDirectory.mkdirs()) {
+                System.out.println("Created backup directory: " + backupDir);
             } else {
-                System.err.println("Failed to create backup directory: " + BACKUP_DIR);
+                System.err.println("Failed to create backup directory: " + backupDir);
             }
         }
     }
@@ -109,35 +111,57 @@ public class BackupManager {
             // Generate backup filename with timestamp
             String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
             String backupFileName = String.format("%s_backup_%s.sql", dbName, timestamp);
-            String backupFilePath = Paths.get(BACKUP_DIR, backupFileName).toString();
+            String backupFilePath = Paths.get(backupDir, backupFileName).toString();
             
-            // Execute mysqldump command
-            ProcessBuilder processBuilder = new ProcessBuilder(
-                "mysqldump",
-                "-h", dbHost,
-                "-P", dbPort,
-                "-u", dbUser,
-                "-p" + dbPassword,
-                "--single-transaction",
-                "--routines",
-                "--triggers",
-                dbName
-            );
+            // Create MySQL configuration file to avoid password exposure in process list
+            File configFile = createMySQLConfigFile();
             
-            // Redirect output to backup file
-            processBuilder.redirectOutput(new File(backupFilePath));
-            processBuilder.redirectErrorStream(true);
-            
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
-            
-            if (exitCode == 0) {
-                System.out.println("Database backup completed successfully: " + backupFilePath);
+            try {
+                // Execute mysqldump command using config file
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                    "mysqldump",
+                    "--defaults-extra-file=" + configFile.getAbsolutePath(),
+                    "-h", dbHost,
+                    "-P", dbPort,
+                    "--single-transaction",
+                    "--routines",
+                    "--triggers",
+                    dbName
+                );
                 
-                // Clean up old backups
-                cleanupOldBackups();
-            } else {
-                System.err.println("Database backup failed with exit code: " + exitCode);
+                // Redirect output to backup file
+                processBuilder.redirectOutput(new File(backupFilePath));
+                
+                Process process = processBuilder.start();
+                
+                // Capture stderr for error logging
+                java.io.BufferedReader errorReader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getErrorStream())
+                );
+                StringBuilder errorOutput = new StringBuilder();
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    errorOutput.append(line).append("\n");
+                }
+                
+                int exitCode = process.waitFor();
+                
+                if (exitCode == 0) {
+                    System.out.println("Database backup completed successfully: " + backupFilePath);
+                    
+                    // Clean up old backups
+                    cleanupOldBackups();
+                } else {
+                    System.err.println("Database backup failed with exit code: " + exitCode);
+                    if (errorOutput.length() > 0) {
+                        System.err.println("Error output: " + errorOutput.toString());
+                    }
+                }
+            } finally {
+                // Clean up temporary config file
+                if (configFile != null && configFile.exists()) {
+                    configFile.delete();
+                }
             }
             
         } catch (IOException | InterruptedException e) {
@@ -151,12 +175,38 @@ public class BackupManager {
     }
     
     /**
+     * Creates a temporary MySQL configuration file with credentials.
+     * This prevents password exposure in process lists.
+     */
+    private File createMySQLConfigFile() throws IOException {
+        File configFile = File.createTempFile("mysql_backup_", ".cnf");
+        configFile.deleteOnExit();
+        
+        // Set restrictive permissions (Unix-like systems only)
+        configFile.setReadable(false, false);
+        configFile.setReadable(true, true);
+        configFile.setWritable(false, false);
+        configFile.setWritable(true, true);
+        
+        String configContent = String.format(
+            "[client]%n" +
+            "user=%s%n" +
+            "password=%s%n",
+            dbUser, dbPassword
+        );
+        
+        Files.write(configFile.toPath(), configContent.getBytes());
+        
+        return configFile;
+    }
+    
+    /**
      * Removes old backups, keeping only the 3 most recent ones.
      */
     private void cleanupOldBackups() {
         try {
-            File backupDir = new File(BACKUP_DIR);
-            File[] backupFiles = backupDir.listFiles((dir, name) -> 
+            File backupDirectory = new File(backupDir);
+            File[] backupFiles = backupDirectory.listFiles((dir, name) -> 
                 name.startsWith(dbName + "_backup_") && name.endsWith(".sql")
             );
             

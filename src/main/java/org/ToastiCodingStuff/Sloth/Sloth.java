@@ -23,11 +23,11 @@ public class Sloth {
         DatabaseHandler handler = new DatabaseHandler();
         
         // Initialize and start backup manager
-        String dbHost = System.getenv().getOrDefault("DB_HOST", "localhost");
-        String dbPort = System.getenv().getOrDefault("DB_PORT", "3306");
-        String dbName = System.getenv().getOrDefault("DB_NAME", "sloth");
-        String dbUser = System.getenv().getOrDefault("DB_USER", "root");
-        String dbPassword = System.getenv().getOrDefault("DB_PASSWORD", "admin");
+        String dbHost = dotenv.get("DB_HOST", "localhost");
+        String dbPort = dotenv.get("DB_PORT", "3306");
+        String dbName = dotenv.get("DB_NAME", "sloth");
+        String dbUser = dotenv.get("DB_USER", "root");
+        String dbPassword = dotenv.get("DB_PASSWORD", "admin");
         
         backupManager = new BackupManager(dbHost, dbPort, dbName, dbUser, dbPassword);
         backupManager.startScheduler();
