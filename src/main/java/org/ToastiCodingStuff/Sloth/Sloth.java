@@ -11,6 +11,8 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 public class Sloth {
+    private static BackupManager backupManager;
+    
     public static void main(String[] args) throws Exception {
         Dotenv dotenv = Dotenv.load();
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
@@ -19,6 +21,16 @@ public class Sloth {
         api.awaitReady();
 
         DatabaseHandler handler = new DatabaseHandler();
+        
+        // Initialize and start backup manager
+        String dbHost = System.getenv().getOrDefault("DB_HOST", "localhost");
+        String dbPort = System.getenv().getOrDefault("DB_PORT", "3306");
+        String dbName = System.getenv().getOrDefault("DB_NAME", "sloth");
+        String dbUser = System.getenv().getOrDefault("DB_USER", "root");
+        String dbPassword = System.getenv().getOrDefault("DB_PASSWORD", "admin");
+        
+        backupManager = new BackupManager(dbHost, dbPort, dbName, dbUser, dbPassword);
+        backupManager.startScheduler();
 
         // Set bot status to "Playing /help"
         api.getPresence().setActivity(Activity.playing("/help"));
@@ -43,6 +55,14 @@ public class Sloth {
 
         // Sync all current guilds to database
         handler.syncGuilds(api.getGuilds());
+        
+        // Add shutdown hook to gracefully stop backup scheduler
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutting down bot...");
+            if (backupManager != null) {
+                backupManager.stopScheduler();
+            }
+        }));
     }
 
     /**
