@@ -262,7 +262,9 @@ public class DatabaseMigrationManager {
             .addColumn("ticket_role", "INTEGER")
             .addColumn("ticket_transcript", "INTEGER DEFAULT 1")
             .addColumn("join_role", "INTEGER")
-            .addColumn("mute_role", "INTEGER");
+            .addColumn("mute_role", "INTEGER")
+            .addColumn("ticket_title", "TEXT DEFAULT '🎫 Create a Ticket'")
+            .addColumn("ticket_description", "TEXT DEFAULT 'Need help or have a question? Click the button below to create a ticket!\\n\\nOur support team will assist you as soon as possible.'");
     }
     
     /**

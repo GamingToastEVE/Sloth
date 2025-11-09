@@ -1700,6 +1700,93 @@ public class DatabaseHandler {
     }
 
     /**
+     * Get ticket panel title for a guild
+     */
+    public String getTicketTitle(String guildId) {
+        try {
+            String query = "SELECT ticket_title FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String title = rs.getString("ticket_title");
+                if (title != null && !title.isEmpty()) {
+                    return title;
+                }
+            }
+            return "🎫 Create a Ticket"; // Default title
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket title: " + e.getMessage());
+            e.printStackTrace();
+            return "🎫 Create a Ticket"; // Default title on error
+        }
+    }
+
+    /**
+     * Get ticket panel description for a guild
+     */
+    public String getTicketDescription(String guildId) {
+        try {
+            String query = "SELECT ticket_description FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String description = rs.getString("ticket_description");
+                if (description != null && !description.isEmpty()) {
+                    return description;
+                }
+            }
+            return "Need help or have a question? Click the button below to create a ticket!\n\nOur support team will assist you as soon as possible."; // Default description
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket description: " + e.getMessage());
+            e.printStackTrace();
+            return "Need help or have a question? Click the button below to create a ticket!\n\nOur support team will assist you as soon as possible."; // Default description on error
+        }
+    }
+
+    /**
+     * Set ticket panel title and description for a guild
+     */
+    public boolean setTicketConfig(String guildId, String title, String description) {
+        try {
+            // Check if settings exist for the guild
+            String checkQuery = "SELECT id FROM guild_settings WHERE guild_id = ?";
+            PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
+            checkStmt.setString(1, guildId);
+            ResultSet rs = checkStmt.executeQuery();
+
+            if (rs.next()) {
+                // Update existing settings
+                String updateQuery = "UPDATE guild_settings SET ticket_title = ?, ticket_description = ? WHERE guild_id = ?";
+                PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+                updateStmt.setString(1, title);
+                updateStmt.setString(2, description);
+                updateStmt.setString(3, guildId);
+
+                int rowsUpdated = updateStmt.executeUpdate();
+                return rowsUpdated > 0;
+            } else {
+                // Insert new settings
+                String insertQuery = "INSERT INTO guild_settings (guild_id, ticket_title, ticket_description) VALUES (?, ?, ?)";
+                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
+                insertStmt.setString(1, guildId);
+                insertStmt.setString(2, title);
+                insertStmt.setString(3, description);
+
+                int rowsInserted = insertStmt.executeUpdate();
+                return rowsInserted > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error setting ticket config: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Ticket-Priorität aktualisieren (MariaDB-Syntax)
      */
     public boolean updateTicketPriority(int ticketId, String priority) {
