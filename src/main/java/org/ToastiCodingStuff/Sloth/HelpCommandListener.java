@@ -219,6 +219,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/add-select-role` - Add role to selection list\n" +
                                 "`/remove-select-role` - Remove role from selection list\n" +
                                 "`/send-select-roles` - Send role selection interface\n" +
+                                "`/edit-select-role-embed` - Edit title/description/footer/color of selection embed\n" +
                                 "*Supports reactions, dropdowns, and buttons*", false)
                         .addField("**Rules/Verification System**",
                                 "`/add-rules-embed` - Create rules embeds with verification\n" +

@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import org.mariadb.jdbc.export.Prepare;
 
 public class DatabaseHandler {
 
@@ -2657,15 +2658,17 @@ public class DatabaseHandler {
             String query = "SELECT * FROM global_statistics";
             PreparedStatement stmt = connection.prepareStatement(query);
             ResultSet rs = stmt.executeQuery();
+            StringBuilder description = new StringBuilder();
 
             while (rs.next()) {
                 String command = rs.getString("command");
                 int count = rs.getInt("number");
                 System.out.println("Anzahl: " + count);
                 String lastUsed = rs.getTimestamp("last_used").toString();
-                embed.addField("Command Name: " + command, "Total Uses: " + count, false);
-                embed.addField("Last Used", lastUsed != null ? lastUsed : "Never", false);
+                description.append("Command Name: ").append(command).append("; Total Uses: ").append(count).append("\n");
+                description.append(lastUsed).append("\n");
             }
+            embed.setDescription(description);
         } catch (SQLException e) {
             System.err.println("Error getting global statistics: " + e.getMessage());
             e.printStackTrace();
@@ -3150,6 +3153,195 @@ public class DatabaseHandler {
             }
         } catch (SQLException e) {
             System.err.println("Error getting Role Select Role ID by Emoji: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public EmbedBuilder getGlobalModStats() {
+        try {
+            String query = "SELECT " +
+                    "SUM(warnings_issued) AS total_warnings, " +
+                    "SUM(kicks_performed) AS total_kicks, " +
+                    "SUM(bans_performed) AS total_bans, " +
+                    "SUM(timeouts_performed) AS total_timeouts, " +
+                    "SUM(untimeouts_performed) AS total_untimeouts, " +
+                    "SUM(tickets_created) AS total_tickets_created, " +
+                    "SUM(tickets_closed) AS total_tickets_closed, " +
+                    "SUM(verifications_performed) AS total_verifications " +
+                    "FROM statistics";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            ResultSet rs = pstmt.executeQuery();
+
+            EmbedBuilder embed = new EmbedBuilder();
+            if (rs.next()) {
+                int totalWarnings = rs.getInt("total_warnings");
+                int totalKicks = rs.getInt("total_kicks");
+                int totalBans = rs.getInt("total_bans");
+                int totalTimeouts = rs.getInt("total_timeouts");
+                int totalUntimeouts = rs.getInt("total_untimeouts");
+                int totalTicketsCreated = rs.getInt("total_tickets_created");
+                int totalTicketsClosed = rs.getInt("total_tickets_closed");
+                int totalVerifications = rs.getInt("total_verifications");
+
+
+                embed.setTitle("Lifetime Moderation Statistics");
+                embed.setColor(Color.BLUE);
+                embed.addField("Total Warnings Issued", String.valueOf(totalWarnings), true);
+                embed.addField("Total Kicks Performed", String.valueOf(totalKicks), true);
+                embed.addField("Total Bans Performed", String.valueOf(totalBans), true);
+                embed.addField("Total Timeouts Performed", String.valueOf(totalTimeouts), true);
+                embed.addField("Total Untimeouts Performed", String.valueOf(totalUntimeouts), true);
+                embed.addField("Total Tickets Created", String.valueOf(totalTicketsCreated), true);
+                embed.addField("Total Tickets Closed", String.valueOf(totalTicketsClosed), true);
+                embed.addField("Total Verifications Performed", String.valueOf(totalVerifications), true);
+
+                return embed;
+            } else {
+                embed.setDescription("Nothing.");
+                return embed;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting global statistics: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public boolean isSelectRoleEmbedExist (String guildId) {
+        String query = "SELECT * FROM role_select_embeds WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                System.out.println("Select Role Embed exists for guild " + guildId);
+                return true;
+            } else {
+                System.out.println("No Select Role Embed found for guild " + guildId);
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking Select Role Embed existence: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public void editSelectRoleEmbed (String title, String description, String footer, String color, String guildId) {
+        if (isSelectRoleEmbedExist(guildId)) {
+            String query = "UPDATE role_select_embeds SET title = ?, description = ?, footer = ?, color = ? WHERE guild_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, title);
+                pstmt.setString(2, description);
+                pstmt.setString(3, footer);
+                pstmt.setString(4, color);
+                pstmt.setString(5, guildId);
+                int rowsAffected = pstmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Select Role Embed updated for guild " + guildId);
+                } else {
+                    System.out.println("No Select Role Embed found to update for guild " + guildId);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error updating Select Role Embed: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            String query = "INSERT INTO role_select_embeds SET title = ?, description = ?, footer = ?, color = ?, guild_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+                pstmt.setString(1, title);
+                pstmt.setString(2, description);
+                pstmt.setString(3, footer);
+                pstmt.setString(4, color);
+                pstmt.setString(5, guildId);
+                int rowsAffected = pstmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Select Role Embed updated for guild " + guildId);
+                } else {
+                    System.out.println("No Select Role Embed found to update for guild " + guildId);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error updating Select Role Embed: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public String getSelectRoleEmbedTitle (String guildId) {
+        String query = "SELECT title FROM role_select_embeds WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String title = rs.getString("title");
+                System.out.println("Select Role Embed Title for guild " + guildId + ": " + title);
+                return title;
+            } else {
+                System.out.println("No Select Role Embed Title found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Select Role Embed Title: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getSelectRolesDescription (String guildId) {
+        String query = "SELECT description FROM role_select_embeds WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String description = rs.getString("description");
+                System.out.println("Select Role Embed Description for guild " + guildId + ": " + description);
+                return description;
+            } else {
+                System.out.println("No Select Role Embed Description found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Select Role Embed Description: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getSelectRolesFooter (String guildId) {
+        String query = "SELECT footer FROM role_select_embeds WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String footer = rs.getString("footer");
+                System.out.println("Select Role Embed Footer for guild " + guildId + ": " + footer);
+                return footer;
+            } else {
+                System.out.println("No Select Role Embed Footer found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Select Role Embed Footer: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public String getSelectRolesColor (String guildId) {
+        String query = "SELECT color FROM role_select_embeds WHERE guild_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String color = rs.getString("color");
+                System.out.println("Select Role Embed Color for guild " + guildId + ": " + color);
+                return color;
+            } else {
+                System.out.println("No Select Role Embed Color found for guild " + guildId);
+                return null;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting Select Role Embed Color: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

@@ -15,6 +15,7 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -44,10 +45,17 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             handler.insertOrUpdateGlobalStatistic("send-select-roles");
             handleSendSelectRole(event);
         }
+        if (event.getName().equals("edit-select-role-embed")) {
+            if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+            handler.insertOrUpdateGlobalStatistic("edit-select-role-embed");
+            handleEditSelectRoleEmbed(event);
+        }
     }
 
     @Override
     public void onMessageReactionAdd (net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent event) {
+        if (event.getUser() == null) {return;}
+        if (handler.getAllRoleSelectForGuild(event.getGuild().getId()).isEmpty()) {return;}
         if (event.getUser().isBot()) {
             return;
         }
@@ -56,6 +64,9 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         String roleId = handler.getRoleSelectRoleIDByEmoji(guildId, emoji);
         if (roleId != null) {
             Role role = event.getGuild().getRoleById(roleId);
+            if (event.getMember().getRoles().contains(role)) {
+                return;
+            }
             if (role != null) {
                 Objects.requireNonNull(event.getMember()).getGuild().addRoleToMember(event.getMember(), role).queue();
             }
@@ -64,6 +75,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     @Override
     public void onMessageReactionRemove (MessageReactionRemoveEvent event) {
+        if (event.getUser() == null) {return;}
+        if (handler.getAllRoleSelectForGuild(event.getGuild().getId()).isEmpty()) {return;}
         if (event.getUser().isBot()) {
             return;
         }
@@ -72,9 +85,11 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         String roleId = handler.getRoleSelectRoleIDByEmoji(guildId, emoji);
         if (roleId != null) {
             Role role = event.getGuild().getRoleById(roleId);
+            if (event.getMember().getRoles().contains(role)) {
+                return;
+            }
             if (role != null) {
-                Objects.requireNonNull(event.getMember()).getGuild().removeRoleFromMember(event.getMember(), role).queue();
-
+                event.getMember().getGuild().removeRoleFromMember(event.getMember(), role).queue();
             }
         }
     }
@@ -164,7 +179,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         event.replyEmbeds(embedBuilder.build()).setEphemeral(true)
                 .addActionRow(
                         net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_reaction", "Reaction Roles"),
-                        net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_dropdown", "Dropdown Menu"),
+                        //net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_dropdown", "Dropdown Menu"),
                         net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_buttons", "Buttons")
                 ).queue();
     }
@@ -173,13 +188,39 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         if (!channel.getType().isMessage()) {
             return;
         }
+        String title = "Select Your Roles";
+        String descriptionText = "React with the corresponding emoji to get the role:";
+        String color = "#3498db";
+        String footer = "Select Roles";
+        if (handler.isSelectRoleEmbedExist(guild.getId())) {
+            if (handler.getSelectRoleEmbedTitle(guild.getId()) != null) {
+                title = handler.getSelectRoleEmbedTitle(guild.getId());
+            }
+            if (handler.getSelectRolesDescription(guild.getId()) != null) {
+                descriptionText = handler.getSelectRolesDescription(guild.getId());
+            }
+            if (handler.getSelectRolesColor(guild.getId()) != null) {
+                color = handler.getSelectRolesColor(guild.getId());
+            }
+            if (handler.getSelectRolesFooter(guild.getId()) != null) {
+                footer = handler.getSelectRolesFooter(guild.getId());
+            }
+        }
         MessageChannel mChannel = guild.getTextChannelById(channel.getId());
         List<String> roleList = handler.getAllRoleSelectForGuild(Objects.requireNonNull(guild.getId()));
         List<String> emojiList = new ArrayList<>();
         EmbedBuilder embedBuilder = new EmbedBuilder();
-        embedBuilder.setTitle("Select Your Roles");
-        StringBuilder description = new StringBuilder("React with the corresponding emoji to get the role:\n");
+        embedBuilder.setTitle(title);
+        StringBuilder description = new StringBuilder(descriptionText);
+        // replace Color.getColor with robust parsing
+        try {
+            embedBuilder.setColor(parseColor(color));
+        } catch (Exception e) {
+            embedBuilder.setColor(Color.BLUE);
+        }
         embedBuilder.setDescription(description);
+        embedBuilder.setFooter(footer);
+        embedBuilder.setTimestamp(java.time.Instant.now());
         for (String roleInfo : roleList) {
             Role role = guild.getRoleById(roleInfo);
             if (role != null) {
@@ -268,5 +309,86 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             }
         }
         message.queue();
+    }
+
+    private void handleEditSelectRoleEmbed (SlashCommandInteractionEvent event) {
+        Guild guild = event.getGuild();
+        if (guild == null) {
+            event.reply("Fehler: Guild nicht gefunden.").setEphemeral(true).queue();
+            return;
+        }
+        String guildId = guild.getId();
+
+        // Bestehende Werte laden
+        String currentTitle = handler.getSelectRoleEmbedTitle(guildId);
+        String currentDescription = handler.getSelectRolesDescription(guildId);
+        String currentFooter = handler.getSelectRolesFooter(guildId);
+        String currentColor = handler.getSelectRolesColor(guildId);
+
+        // Neue Werte aus Optionen oder Fallback auf bestehend
+        String newTitle = event.getOption("title") != null ? Objects.requireNonNull(event.getOption("title")).getAsString() : currentTitle;
+        String newDescription = event.getOption("description") != null ? Objects.requireNonNull(event.getOption("description")).getAsString() : currentDescription;
+        String newFooter = event.getOption("footer") != null ? Objects.requireNonNull(event.getOption("footer")).getAsString() : currentFooter;
+        String newColor = event.getOption("color") != null ? Objects.requireNonNull(event.getOption("color")).getAsString() : currentColor;
+
+        // Defaults setzen falls weiterhin leer
+        if (newTitle == null || newTitle.isBlank()) newTitle = "Select Your Roles";
+        if (newDescription == null || newDescription.isBlank()) newDescription = "Wähle deine Rollen über Reaktionen, Dropdown oder Buttons aus.";
+        if (newFooter == null || newFooter.isBlank()) newFooter = "Role Selection";
+        if (newColor == null || newColor.isBlank()) newColor = "#3498db";
+
+        // Validierung Farbe
+        if (!isValidColor(newColor)) {
+            event.reply("Ungültige Farbe. Erlaubt: #RRGGBB oder red/blue/green/yellow/orange/pink/cyan/magenta/white/black/gray.").setEphemeral(true).queue();
+            return;
+        }
+
+        // Persistieren
+        handler.editSelectRoleEmbed(newTitle, newDescription, newFooter, newColor, guildId);
+
+        // Preview Embed
+        EmbedBuilder embed = new EmbedBuilder();
+        embed.setTitle(newTitle);
+        embed.setDescription(newDescription);
+        embed.setFooter(newFooter);
+        try {
+            embed.setColor(parseColor(newColor));
+        } catch (Exception ex) {
+            embed.setColor(Color.BLUE);
+        }
+        embed.setTimestamp(java.time.Instant.now());
+
+        event.replyEmbeds(embed.build())
+                .addContent("Select Role Embed aktualisiert. Verwende /send-select-roles zum Versand.")
+                .setEphemeral(true)
+                .queue();
+    }
+
+    // Farb-Hilfsmethoden
+    private boolean isValidColor(String c) {
+        if (c == null) return false;
+        c = c.trim();
+        if (c.matches("(?i)^(red|blue|green|yellow|orange|pink|cyan|magenta|white|black|gray|grey)$")) return true;
+        return c.matches("^#?[0-9A-Fa-f]{6}$");
+    }
+
+    private Color parseColor(String c) {
+        c = c.trim();
+        if (c.startsWith("#")) return Color.decode(c);
+        switch (c.toLowerCase()) {
+            case "red": return Color.RED;
+            case "blue": return Color.BLUE;
+            case "green": return Color.GREEN;
+            case "yellow": return Color.YELLOW;
+            case "orange": return Color.ORANGE;
+            case "pink": return Color.PINK;
+            case "cyan": return Color.CYAN;
+            case "magenta": return Color.MAGENTA;
+            case "white": return Color.WHITE;
+            case "black": return Color.BLACK;
+            case "gray":
+            case "grey": return Color.GRAY;
+            default: return Color.BLUE;
+        }
     }
 }
