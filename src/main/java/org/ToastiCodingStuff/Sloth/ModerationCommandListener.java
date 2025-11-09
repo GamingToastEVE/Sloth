@@ -27,30 +27,37 @@ public class ModerationCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "kick":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
                 handler.insertOrUpdateGlobalStatistic("kick");
                 handleKickCommand(event, guildId);
                 break;
             case "ban":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
                 handler.insertOrUpdateGlobalStatistic("ban");
                 handleBanCommand(event, guildId);
                 break;
             case "unban":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
                 handler.insertOrUpdateGlobalStatistic("unban");
                 handleUnbanCommand(event, guildId);
                 break;
             case "timeout":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
                 handler.insertOrUpdateGlobalStatistic("timeout");
                 handleTimeoutCommand(event, guildId);
                 break;
             case "untimeout":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
                 handler.insertOrUpdateGlobalStatistic("untimeout");
                 handleUntimeoutCommand(event, guildId);
                 break;
             case "purge":
+                if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {return;}
                 handler.insertOrUpdateGlobalStatistic("purge");
                 handlePurgeCommand(event, guildId);
                 break;
             case "slowmode":
+                if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {return;}
                 handler.insertOrUpdateGlobalStatistic("slowmode");
                 handleSlowmodeCommand(event, guildId);
                 break;

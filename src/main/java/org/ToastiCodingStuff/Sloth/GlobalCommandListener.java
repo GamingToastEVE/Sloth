@@ -15,6 +15,8 @@ public class GlobalCommandListener extends ListenerAdapter {
         if (!event.getName().equals("global-stats")) {return;}
 
         EmbedBuilder embed = handler.getGlobalStats();
+        EmbedBuilder embed2 = handler.getGlobalModStats();
         event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getChannel().sendMessageEmbeds(embed2.build()).queue();
     }
 }

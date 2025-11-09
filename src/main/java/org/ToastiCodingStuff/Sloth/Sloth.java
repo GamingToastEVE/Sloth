@@ -5,10 +5,11 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import java.util.List;
 
 public class Sloth {
     public static void main(String[] args) throws Exception {
@@ -19,6 +20,8 @@ public class Sloth {
         api.awaitReady();
 
         DatabaseHandler handler = new DatabaseHandler();
+
+        Guild guild = api.getGuildById("1169699077986988112");
 
         // Set bot status to "Playing /help"
         api.getPresence().setActivity(Activity.playing("/help"));
@@ -32,6 +35,8 @@ public class Sloth {
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
         api.addEventListener(new OnGuildLeaveListener(handler));
         api.addEventListener(new GlobalCommandListener(handler));
+        api.addEventListener(new FeedbackCommandListener(guild));
+        api.addEventListener(new SelectRolesCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -42,7 +47,9 @@ public class Sloth {
         handler.runMigrationCheck();
 
         // Sync all current guilds to database
-        handler.syncGuilds(api.getGuilds());
+        List<Guild> guilds = api.getGuilds();
+        handler.syncGuilds(guilds);
+        handler.updateGuildActivityStatus(guilds);
     }
 
     /**
@@ -78,6 +85,8 @@ public class Sloth {
         // Register each command globally
         //guild.updateCommands().addCommands(allCommands).queue();
         api.updateCommands().addCommands(allCommands).queue();
+        assert testServer != null;
+        //testServer.updateCommands().addCommands(allCommands).queue();
 
         System.out.println("Finished registering " + allCommands.size() + " global commands");
     }

@@ -1,5 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -16,13 +17,16 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("add-just-verify-button")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("add-just-verify-button");
             handleJustVerifyButtonCommand(event);
         }
         else if (event.getName().equals("remove-verify-button")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("remove-verify-button");
             handleJustVerifyButtonRemove(event);
         } else if (event.getName().equals("send-just-verify-button")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("send-just-verify-button");
             handleSendJustVerifyButtonCommand(event);
         }

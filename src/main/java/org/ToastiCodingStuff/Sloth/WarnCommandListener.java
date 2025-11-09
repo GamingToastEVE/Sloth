@@ -24,14 +24,17 @@ public class WarnCommandListener extends ListenerAdapter {
 
         switch (event.getName()) {
             case "warn":
+                if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {return;}
                 handler.insertOrUpdateGlobalStatistic("warn");
                 handleWarnCommand(event, guildId);
                 break;
             case "set-warn-settings":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("set-warn-settings");
                 handleSetWarnSettingsCommand(event, guildId);
                 break;
             case "get-warn-settings":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("get-warn-settings");
                 handleGetWarnSettingsCommand(event, guildId);
                 break;

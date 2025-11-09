@@ -1,5 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -15,6 +16,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction (SlashCommandInteractionEvent event) {
         if (event.getName().equals("set-log-channel")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("set-log-channel");
             Channel channel = event.getOption("logchannel").getAsChannel();
             String channelID = handler.setLogChannel(event.getGuild().getId(), channel.getId());
@@ -25,6 +27,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
             }
         }
         if (event.getName().equals("get-log-channel")) {
+            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
             handler.insertOrUpdateGlobalStatistic("get-log-channel");
             if (handler.hasLogChannel(event.getGuild().getId())) {
                 Channel channel = event.getGuild().getTextChannelById(handler.getLogChannelID(event.getGuild().getId()));

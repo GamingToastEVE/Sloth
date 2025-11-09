@@ -37,7 +37,8 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getStatisticsCommands());
         allCommands.addAll(getRuleCommands());
         allCommands.addAll(getJustVerifyButtonCommand());
-
+        allCommands.addAll(getFeedbackCommands());
+        allCommands.addAll(getSelectRolesCommands());
         return allCommands;
     }
 
@@ -72,6 +73,18 @@ public class AddGuildSlashCommands {
         return commands;
     }
 
+    private List<SlashCommandData> getSelectRolesCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("send-select-roles", "Sends a select roles message in the current channel"));
+        commands.add(Commands.slash("add-select-role", "Adds a role to the select roles message")
+                .addOption(OptionType.ROLE, "role", "Role to add to the select roles message", true)
+                .addOption(OptionType.STRING, "description", "Description for the role in the select menu", false)
+                .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false));
+        commands.add(Commands.slash("remove-select-role", "Removes a role from the select roles message")
+                .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true));
+        return commands;
+    }
+
     private List<SlashCommandData> getJustVerifyButtonCommand() {
         List<SlashCommandData> commands = new ArrayList<>();
         commands.add(Commands.slash("send-just-verify-button", "Sends a message with a button that gives a role"));
@@ -84,26 +97,10 @@ public class AddGuildSlashCommands {
         return commands;
     }
 
-    private List<SlashCommandData> getSelectRolesCommands () {
+    private List<SlashCommandData> getFeedbackCommands() {
         List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("create-select-roles", "Creates a select roles message in the current channel")
-                .addOption(OptionType.STRING, "type", "Type of select roles (reactions, dropdown or buttons)", true)
-                .addOption(OptionType.STRING, "title", "Title of the embed", false)
-                .addOption(OptionType.STRING, "description", "Description of the embed", false)
-                .addOption(OptionType.BOOLEAN, "ephemeral", "Whether the role selection is ephemeral", false));
-        commands.add(Commands.slash("add-select-role", "Adds a role option to the select roles message")
-                .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message", true)
-                .addOption(OptionType.ROLE, "role", "Role to add as an option", true)
-                .addOption(OptionType.STRING, "label", "Label for the role option", false)
-                .addOption(OptionType.STRING, "description", "Description for the role option", false)
-                .addOption(OptionType.STRING, "emoji", "Emoji for the role option", false));
-        commands.add(Commands.slash("remove-select-role", "Removes a role option from the select roles message")
-                .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message", true)
-                .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
-        commands.add(Commands.slash("delete-select-roles-message", "Deletes a select roles message and its configuration")
-                .addOption(OptionType.INTEGER, "message_id", "ID of the select roles message to delete", true));
-        commands.add(Commands.slash("remove-select-role", "Removes a role option from the select roles message")
-                .addOption(OptionType.ROLE, "role", "Role to remove from options", true));
+        commands.add(Commands.slash("feedback", "Send feedback to the bot developer")
+                .addOption(OptionType.STRING, "message", "Your feedback message", true));
         return commands;
     }
 

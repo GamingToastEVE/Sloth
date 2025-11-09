@@ -1,4 +1,4 @@
-Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot Sloth Bot ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
+Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot [Bot Name] ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
 
 1. Data Controller
 
@@ -84,5 +84,5 @@ We may update this Privacy Policy from time to time, for example if the Bot is e
 
 If you have questions about this Privacy Policy, you can reach us at:
 
-https://discord.gg/dQT53fD8M5
+https://discord.gg/8fce9j7fXA
 Or directly on discord: gamingtoasti
