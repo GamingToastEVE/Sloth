@@ -176,6 +176,9 @@ public class AddGuildSlashCommands {
                 .addOption(OptionType.ROLE, "support-role", "Role that can manage tickets", false));
                 //.addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
         commands.add(Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"));
+        commands.add(Commands.slash("set-ticket-config", "Set custom title and description for the ticket panel")
+                .addOption(OptionType.STRING, "title", "Title for the ticket panel embed", true)
+                .addOption(OptionType.STRING, "description", "Description for the ticket panel embed", true));
         commands.add(Commands.slash("close-ticket", "Close the current ticket")
                 .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false));
         commands.add(Commands.slash("assign-ticket", "Assign current ticket to a staff member")

@@ -44,6 +44,11 @@ public class TicketCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("ticket-panel");
                 handleTicketPanel(event, guildId);
                 break;
+            case "set-ticket-config":
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                handler.insertOrUpdateGlobalStatistic("set-ticket-config");
+                handleSetTicketConfig(event, guildId);
+                break;
             case "close-ticket":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("close-ticket");
@@ -129,6 +134,33 @@ public class TicketCommandListener extends ListenerAdapter {
         }
     }
 
+    private void handleSetTicketConfig(SlashCommandInteractionEvent event, String guildId) {
+        // Check if user has manage server permissions
+        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("❌ You need Manage Server permissions to configure ticket settings.").setEphemeral(true).queue();
+            return;
+        }
+
+        String title = Objects.requireNonNull(event.getOption("title")).getAsString();
+        String description = Objects.requireNonNull(event.getOption("description")).getAsString();
+
+        boolean success = handler.setTicketConfig(guildId, title, description);
+        
+        if (success) {
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle("✅ Ticket Configuration Updated")
+                    .setDescription("The ticket panel title and description have been successfully updated!")
+                    .addField("New Title", title, false)
+                    .addField("New Description", description, false)
+                    .setColor(Color.GREEN)
+                    .setFooter("Use /ticket-panel to create a new panel with these settings");
+            
+            event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+        } else {
+            event.reply("❌ Failed to update ticket configuration. Please try again.").setEphemeral(true).queue();
+        }
+    }
+
     private void handleTicketPanel(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has manage channels permission
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
@@ -141,13 +173,16 @@ public class TicketCommandListener extends ListenerAdapter {
             return;
         }
 
+        // Get customizable title and description from database
+        String title = handler.getTicketTitle(guildId);
+        String description = handler.getTicketDescription(guildId);
+
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🎫 Create a Ticket")
-                .setDescription("Need help or have a question? Click the button below to create a ticket!\n\n" +
-                        "Our support team will assist you as soon as possible.")
-                .addField("📋 What to include:", 
+                .setTitle(title)
+                .setDescription(description + "\n\n" +
+                        "**📋 What to include:**\n" +
                         "• A clear description of your issue\n" +
-                        "• Any relevant information or screenshots\n", false)
+                        "• Any relevant information or screenshots\n")
                 .setColor(Color.BLUE)
                 .setFooter("Ticket System • Click the button to get started");
 
