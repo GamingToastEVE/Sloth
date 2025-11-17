@@ -99,13 +99,16 @@ public class AddGuildSlashCommands {
                 .addOption(OptionType.STRING, "name", "Name of the embed", true)
                 .addOption(OptionType.STRING, "author-name", "Author name", true)
                 .addOption(OptionType.STRING, "author-url", "Author URL (optional)", false)
-                .addOption(OptionType.STRING, "author-icon-url", "Author icon URL (optional)", false));
+                .addOption(OptionType.STRING, "author-icon-url", "Author icon URL or file path (optional)", false)
+                .addOption(OptionType.ATTACHMENT, "author-icon-file", "Author icon file (optional)", false));
         commands.add(Commands.slash("set-embed-image", "Set the image for an embed")
                 .addOption(OptionType.STRING, "name", "Name of the embed", true)
-                .addOption(OptionType.STRING, "image-url", "Image URL", true));
+                .addOption(OptionType.STRING, "image-url", "Image URL or file path (optional if using file)", false)
+                .addOption(OptionType.ATTACHMENT, "image-file", "Image file to upload (optional if using URL)", false));
         commands.add(Commands.slash("set-embed-thumbnail", "Set the thumbnail for an embed")
                 .addOption(OptionType.STRING, "name", "Name of the embed", true)
-                .addOption(OptionType.STRING, "thumbnail-url", "Thumbnail URL", true));
+                .addOption(OptionType.STRING, "thumbnail-url", "Thumbnail URL or file path (optional if using file)", false)
+                .addOption(OptionType.ATTACHMENT, "thumbnail-file", "Thumbnail file to upload (optional if using URL)", false));
         commands.add(Commands.slash("set-embed-timestamp", "Toggle timestamp for an embed")
                 .addOption(OptionType.STRING, "name", "Name of the embed", true)
                 .addOption(OptionType.BOOLEAN, "enabled", "Enable or disable timestamp", true));

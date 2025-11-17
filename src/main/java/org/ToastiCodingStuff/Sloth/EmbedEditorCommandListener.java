@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -11,7 +12,12 @@ import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.text.TextInput;
 import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import net.dv8tion.jda.api.interactions.modals.Modal;
+import net.dv8tion.jda.api.utils.FileUpload;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -387,38 +393,8 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         }
     }
     
-    private void handleSetAuthor(SlashCommandInteractionEvent event, String guildId) {
-        String name = Objects.requireNonNull(event.getOption("name")).getAsString();
-        String authorName = Objects.requireNonNull(event.getOption("author-name")).getAsString();
-        String authorUrl = event.getOption("author-url") != null ? event.getOption("author-url").getAsString() : null;
-        String authorIconUrl = event.getOption("author-icon-url") != null ? event.getOption("author-icon-url").getAsString() : null;
-        
-        DatabaseHandler.EmbedData embedData = handler.getEmbed(guildId, name);
-        if (embedData == null) {
-            event.reply("❌ No embed found with the name `" + name + "`. Use `/create-embed` to create one.").setEphemeral(true).queue();
-            return;
-        }
-        
-        boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
-                                             embedData.footer, embedData.footerIconUrl, embedData.color,
-                                             authorName, authorUrl, authorIconUrl,
-                                             embedData.thumbnailUrl, embedData.imageUrl, 
-                                             embedData.fieldsJson, embedData.timestamp);
-        
-        if (success) {
-            DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
-            event.reply("✅ Successfully set author for embed `" + name + "`!\n\n**Preview:**")
-                 .addEmbeds(updatedEmbed.toEmbedBuilder().build())
-                 .setEphemeral(true)
-                 .queue();
-        } else {
-            event.reply("❌ Failed to update embed. Please try again.").setEphemeral(true).queue();
-        }
-    }
-    
     private void handleSetImage(SlashCommandInteractionEvent event, String guildId) {
         String name = Objects.requireNonNull(event.getOption("name")).getAsString();
-        String imageUrl = Objects.requireNonNull(event.getOption("image-url")).getAsString();
         
         DatabaseHandler.EmbedData embedData = handler.getEmbed(guildId, name);
         if (embedData == null) {
@@ -426,26 +402,34 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             return;
         }
         
-        boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
-                                             embedData.footer, embedData.footerIconUrl, embedData.color,
-                                             embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
-                                             embedData.thumbnailUrl, imageUrl, 
-                                             embedData.fieldsJson, embedData.timestamp);
+        // Check if attachment or URL/path is provided
+        Message.Attachment attachment = event.getOption("image-file") != null ? event.getOption("image-file").getAsAttachment() : null;
+        String imageInput = event.getOption("image-url") != null ? event.getOption("image-url").getAsString() : null;
         
-        if (success) {
-            DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
-            event.reply("✅ Successfully set image for embed `" + name + "`!\n\n**Preview:**")
-                 .addEmbeds(updatedEmbed.toEmbedBuilder().build())
-                 .setEphemeral(true)
-                 .queue();
+        if (attachment == null && imageInput == null) {
+            event.reply("❌ You must provide either an image file or an image URL/path!").setEphemeral(true).queue();
+            return;
+        }
+        
+        event.deferReply(true).queue();
+        
+        // Handle attachment upload
+        if (attachment != null) {
+            if (!attachment.isImage()) {
+                event.getHook().editOriginal("❌ The provided file is not an image!").queue();
+                return;
+            }
+            
+            // Upload the attachment to get a Discord CDN URL
+            uploadAttachmentAndUpdateEmbed(event, guildId, name, embedData, attachment, "image");
         } else {
-            event.reply("❌ Failed to update embed. Please try again.").setEphemeral(true).queue();
+            // Handle URL or local file path
+            processImageInput(event, guildId, name, embedData, imageInput, "image");
         }
     }
     
     private void handleSetThumbnail(SlashCommandInteractionEvent event, String guildId) {
         String name = Objects.requireNonNull(event.getOption("name")).getAsString();
-        String thumbnailUrl = Objects.requireNonNull(event.getOption("thumbnail-url")).getAsString();
         
         DatabaseHandler.EmbedData embedData = handler.getEmbed(guildId, name);
         if (embedData == null) {
@@ -453,21 +437,324 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             return;
         }
         
-        boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
-                                             embedData.footer, embedData.footerIconUrl, embedData.color,
-                                             embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
-                                             thumbnailUrl, embedData.imageUrl, 
-                                             embedData.fieldsJson, embedData.timestamp);
+        // Check if attachment or URL/path is provided
+        Message.Attachment attachment = event.getOption("thumbnail-file") != null ? event.getOption("thumbnail-file").getAsAttachment() : null;
+        String thumbnailInput = event.getOption("thumbnail-url") != null ? event.getOption("thumbnail-url").getAsString() : null;
+        
+        if (attachment == null && thumbnailInput == null) {
+            event.reply("❌ You must provide either a thumbnail file or a thumbnail URL/path!").setEphemeral(true).queue();
+            return;
+        }
+        
+        event.deferReply(true).queue();
+        
+        // Handle attachment upload
+        if (attachment != null) {
+            if (!attachment.isImage()) {
+                event.getHook().editOriginal("❌ The provided file is not an image!").queue();
+                return;
+            }
+            
+            // Upload the attachment to get a Discord CDN URL
+            uploadAttachmentAndUpdateEmbed(event, guildId, name, embedData, attachment, "thumbnail");
+        } else {
+            // Handle URL or local file path
+            processImageInput(event, guildId, name, embedData, thumbnailInput, "thumbnail");
+        }
+    }
+    
+    private void handleSetAuthor(SlashCommandInteractionEvent event, String guildId) {
+        String name = Objects.requireNonNull(event.getOption("name")).getAsString();
+        String authorName = Objects.requireNonNull(event.getOption("author-name")).getAsString();
+        String authorUrl = event.getOption("author-url") != null ? event.getOption("author-url").getAsString() : null;
+        
+        DatabaseHandler.EmbedData embedData = handler.getEmbed(guildId, name);
+        if (embedData == null) {
+            event.reply("❌ No embed found with the name `" + name + "`. Use `/create-embed` to create one.").setEphemeral(true).queue();
+            return;
+        }
+        
+        // Check if attachment or URL/path is provided for icon
+        Message.Attachment attachment = event.getOption("author-icon-file") != null ? event.getOption("author-icon-file").getAsAttachment() : null;
+        String authorIconInput = event.getOption("author-icon-url") != null ? event.getOption("author-icon-url").getAsString() : null;
+        
+        event.deferReply(true).queue();
+        
+        // Handle attachment upload for author icon
+        if (attachment != null) {
+            if (!attachment.isImage()) {
+                event.getHook().editOriginal("❌ The provided file is not an image!").queue();
+                return;
+            }
+            
+            // Upload the attachment to get a Discord CDN URL, then update with author info
+            uploadAttachmentForAuthor(event, guildId, name, embedData, attachment, authorName, authorUrl);
+        } else if (authorIconInput != null) {
+            // Handle URL or local file path for author icon
+            processAuthorIconInput(event, guildId, name, embedData, authorIconInput, authorName, authorUrl);
+        } else {
+            // No icon, just update author name and URL
+            boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                 embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                 authorName, authorUrl, null,
+                                                 embedData.thumbnailUrl, embedData.imageUrl, 
+                                                 embedData.fieldsJson, embedData.timestamp);
+            
+            if (success) {
+                DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                event.getHook().editOriginal("✅ Successfully set author for embed `" + name + "`!")
+                     .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                     .queue();
+            } else {
+                event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+            }
+        }
+    }
+    
+    /**
+     * Upload an attachment and update the embed with the resulting Discord CDN URL
+     */
+    private void uploadAttachmentAndUpdateEmbed(SlashCommandInteractionEvent event, String guildId, 
+                                                String name, DatabaseHandler.EmbedData embedData, 
+                                                Message.Attachment attachment, String type) {
+        // Create a temporary message with the attachment to get a Discord CDN URL
+        event.getChannel().sendFiles(FileUpload.fromData(attachment.getProxy().download().join(), attachment.getFileName()))
+             .queue(message -> {
+                 String cdnUrl = message.getAttachments().get(0).getUrl();
+                 
+                 // Delete the temporary message
+                 message.delete().queue();
+                 
+                 // Update the embed based on type
+                 boolean success = false;
+                 if ("image".equals(type)) {
+                     success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                   embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                   embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                                   embedData.thumbnailUrl, cdnUrl, 
+                                                   embedData.fieldsJson, embedData.timestamp);
+                 } else if ("thumbnail".equals(type)) {
+                     success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                   embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                   embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                                   cdnUrl, embedData.imageUrl, 
+                                                   embedData.fieldsJson, embedData.timestamp);
+                 }
+                 
+                 if (success) {
+                     DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                     event.getHook().editOriginal("✅ Successfully set " + type + " for embed `" + name + "`!")
+                          .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                          .queue();
+                 } else {
+                     event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+                 }
+             }, error -> {
+                 event.getHook().editOriginal("❌ Failed to upload image: " + error.getMessage()).queue();
+             });
+    }
+    
+    /**
+     * Upload an attachment for author icon and update the embed
+     */
+    private void uploadAttachmentForAuthor(SlashCommandInteractionEvent event, String guildId, 
+                                          String name, DatabaseHandler.EmbedData embedData, 
+                                          Message.Attachment attachment, String authorName, String authorUrl) {
+        event.getChannel().sendFiles(FileUpload.fromData(attachment.getProxy().download().join(), attachment.getFileName()))
+             .queue(message -> {
+                 String cdnUrl = message.getAttachments().get(0).getUrl();
+                 message.delete().queue();
+                 
+                 boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                      embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                      authorName, authorUrl, cdnUrl,
+                                                      embedData.thumbnailUrl, embedData.imageUrl, 
+                                                      embedData.fieldsJson, embedData.timestamp);
+                 
+                 if (success) {
+                     DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                     event.getHook().editOriginal("✅ Successfully set author for embed `" + name + "`!")
+                          .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                          .queue();
+                 } else {
+                     event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+                 }
+             }, error -> {
+                 event.getHook().editOriginal("❌ Failed to upload author icon: " + error.getMessage()).queue();
+             });
+    }
+    
+    /**
+     * Process image input (URL or local file path) and update embed
+     */
+    private void processImageInput(SlashCommandInteractionEvent event, String guildId, 
+                                   String name, DatabaseHandler.EmbedData embedData, 
+                                   String input, String type) {
+        // Check if it's a URL or a local file path
+        if (input.startsWith("http://") || input.startsWith("https://")) {
+            // It's a URL, use it directly
+            updateEmbedWithUrl(event, guildId, name, embedData, input, type);
+        } else {
+            // It's a local file path
+            uploadLocalFileAndUpdateEmbed(event, guildId, name, embedData, input, type);
+        }
+    }
+    
+    /**
+     * Process author icon input (URL or local file path)
+     */
+    private void processAuthorIconInput(SlashCommandInteractionEvent event, String guildId, 
+                                       String name, DatabaseHandler.EmbedData embedData, 
+                                       String input, String authorName, String authorUrl) {
+        if (input.startsWith("http://") || input.startsWith("https://")) {
+            // It's a URL, use it directly
+            boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                 embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                 authorName, authorUrl, input,
+                                                 embedData.thumbnailUrl, embedData.imageUrl, 
+                                                 embedData.fieldsJson, embedData.timestamp);
+            
+            if (success) {
+                DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                event.getHook().editOriginal("✅ Successfully set author for embed `" + name + "`!")
+                     .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                     .queue();
+            } else {
+                event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+            }
+        } else {
+            // It's a local file path
+            uploadLocalFileForAuthor(event, guildId, name, embedData, input, authorName, authorUrl);
+        }
+    }
+    
+    /**
+     * Update embed with a URL directly
+     */
+    private void updateEmbedWithUrl(SlashCommandInteractionEvent event, String guildId, 
+                                   String name, DatabaseHandler.EmbedData embedData, 
+                                   String url, String type) {
+        boolean success = false;
+        if ("image".equals(type)) {
+            success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                         embedData.footer, embedData.footerIconUrl, embedData.color,
+                                         embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                         embedData.thumbnailUrl, url, 
+                                         embedData.fieldsJson, embedData.timestamp);
+        } else if ("thumbnail".equals(type)) {
+            success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                         embedData.footer, embedData.footerIconUrl, embedData.color,
+                                         embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                         url, embedData.imageUrl, 
+                                         embedData.fieldsJson, embedData.timestamp);
+        }
         
         if (success) {
             DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
-            event.reply("✅ Successfully set thumbnail for embed `" + name + "`!\n\n**Preview:**")
-                 .addEmbeds(updatedEmbed.toEmbedBuilder().build())
-                 .setEphemeral(true)
+            event.getHook().editOriginal("✅ Successfully set " + type + " for embed `" + name + "`!")
+                 .setEmbeds(updatedEmbed.toEmbedBuilder().build())
                  .queue();
         } else {
-            event.reply("❌ Failed to update embed. Please try again.").setEphemeral(true).queue();
+            event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
         }
+    }
+    
+    /**
+     * Upload a local file and update the embed
+     */
+    private void uploadLocalFileAndUpdateEmbed(SlashCommandInteractionEvent event, String guildId, 
+                                              String name, DatabaseHandler.EmbedData embedData, 
+                                              String filePath, String type) {
+        File file = new File(filePath);
+        
+        if (!file.exists() || !file.isFile()) {
+            event.getHook().editOriginal("❌ File not found: `" + filePath + "`\n" +
+                                        "Please provide a valid file path or use an attachment instead.").queue();
+            return;
+        }
+        
+        if (!file.canRead()) {
+            event.getHook().editOriginal("❌ Cannot read file: `" + filePath + "`\n" +
+                                        "Please check file permissions.").queue();
+            return;
+        }
+        
+        // Upload the file to Discord to get a CDN URL
+        event.getChannel().sendFiles(FileUpload.fromData(file))
+             .queue(message -> {
+                 String cdnUrl = message.getAttachments().get(0).getUrl();
+                 message.delete().queue();
+                 
+                 boolean success = false;
+                 if ("image".equals(type)) {
+                     success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                   embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                   embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                                   embedData.thumbnailUrl, cdnUrl, 
+                                                   embedData.fieldsJson, embedData.timestamp);
+                 } else if ("thumbnail".equals(type)) {
+                     success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                   embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                   embedData.authorName, embedData.authorUrl, embedData.authorIconUrl,
+                                                   cdnUrl, embedData.imageUrl, 
+                                                   embedData.fieldsJson, embedData.timestamp);
+                 }
+                 
+                 if (success) {
+                     DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                     event.getHook().editOriginal("✅ Successfully uploaded and set " + type + " from `" + filePath + "` for embed `" + name + "`!")
+                          .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                          .queue();
+                 } else {
+                     event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+                 }
+             }, error -> {
+                 event.getHook().editOriginal("❌ Failed to upload file: " + error.getMessage()).queue();
+             });
+    }
+    
+    /**
+     * Upload a local file for author icon
+     */
+    private void uploadLocalFileForAuthor(SlashCommandInteractionEvent event, String guildId, 
+                                         String name, DatabaseHandler.EmbedData embedData, 
+                                         String filePath, String authorName, String authorUrl) {
+        File file = new File(filePath);
+        
+        if (!file.exists() || !file.isFile()) {
+            event.getHook().editOriginal("❌ File not found: `" + filePath + "`\n" +
+                                        "Please provide a valid file path or use an attachment instead.").queue();
+            return;
+        }
+        
+        if (!file.canRead()) {
+            event.getHook().editOriginal("❌ Cannot read file: `" + filePath + "`\n" +
+                                        "Please check file permissions.").queue();
+            return;
+        }
+        
+        event.getChannel().sendFiles(FileUpload.fromData(file))
+             .queue(message -> {
+                 String cdnUrl = message.getAttachments().get(0).getUrl();
+                 message.delete().queue();
+                 
+                 boolean success = handler.updateEmbed(guildId, name, embedData.title, embedData.description, 
+                                                      embedData.footer, embedData.footerIconUrl, embedData.color,
+                                                      authorName, authorUrl, cdnUrl,
+                                                      embedData.thumbnailUrl, embedData.imageUrl, 
+                                                      embedData.fieldsJson, embedData.timestamp);
+                 
+                 if (success) {
+                     DatabaseHandler.EmbedData updatedEmbed = handler.getEmbed(guildId, name);
+                     event.getHook().editOriginal("✅ Successfully uploaded and set author icon from `" + filePath + "` for embed `" + name + "`!")
+                          .setEmbeds(updatedEmbed.toEmbedBuilder().build())
+                          .queue();
+                 } else {
+                     event.getHook().editOriginal("❌ Failed to update embed. Please try again.").queue();
+                 }
+             }, error -> {
+                 event.getHook().editOriginal("❌ Failed to upload file: " + error.getMessage()).queue();
+             });
     }
     
     private void handleSetTimestamp(SlashCommandInteractionEvent event, String guildId) {

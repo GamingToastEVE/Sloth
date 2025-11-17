@@ -39,13 +39,39 @@ The Embed Editor system allows you to create, customize, preview, and send rich 
 ```
 
 ### Adding an Image
+You can use either a URL, a local file path, or upload a file directly:
+
+**Using a URL:**
 ```
 /set-embed-image name:welcome-message image-url:https://example.com/banner.png
 ```
 
+**Using a local file path:**
+```
+/set-embed-image name:welcome-message image-url:/path/to/image.png
+```
+
+**Using file upload (recommended):**
+```
+/set-embed-image name:welcome-message image-file:[upload file]
+```
+
 ### Adding a Thumbnail
+Same options as images:
+
+**URL:**
 ```
 /set-embed-thumbnail name:welcome-message thumbnail-url:https://example.com/logo.png
+```
+
+**Local file path:**
+```
+/set-embed-thumbnail name:welcome-message thumbnail-url:/home/user/logo.png
+```
+
+**File upload:**
+```
+/set-embed-thumbnail name:welcome-message thumbnail-file:[upload file]
 ```
 
 ### Adding a Timestamp
@@ -86,18 +112,68 @@ You can use named colors or hex codes:
 - `#0000FF` (blue)
 - Any valid hex color code
 
-## Image URLs
+## Image URLs and File Paths
 
-For images, thumbnails, and author icons, you need direct URLs to image files. These should end with `.png`, `.jpg`, `.jpeg`, or `.gif`.
+You have three options for adding images to your embeds:
+
+### 1. Direct URL
+For images already hosted online:
+```
+/set-embed-image name:announcement image-url:https://cdn.example.com/image.png
+```
 
 **Good Examples:**
 - `https://example.com/image.png`
 - `https://cdn.discordapp.com/attachments/123/456/image.jpg`
 
+### 2. Local File Path
+For images stored on your computer or server:
+```
+/set-embed-image name:announcement image-url:/home/user/Pictures/banner.png
+```
+
+**Important Notes:**
+- Use absolute file paths (full path from root)
+- The bot must have read access to the file
+- The file will be uploaded to Discord's CDN and the URL will be stored
+- Supported formats: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`
+
+**Good Examples:**
+- Linux/Mac: `/home/user/images/logo.png`
+- Windows: `C:\Users\Username\Pictures\banner.jpg`
+
+### 3. File Upload (Recommended)
+Upload a file directly through Discord:
+```
+/set-embed-image name:announcement image-file:[click to upload]
+```
+
+**Advantages:**
+- Most convenient method
+- No need to worry about file paths
+- Works from any device
+- File is immediately uploaded to Discord's CDN
+
+### Which Method to Use?
+
+- **File Upload**: Best for most users, especially on desktop
+- **URL**: Best when image is already hosted online
+- **File Path**: Best for automated scripts or when running bot on a server with local images
+
+## Image URLs
+
+For images, thumbnails, and author icons, you can use:
+- Direct URLs ending with image extensions
+- Discord CDN URLs
+- Local file paths (absolute paths)
+- File attachments uploaded through Discord
+
 **Tips:**
-- Use Discord's CDN for reliable hosting
-- Upload images to Discord, right-click, and "Copy Link"
+- File uploads are automatically converted to Discord CDN URLs
+- Local file paths are uploaded and converted to URLs
 - Ensure URLs are publicly accessible
+- For local files, the bot needs read permission
+- Maximum file size: 8MB (Discord limit)
 
 ## Best Practices
 
@@ -170,8 +246,20 @@ To use the Embed Editor system, you need the **Manage Server** permission in you
 **Problem: "Failed to create embed"**
 - Solution: Check that your description is not empty and all URLs are valid
 
-**Problem: Image not showing**
-- Solution: Ensure the URL is a direct link to an image file and is publicly accessible
+**Problem: "Failed to upload file" or "File not found"**
+- Solution: 
+  - For local file paths: Use absolute paths (full path from root)
+  - Ensure the file exists at the specified location
+  - Check that the bot has read permissions for the file
+  - Verify the file is a valid image format
+  - Try using file upload instead of file path
+
+**Problem: Image shows as broken/not loading**
+- Solution: 
+  - If using a local file path, it's uploaded to Discord CDN automatically
+  - Wait a moment for Discord to process the upload
+  - Ensure the file is under 8MB (Discord's limit)
+  - Try using a URL instead
 
 **Problem: Can't send embed to channel**
 - Solution: Make sure the bot has permission to send messages in that channel
