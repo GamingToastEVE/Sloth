@@ -38,6 +38,13 @@ Sloth offers several modular systems that can be independently activated per ser
 - Customizable rule formatting and styling
 - Easy rule distribution across your server
 
+### 🎨 Embed Editor System
+- Create custom embeds with interactive modals
+- Live preview before sending
+- Support for images, thumbnails, and author information
+- Save and reuse embeds across your server
+- Advanced color and formatting options
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -118,6 +125,18 @@ Navigate between help sections using the interactive buttons.
 - `/add-rules-embed` - Add a formatted rules embed to a channel
 - Supports custom formatting and styling options
 
+#### Embed Editor System
+- `/create-embed` - Create a new custom embed with an interactive modal
+- `/edit-embed` - Edit an existing saved embed
+- `/set-embed-author` - Set the author information (name, icon, URL)
+- `/set-embed-image` - Set the main image for an embed
+- `/set-embed-thumbnail` - Set the thumbnail for an embed
+- `/set-embed-timestamp` - Toggle timestamp on or off
+- `/preview-embed` - Preview an embed before sending
+- `/send-embed` - Send a saved embed to a channel
+- `/list-embeds` - List all saved embeds for your server
+- `/delete-embed` - Delete a saved embed
+
 ## Database
 
 Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
@@ -126,6 +145,7 @@ Sloth uses MariaDB for data storage and automatically creates and manages the da
 - Ticket information and transcripts
 - System activation status
 - Activity statistics
+- Custom embeds (via Embed Editor system)
 
 For detailed database setup instructions, see [DATABASE_SETUP.md](DATABASE_SETUP.md).
 
@@ -139,6 +159,16 @@ Sloth/
 │   ├── Sloth.java                              # Main bot class
 │   ├── DatabaseHandler.java                    # Database operations
 │   ├── DatabaseMigrationManager.java           # Database schema migrations
+│   ├── AddGuildSlashCommands.java              # Command registration
+│   ├── HelpCommandListener.java                # Help system
+│   ├── TicketCommandListener.java              # Ticket system
+│   ├── WarnCommandListener.java                # Warning system
+│   ├── ModerationCommandListener.java          # Moderation system
+│   ├── LogChannelSlashCommandListener.java     # Logging system
+│   ├── StatisticsCommandListener.java          # Statistics tracking
+│   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
+│   ├── EmbedEditorCommandListener.java         # Embed editor system
+│   └── GuildEventListener.java                 # Guild event handling
 │   ├── AddGuildSlashCommands.java              # Command registration
 │   ├── HelpCommandListener.java                # Help system
 │   ├── TicketCommandListener.java              # Ticket system
