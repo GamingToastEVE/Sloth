@@ -39,6 +39,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getJustVerifyButtonCommand());
         allCommands.addAll(getFeedbackCommands());
         allCommands.addAll(getSelectRolesCommands());
+        allCommands.addAll(getEmbedEditorCommands());
         return allCommands;
     }
 
@@ -82,6 +83,40 @@ public class AddGuildSlashCommands {
                 .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false));
         commands.add(Commands.slash("remove-select-role", "Removes a role from the select roles message")
                 .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true));
+        return commands;
+    }
+
+    /**
+     * Get embed editor commands
+     */
+    private List<SlashCommandData> getEmbedEditorCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+        commands.add(Commands.slash("create-embed", "Create a new custom embed")
+                .addOption(OptionType.STRING, "name", "Unique name for the embed", true));
+        commands.add(Commands.slash("edit-embed", "Edit an existing embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed to edit", true));
+        commands.add(Commands.slash("set-embed-author", "Set the author for an embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed", true)
+                .addOption(OptionType.STRING, "author-name", "Author name", true)
+                .addOption(OptionType.STRING, "author-url", "Author URL (optional)", false)
+                .addOption(OptionType.STRING, "author-icon-url", "Author icon URL (optional)", false));
+        commands.add(Commands.slash("set-embed-image", "Set the image for an embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed", true)
+                .addOption(OptionType.STRING, "image-url", "Image URL", true));
+        commands.add(Commands.slash("set-embed-thumbnail", "Set the thumbnail for an embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed", true)
+                .addOption(OptionType.STRING, "thumbnail-url", "Thumbnail URL", true));
+        commands.add(Commands.slash("set-embed-timestamp", "Toggle timestamp for an embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed", true)
+                .addOption(OptionType.BOOLEAN, "enabled", "Enable or disable timestamp", true));
+        commands.add(Commands.slash("preview-embed", "Preview an embed before sending")
+                .addOption(OptionType.STRING, "name", "Name of the embed to preview", true));
+        commands.add(Commands.slash("send-embed", "Send a saved embed to a channel")
+                .addOption(OptionType.STRING, "name", "Name of the embed to send", true)
+                .addOption(OptionType.CHANNEL, "channel", "Channel to send the embed to (defaults to current)", false));
+        commands.add(Commands.slash("list-embeds", "List all saved embeds"));
+        commands.add(Commands.slash("delete-embed", "Delete a saved embed")
+                .addOption(OptionType.STRING, "name", "Name of the embed to delete", true));
         return commands;
     }
 

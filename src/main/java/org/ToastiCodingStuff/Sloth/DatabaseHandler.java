@@ -151,6 +151,159 @@ public class DatabaseHandler {
         }
     }
 
+    /**
+     * Data class to hold complete embed information for the generic embed editor
+     */
+    public static class EmbedData {
+        public final int id;
+        public final String name;
+        public final String title;
+        public final String description;
+        public final String footer;
+        public final String footerIconUrl;
+        public final String color;
+        public final String authorName;
+        public final String authorUrl;
+        public final String authorIconUrl;
+        public final String thumbnailUrl;
+        public final String imageUrl;
+        public final String fieldsJson; // JSON string for fields
+        public final boolean timestamp;
+        
+        public EmbedData(int id, String name, String title, String description, String footer, 
+                        String footerIconUrl, String color, String authorName, String authorUrl, 
+                        String authorIconUrl, String thumbnailUrl, String imageUrl, 
+                        String fieldsJson, boolean timestamp) {
+            this.id = id;
+            this.name = name;
+            this.title = title;
+            this.description = description;
+            this.footer = footer;
+            this.footerIconUrl = footerIconUrl;
+            this.color = color;
+            this.authorName = authorName;
+            this.authorUrl = authorUrl;
+            this.authorIconUrl = authorIconUrl;
+            this.thumbnailUrl = thumbnailUrl;
+            this.imageUrl = imageUrl;
+            this.fieldsJson = fieldsJson;
+            this.timestamp = timestamp;
+        }
+        
+        public EmbedBuilder toEmbedBuilder() {
+            EmbedBuilder embed = new EmbedBuilder();
+            
+            // Set title
+            if (title != null && !title.isEmpty()) {
+                embed.setTitle(title);
+            }
+            
+            // Set description
+            if (description != null && !description.isEmpty()) {
+                embed.setDescription(processLinebreaks(description));
+            }
+            
+            // Set footer
+            if (footer != null && !footer.isEmpty()) {
+                if (footerIconUrl != null && !footerIconUrl.isEmpty()) {
+                    embed.setFooter(processLinebreaks(footer), footerIconUrl);
+                } else {
+                    embed.setFooter(processLinebreaks(footer));
+                }
+            }
+            
+            // Set author
+            if (authorName != null && !authorName.isEmpty()) {
+                embed.setAuthor(authorName, authorUrl, authorIconUrl);
+            }
+            
+            // Set thumbnail
+            if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
+                embed.setThumbnail(thumbnailUrl);
+            }
+            
+            // Set image
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                embed.setImage(imageUrl);
+            }
+            
+            // Set timestamp
+            if (timestamp) {
+                embed.setTimestamp(java.time.Instant.now());
+            }
+            
+            // Set color
+            if (color != null && !color.isEmpty()) {
+                try {
+                    if (color.startsWith("#")) {
+                        Color parsedColor = Color.decode(color);
+                        embed.setColor(parsedColor);
+                    } else {
+                        switch (color.toLowerCase()) {
+                            case "red": embed.setColor(Color.RED); break;
+                            case "blue": embed.setColor(Color.BLUE); break;
+                            case "green": embed.setColor(Color.GREEN); break;
+                            case "yellow": embed.setColor(Color.YELLOW); break;
+                            case "orange": embed.setColor(Color.ORANGE); break;
+                            case "pink": embed.setColor(Color.PINK); break;
+                            case "cyan": embed.setColor(Color.CYAN); break;
+                            case "magenta": embed.setColor(Color.MAGENTA); break;
+                            case "white": embed.setColor(Color.WHITE); break;
+                            case "black": embed.setColor(Color.BLACK); break;
+                            case "gray": case "grey": embed.setColor(Color.GRAY); break;
+                            default: embed.setColor(Color.BLUE); break;
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    embed.setColor(Color.BLUE);
+                }
+            } else {
+                embed.setColor(Color.BLUE);
+            }
+            
+            // Parse and add fields from JSON
+            if (fieldsJson != null && !fieldsJson.isEmpty() && !fieldsJson.equals("[]")) {
+                try {
+                    // Simple JSON parsing for fields (format: [{"name":"...", "value":"...", "inline":true/false}, ...])
+                    String[] fieldArray = fieldsJson.substring(1, fieldsJson.length() - 1).split("\\},\\{");
+                    for (String fieldStr : fieldArray) {
+                        fieldStr = fieldStr.replace("{", "").replace("}", "");
+                        String[] parts = fieldStr.split("\",\"");
+                        
+                        String fieldName = null;
+                        String fieldValue = null;
+                        boolean inline = false;
+                        
+                        for (String part : parts) {
+                            if (part.contains("\"name\":\"")) {
+                                fieldName = part.split("\"name\":\"")[1].replace("\"", "");
+                            } else if (part.contains("\"value\":\"")) {
+                                fieldValue = part.split("\"value\":\"")[1].replace("\"", "");
+                            } else if (part.contains("\"inline\":")) {
+                                inline = part.contains("true");
+                            }
+                        }
+                        
+                        if (fieldName != null && fieldValue != null) {
+                            embed.addField(fieldName, processLinebreaks(fieldValue), inline);
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error parsing embed fields JSON: " + e.getMessage());
+                }
+            }
+            
+            return embed;
+        }
+        
+        private String processLinebreaks(String text) {
+            if (text == null) return null;
+            return text.replace("\\n", "\n")
+                      .replace("\\r\\n", "\n")
+                      .replace("\\r", "\n");
+        }
+    }
+
     private final Connection connection;
     private final DatabaseMigrationManager migrationManager;
     
@@ -264,6 +417,7 @@ public class DatabaseHandler {
             createJustVerifyButtonTable();
             createSelectRolesTable();
             createSelectRolesEmbedsTable();
+            createEmbedsTable();
             
             // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
@@ -333,6 +487,35 @@ public class DatabaseHandler {
         Statement stmt = connection.createStatement();
         stmt.execute(createTable);
     }
+
+    /**
+     * Create embeds table for generic embed editor system
+     */
+    private void createEmbedsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS embeds (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "guild_id VARCHAR(32) NOT NULL, " +
+            "name VARCHAR(100) NOT NULL, " +
+            "title VARCHAR(256), " +
+            "description TEXT, " +
+            "footer TEXT, " +
+            "footer_icon_url VARCHAR(512), " +
+            "color VARCHAR(32) DEFAULT 'blue', " +
+            "author_name VARCHAR(256), " +
+            "author_url VARCHAR(512), " +
+            "author_icon_url VARCHAR(512), " +
+            "thumbnail_url VARCHAR(512), " +
+            "image_url VARCHAR(512), " +
+            "fields_json TEXT, " +
+            "timestamp TINYINT(1) DEFAULT 0, " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+            "UNIQUE KEY unique_guild_name (guild_id, name))";
+        Statement stmt = connection.createStatement();
+        stmt.execute(createTable);
+        System.out.println("Created embeds table for generic embed editor");
+    }
+
 
     /**
      * Create guilds table - main table for Discord servers/guilds
@@ -3432,5 +3615,191 @@ public class DatabaseHandler {
             e.printStackTrace();
             return null;
         }
+    }
+
+    // ==================== EMBED EDITOR METHODS ====================
+
+    /**
+     * Create a new embed in the database
+     */
+    public boolean createEmbed(String guildId, String name, String title, String description, 
+                              String footer, String footerIconUrl, String color, String authorName, 
+                              String authorUrl, String authorIconUrl, String thumbnailUrl, 
+                              String imageUrl, String fieldsJson, boolean timestamp) {
+        String query = "INSERT INTO embeds (guild_id, name, title, description, footer, " +
+                      "footer_icon_url, color, author_name, author_url, author_icon_url, " +
+                      "thumbnail_url, image_url, fields_json, timestamp) " +
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, name);
+            pstmt.setString(3, title);
+            pstmt.setString(4, description);
+            pstmt.setString(5, footer);
+            pstmt.setString(6, footerIconUrl);
+            pstmt.setString(7, color);
+            pstmt.setString(8, authorName);
+            pstmt.setString(9, authorUrl);
+            pstmt.setString(10, authorIconUrl);
+            pstmt.setString(11, thumbnailUrl);
+            pstmt.setString(12, imageUrl);
+            pstmt.setString(13, fieldsJson);
+            pstmt.setBoolean(14, timestamp);
+            pstmt.executeUpdate();
+            System.out.println("Created embed '" + name + "' for guild " + guildId);
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error creating embed: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update an existing embed
+     */
+    public boolean updateEmbed(String guildId, String name, String title, String description, 
+                              String footer, String footerIconUrl, String color, String authorName, 
+                              String authorUrl, String authorIconUrl, String thumbnailUrl, 
+                              String imageUrl, String fieldsJson, boolean timestamp) {
+        String query = "UPDATE embeds SET title = ?, description = ?, footer = ?, " +
+                      "footer_icon_url = ?, color = ?, author_name = ?, author_url = ?, " +
+                      "author_icon_url = ?, thumbnail_url = ?, image_url = ?, fields_json = ?, " +
+                      "timestamp = ? WHERE guild_id = ? AND name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, title);
+            pstmt.setString(2, description);
+            pstmt.setString(3, footer);
+            pstmt.setString(4, footerIconUrl);
+            pstmt.setString(5, color);
+            pstmt.setString(6, authorName);
+            pstmt.setString(7, authorUrl);
+            pstmt.setString(8, authorIconUrl);
+            pstmt.setString(9, thumbnailUrl);
+            pstmt.setString(10, imageUrl);
+            pstmt.setString(11, fieldsJson);
+            pstmt.setBoolean(12, timestamp);
+            pstmt.setString(13, guildId);
+            pstmt.setString(14, name);
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Updated embed '" + name + "' for guild " + guildId);
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.err.println("Error updating embed: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get an embed by name
+     */
+    public EmbedData getEmbed(String guildId, String name) {
+        String query = "SELECT * FROM embeds WHERE guild_id = ? AND name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, name);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new EmbedData(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("footer_icon_url"),
+                    rs.getString("color"),
+                    rs.getString("author_name"),
+                    rs.getString("author_url"),
+                    rs.getString("author_icon_url"),
+                    rs.getString("thumbnail_url"),
+                    rs.getString("image_url"),
+                    rs.getString("fields_json"),
+                    rs.getBoolean("timestamp")
+                );
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting embed: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get all embeds for a guild
+     */
+    public List<EmbedData> getAllEmbeds(String guildId) {
+        List<EmbedData> embeds = new ArrayList<>();
+        String query = "SELECT * FROM embeds WHERE guild_id = ? ORDER BY name";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                embeds.add(new EmbedData(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("footer_icon_url"),
+                    rs.getString("color"),
+                    rs.getString("author_name"),
+                    rs.getString("author_url"),
+                    rs.getString("author_icon_url"),
+                    rs.getString("thumbnail_url"),
+                    rs.getString("image_url"),
+                    rs.getString("fields_json"),
+                    rs.getBoolean("timestamp")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting embeds: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return embeds;
+    }
+
+    /**
+     * Delete an embed
+     */
+    public boolean deleteEmbed(String guildId, String name) {
+        String query = "DELETE FROM embeds WHERE guild_id = ? AND name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, name);
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Deleted embed '" + name + "' for guild " + guildId);
+                return true;
+            }
+            return false;
+        } catch (SQLException e) {
+            System.err.println("Error deleting embed: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Check if an embed exists
+     */
+    public boolean embedExists(String guildId, String name) {
+        String query = "SELECT COUNT(*) FROM embeds WHERE guild_id = ? AND name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, name);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking embed existence: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
     }
 }

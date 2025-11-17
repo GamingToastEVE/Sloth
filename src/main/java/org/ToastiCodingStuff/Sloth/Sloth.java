@@ -37,6 +37,7 @@ public class Sloth {
         api.addEventListener(new GlobalCommandListener(handler));
         api.addEventListener(new FeedbackCommandListener(guild));
         api.addEventListener(new SelectRolesCommandListener(handler));
+        api.addEventListener(new EmbedEditorCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
