@@ -103,7 +103,6 @@ Navigate between help sections using the interactive buttons.
 - `/close-ticket` - Close a ticket
 - `/assign-ticket` - Assign ticket to staff member
 - `/ticket-info` - Get ticket information
-- `/ticket-transcript` - Generate ticket transcript
 
 #### Moderation System
 - `/kick` - Kick a user from the server
