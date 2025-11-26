@@ -4,7 +4,7 @@ Sloth is a comprehensive Discord moderation and management bot that provides mul
 
 ## Features
 
-Sloth offers several modular systems that can be independently activated per server:
+Sloth offers several systems that can be used:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
