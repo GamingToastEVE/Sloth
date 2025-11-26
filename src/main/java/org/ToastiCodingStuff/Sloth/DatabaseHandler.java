@@ -1389,24 +1389,31 @@ public class DatabaseHandler {
             // Transaktion starten
             connection.setAutoCommit(false);
 
-            for (Guild guild : currentGuilds) {
-                String guildId = guild.getId();
-                String guildName = guild.getName();
-                System.out.println("Syncing guild: " + guildName + " (" + guildId + ")");
+            try {
+                for (Guild guild : currentGuilds) {
+                    String guildId = guild.getId();
+                    String guildName = guild.getName();
+                    System.out.println("Syncing guild: " + guildName + " (" + guildId + ")");
 
-                // INSERT ... ON DUPLICATE KEY UPDATE verwenden statt Trigger
-                String upsertQuery = "INSERT INTO guilds (id, name) VALUES (?, ?) " +
-                        "ON DUPLICATE KEY UPDATE name = ?";
-                PreparedStatement stmt = connection.prepareStatement(upsertQuery);
-                stmt.setString(1, guildId);
-                stmt.setString(2, guildName);
-                stmt.setString(3, guildName);
-                stmt.executeUpdate();
+                    // INSERT ... ON DUPLICATE KEY UPDATE verwenden statt Trigger
+                    String upsertQuery = "INSERT INTO guilds (id, name) VALUES (?, ?) " +
+                            "ON DUPLICATE KEY UPDATE name = ?";
+                    PreparedStatement stmt = connection.prepareStatement(upsertQuery);
+                    stmt.setString(1, guildId);
+                    stmt.setString(2, guildName);
+                    stmt.setString(3, guildName);
+                    stmt.executeUpdate();
+                }
+
+                // Transaktion bestätigen
+                connection.commit();
+            } catch (SQLException e) {
+                // Bei Fehler: Rollback
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
             }
-
-            // Transaktion bestätigen
-            connection.commit();
-            connection.setAutoCommit(true);
 
         } catch (SQLException e) {
             System.err.println("Error syncing guilds: " + e.getMessage());
