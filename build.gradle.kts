@@ -18,6 +18,7 @@ dependencies {
     implementation("net.dv8tion:JDA:$jdaVersion")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.3.3")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
+    implementation("com.zaxxer:HikariCP:5.1.0")
 }
 
 tasks.withType<JavaCompile> {

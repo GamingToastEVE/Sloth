@@ -5,12 +5,13 @@ import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import org.mariadb.jdbc.export.Prepare;
 
 public class DatabaseHandler {
 
@@ -26,7 +27,8 @@ public class DatabaseHandler {
                 "SUM(verifications_performed) AS total_verifications " +
                 "FROM statistics WHERE guild_id = ?";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
 
@@ -151,14 +153,13 @@ public class DatabaseHandler {
         }
     }
 
-    private final Connection connection;
+    private final HikariDataSource dataSource;
     private final DatabaseMigrationManager migrationManager;
     
     public DatabaseHandler() {
-        Connection connection1;
+        HikariDataSource ds = null;
         try {
-            // Connect to MariaDB on localhost
-            // Use environment variables for configuration, with defaults
+            // Configure HikariCP connection pool
             String host = System.getenv().getOrDefault("DB_HOST", "localhost");
             String port = System.getenv().getOrDefault("DB_PORT", "3306");
             String database = System.getenv().getOrDefault("DB_NAME", "sloth");
@@ -166,31 +167,51 @@ public class DatabaseHandler {
             String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
             
             String url = String.format("jdbc:mariadb://%s:%s/%s", host, port, database);
-            System.out.println("Connecting to MariaDB database: " + url);
-            connection1 = DriverManager.getConnection(url, user, password);
-            System.out.println("Successfully connected to MariaDB database");
-            connection1.setAutoCommit(true);
-            if (connection1.getAutoCommit()) {
-                System.out.println("Auto-commit is enabled");
-            } else {
-                System.out.println("Auto-commit is disabled");
-            }
-            // Initialize database tables
-
-        } catch (SQLException e) {
-            connection1 = null;
-            System.err.println("Database connection error: " + e.getMessage());
+            System.out.println("Configuring HikariCP connection pool for MariaDB: " + url);
+            
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(url);
+            config.setUsername(user);
+            config.setPassword(password);
+            config.setMaximumPoolSize(10);
+            config.setMinimumIdle(2);
+            config.setIdleTimeout(300000); // 5 minutes
+            config.setConnectionTimeout(30000); // 30 seconds
+            config.setMaxLifetime(1800000); // 30 minutes
+            config.setAutoCommit(true);
+            config.setPoolName("SlothDBPool");
+            
+            // MariaDB specific optimizations
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "250");
+            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+            
+            ds = new HikariDataSource(config);
+            System.out.println("Successfully created HikariCP connection pool");
+            
+        } catch (Exception e) {
+            System.err.println("Database connection pool error: " + e.getMessage());
         }
-        this.connection = connection1;
-        this.migrationManager = new DatabaseMigrationManager(connection1);
+        this.dataSource = ds;
+        this.migrationManager = new DatabaseMigrationManager(this);
         initializeTables();
+    }
+    
+    /**
+     * Get a connection from the pool. Callers should use try-with-resources to ensure proper release.
+     */
+    public Connection getConnection() throws SQLException {
+        if (dataSource == null) {
+            throw new SQLException("DataSource is not initialized");
+        }
+        return dataSource.getConnection();
     }
 
     /**
      * Check if database tables already exist
      */
     private boolean tablesAlreadyExist() {
-        try {
+        try (Connection connection = getConnection()) {
             DatabaseMetaData meta = connection.getMetaData();
             String[] tableNames = {
                 "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
@@ -229,9 +250,8 @@ public class DatabaseHandler {
      * - Migration history and performance tracking
      */
     private void initializeTables() {
-        try {
-            // MariaDB has foreign keys enabled by default
-            Statement stmt = connection.createStatement();
+        try (Connection connection = getConnection();
+             Statement stmt = connection.createStatement()) {
 
             // Check for every table if already exist, if so apply migrations instead of full initialization
             if (tablesAlreadyExist()) {
@@ -314,8 +334,10 @@ public class DatabaseHandler {
             "description VARCHAR(255), " +
             "emoji_id VARCHAR(64), " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection();
+             Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     private void createSelectRolesEmbedsTable() throws SQLException {
@@ -330,8 +352,10 @@ public class DatabaseHandler {
             "footer TEXT, " +
             "color VARCHAR(32) DEFAULT 'blue', " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection();
+             Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -350,9 +374,11 @@ public class DatabaseHandler {
             "button_label VARCHAR(64), " +
             "button_emoji_id VARCHAR(64))";
 
-        java.sql.Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
+    
     private void createGuildsTable() throws SQLException {
         String createTable = "CREATE TABLE IF NOT EXISTS guilds (" +
             "id INT PRIMARY KEY AUTO_INCREMENT, " +
@@ -362,8 +388,9 @@ public class DatabaseHandler {
             "created_at DATETIME, " +
             "updated_at DATETIME, " +
             "active TINYINT(1) DEFAULT 1)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -378,8 +405,9 @@ public class DatabaseHandler {
             "avatar VARCHAR(512), " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
             "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -396,8 +424,9 @@ public class DatabaseHandler {
                 "active TINYINT(1) DEFAULT 1, " +
                 "expires_at DATETIME, " +
                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     private void createJustVerifyButtonTable() throws SQLException {
@@ -408,8 +437,9 @@ public class DatabaseHandler {
             "role_to_remove_id VARCHAR(32), " +
             "button_label VARCHAR(64) DEFAULT 'Verify', " +
             "button_emoji_id VARCHAR(64))";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -427,31 +457,33 @@ public class DatabaseHandler {
                 "expires_at DATETIME, " +
                 "active TINYINT(1) DEFAULT 1, " +
                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
     /**
      * Create tickets table
      */
     private void createTicketsTable() throws SQLException {
-                String createTable = "CREATE TABLE IF NOT EXISTS tickets (" +
-                    "id INT PRIMARY KEY AUTO_INCREMENT, " +
-                    "guild_id INT NOT NULL, " +
-                    "user_id INT NOT NULL, " +
-                    "channel_id BIGINT UNIQUE, " +
-                    "category VARCHAR(64) DEFAULT 'general', " +
-                    "subject VARCHAR(255), " +
-                    "status VARCHAR(255) DEFAULT 'OPEN', " +
-                    "priority VARCHAR(255) DEFAULT 'MEDIUM', " +
-                    "assigned_to BIGINT(20), " +
-                    "closed_by BIGINT(20), " +
-                    "closed_reason TEXT, " +
-                    "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                    "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                    "closed_at DATETIME)";
-                Statement stmt = connection.createStatement();
-                stmt.execute(createTable);
-            }
+        String createTable = "CREATE TABLE IF NOT EXISTS tickets (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "guild_id INT NOT NULL, " +
+            "user_id INT NOT NULL, " +
+            "channel_id BIGINT UNIQUE, " +
+            "category VARCHAR(64) DEFAULT 'general', " +
+            "subject VARCHAR(255), " +
+            "status VARCHAR(255) DEFAULT 'OPEN', " +
+            "priority VARCHAR(255) DEFAULT 'MEDIUM', " +
+            "assigned_to BIGINT(20), " +
+            "closed_by BIGINT(20), " +
+            "closed_reason TEXT, " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+            "closed_at DATETIME)";
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
+    }
 
     /**
      * Create ticket_messages table
@@ -466,8 +498,9 @@ public class DatabaseHandler {
             "attachments TEXT, " +
             "is_staff INTEGER DEFAULT 0, " +
             "created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -489,8 +522,9 @@ public class DatabaseHandler {
                 "mute_role VARCHAR(32), " +
                 "created_at TEXT DEFAULT CURRENT_TIMESTAMP, " +
                 "updated_at TEXT DEFAULT CURRENT_TIMESTAMP)";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -512,8 +546,9 @@ public class DatabaseHandler {
                 "verifications_performed INT DEFAULT 0, " +
                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                 "UNIQUE(guild_id, user_id, date))";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     /**
@@ -541,13 +576,14 @@ public class DatabaseHandler {
                 "messages_sent INT DEFAULT 0, " +
                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                 "UNIQUE(guild_id, user_id, date))";
-        Statement stmt = connection.createStatement();
-        stmt.execute(createTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
     }
 
     public boolean removeRulesEmbedFromDatabase(String guildId, String embedId) {
         String deleteQuery = "DELETE FROM rules_embeds_channel WHERE guild_id = ? AND id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(deleteQuery)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(deleteQuery)) {
             pstmt.setString(1, guildId);
             pstmt.setInt(2, Integer.parseInt(embedId));
             int affectedRows = pstmt.executeUpdate();
@@ -564,35 +600,35 @@ public class DatabaseHandler {
      * New migrations should use updateTableColumns() for a more generic approach.
      */
     private void migrateStatisticsTable() throws SQLException {
-        Statement stmt = connection.createStatement();
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            // Prüfe, ob die Spalten bereits existieren
+            String checkColumns = "SHOW COLUMNS FROM statistics FROM sloth";
+            ResultSet rs = stmt.executeQuery(checkColumns);
+            boolean hasTimeouts = false;
+            boolean hasUntimeouts = false;
+            boolean hasVerifications = false;
 
-        // Prüfe, ob die Spalten bereits existieren
-        String checkColumns = "SHOW COLUMNS FROM statistics FROM sloth";
-        ResultSet rs = stmt.executeQuery(checkColumns);
-        boolean hasTimeouts = false;
-        boolean hasUntimeouts = false;
-        boolean hasVerifications = false;
-
-        while (rs.next()) {
-            String columnName = rs.getString("Field");
-            if ("timeouts_performed".equals(columnName)) {
-                hasTimeouts = true;
-            } else if ("untimeouts_performed".equals(columnName)) {
-                hasUntimeouts = true;
-            } else if ("verifications_performed".equals(columnName)) {
-                hasVerifications = true;
+            while (rs.next()) {
+                String columnName = rs.getString("Field");
+                if ("timeouts_performed".equals(columnName)) {
+                    hasTimeouts = true;
+                } else if ("untimeouts_performed".equals(columnName)) {
+                    hasUntimeouts = true;
+                } else if ("verifications_performed".equals(columnName)) {
+                    hasVerifications = true;
+                }
             }
-        }
 
-        // Fehlende Spalten hinzufügen (MariaDB-Syntax)
-        if (!hasTimeouts) {
-            stmt.execute("ALTER TABLE statistics ADD COLUMN timeouts_performed INT DEFAULT 0");
-        }
-        if (!hasUntimeouts) {
-            stmt.execute("ALTER TABLE statistics ADD COLUMN untimeouts_performed INT DEFAULT 0");
-        }
-        if (!hasVerifications) {
-            stmt.execute("ALTER TABLE statistics ADD COLUMN verifications_performed INT DEFAULT 0");
+            // Fehlende Spalten hinzufügen (MariaDB-Syntax)
+            if (!hasTimeouts) {
+                stmt.execute("ALTER TABLE statistics ADD COLUMN timeouts_performed INT DEFAULT 0");
+            }
+            if (!hasUntimeouts) {
+                stmt.execute("ALTER TABLE statistics ADD COLUMN untimeouts_performed INT DEFAULT 0");
+            }
+            if (!hasVerifications) {
+                stmt.execute("ALTER TABLE statistics ADD COLUMN verifications_performed INT DEFAULT 0");
+            }
         }
     }
 
@@ -648,10 +684,8 @@ public class DatabaseHandler {
             return false; // Nichts zu aktualisieren
         }
 
-        Statement stmt = connection.createStatement();
         boolean columnsAdded = false;
-
-        try {
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             // Prüfe existierende Spalten in der Tabelle
             String checkColumns = "SHOW COLUMNS FROM `" + tableName + "`";
             ResultSet rs = stmt.executeQuery(checkColumns);
@@ -695,9 +729,6 @@ public class DatabaseHandler {
                     }
                 }
             }
-
-        } finally {
-            stmt.close();
         }
 
         return columnsAdded;
@@ -767,9 +798,10 @@ public class DatabaseHandler {
             "role_id VARCHAR(32) NOT NULL, " +
             "warn_time_hours INT NOT NULL)";
 
-        Statement stmt = connection.createStatement();
-        stmt.execute(logChannelsTable);
-        stmt.execute(warnSystemTable);
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(logChannelsTable);
+            stmt.execute(warnSystemTable);
+        }
     }
 
     /**
@@ -821,18 +853,14 @@ public class DatabaseHandler {
     }
 
     public void closeConnection() {
-        try {
-            if (connection != null) {
-                connection.close();
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+        if (dataSource != null) {
+            dataSource.close();
         }
     }
 
     //add Embed to Database
     public Boolean addRulesEmbedToDatabase(String guildID, String title, String description, String footer, String color, String roleId, String buttonLabel, String buttonEmoji) {
-        try {
+        try (Connection connection = getConnection()) {
             if (getNumberOfEmbedsInDataBase(guildID) >= 3) {
                 System.out.println("Guild already has maximum rules embeds (3) in the database.");
                 return false;
@@ -859,7 +887,7 @@ public class DatabaseHandler {
     }
 
     public int getNumberOfEmbedsInDataBase(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT COUNT(*) AS count FROM rules_embeds_channel WHERE guild_id = ?";
             PreparedStatement pstmt = connection.prepareStatement(query);
             pstmt.setString(1, guildID);
@@ -875,7 +903,7 @@ public class DatabaseHandler {
     }
 
     public ArrayList<RulesEmbedData> getAllRulesEmbedDataFromDatabase(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             ArrayList<RulesEmbedData> embedDataList = new ArrayList<>();
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String query = "SELECT * FROM rules_embeds_channel WHERE guild_id = ?";
@@ -906,7 +934,7 @@ public class DatabaseHandler {
 
     public String getRoleIDFromRulesEmbed(String guildID) {
         String roleId = "0";
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String query = "SELECT role_id FROM rules_embeds_channel WHERE guild_id = ?";
             PreparedStatement pstmt = connection.prepareStatement(query);
@@ -929,7 +957,7 @@ public class DatabaseHandler {
     //Log Channel Databasekram
 
     public String getLogChannelID(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT channelid FROM log_channels WHERE guildid = ?";
             PreparedStatement pstmt = connection.prepareStatement(query);
             pstmt.setString(1, guildID);
@@ -950,7 +978,7 @@ public class DatabaseHandler {
     }
 
    public boolean hasLogChannel(String guildID) {
-       try {
+       try (Connection connection = getConnection()) {
            String query = "SELECT channelid FROM log_channels WHERE guildid = ?";
            PreparedStatement pstmt = connection.prepareStatement(query);
            pstmt.setString(1, guildID);
@@ -967,7 +995,7 @@ public class DatabaseHandler {
    }
 
     public String setLogChannel (String guildID, String channelID) {
-        try {
+        try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
             if (hasLogChannel(guildID)) {
                 String setLogChannel = "UPDATE log_channels SET channelid=? WHERE guildid=?";
@@ -995,7 +1023,7 @@ public class DatabaseHandler {
 
     //Warn System Kram
     public boolean hasWarnSystemSettings(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT max_warns, minutes_muted, role_id, warn_time_hours FROM warn_system_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildID);
@@ -1010,7 +1038,7 @@ public class DatabaseHandler {
     }
 
     public int getMaxWarns(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT max_warns FROM warn_system_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildID);
@@ -1028,7 +1056,7 @@ public class DatabaseHandler {
     }
 
     public int getTimeMuted(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String getMinutesMutedString = "SELECT minutes_muted FROM warn_system_settings WHERE guild_id = ?";
             PreparedStatement getMinutesMutedStatement = connection.prepareStatement(getMinutesMutedString);
             getMinutesMutedStatement.setString(1, guildID);
@@ -1043,7 +1071,7 @@ public class DatabaseHandler {
     }
 
     public int getWarnTimeHours(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String getWarnTimeHoursString = "SELECT warn_time_hours FROM warn_system_settings WHERE guild_id = ?";
             PreparedStatement getWarnTimeHoursStatement = connection.prepareStatement(getWarnTimeHoursString);
             getWarnTimeHoursStatement.setString(1, guildID);
@@ -1058,7 +1086,7 @@ public class DatabaseHandler {
     }
 
     public String getWarnRoleID(String guildID) {
-        try {
+        try (Connection connection = getConnection()) {
             String getRoleIDString = "SELECT role_id FROM warn_system_settings WHERE guild_id = ?";
             PreparedStatement getRoleIDStatement = connection.prepareStatement(getRoleIDString);
             getRoleIDStatement.setString(1, guildID);
@@ -1073,7 +1101,7 @@ public class DatabaseHandler {
     }
 
     public void setWarnSettings(String guildID, int maxWarns, int minutesMuted, String roleID, int warnTimeHours) {
-        try {
+        try (Connection connection = getConnection()) {
             if (hasWarnSystemSettings(guildID)) {
                 String setWarnSettings1 = "UPDATE warn_system_settings SET max_warns=?, minutes_muted=?, role_id=?, warn_time_hours=? WHERE guild_id=?";
                 PreparedStatement setWarnSettings2 = connection.prepareStatement(setWarnSettings1);
@@ -1108,7 +1136,7 @@ public class DatabaseHandler {
     }
 
     public boolean userInWarnTable(String guildID, String userID) {
-        try {
+        try (Connection connection = getConnection()) {
             String checkIfUserIsInGuildTable = "SELECT user_id FROM warnings WHERE guild_id = ? AND user_id = ?";
             PreparedStatement stmt = connection.prepareStatement(checkIfUserIsInGuildTable);
             stmt.setString(1, guildID);
@@ -1121,7 +1149,7 @@ public class DatabaseHandler {
     }
 
     public int getActiveWarningsCount(String guildID, String userID) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT COUNT(*) as count FROM warnings WHERE guild_id = ? AND user_id = ? AND active = 1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildID);
@@ -1137,7 +1165,7 @@ public class DatabaseHandler {
     }
 
     public void insertModerationAction(String guildId, String userId, String moderatorId, String actionType, String reason, Object duration, String expiresAt) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String insertAction = "INSERT INTO moderation_actions (guild_id, user_id, moderator_id, action_type, reason, duration, expires_at) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -1161,7 +1189,7 @@ public class DatabaseHandler {
     }
 
     public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt) {
-        try {
+        try (Connection connection = getConnection()) {
             String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, expires_at) " +
                 "VALUES (?, ?, ?, ?, ?, ?)";
             PreparedStatement stmt = connection.prepareStatement(insertWarning, Statement.RETURN_GENERATED_KEYS);
@@ -1188,7 +1216,7 @@ public class DatabaseHandler {
     }
 
     public void insertOrUpdateUser(String userId, String effectiveName, String discriminator, String avatarUrl) {
-        try {
+        try (Connection connection = getConnection()) {
             if (isUserInDatabase(userId)) {
                 String updateUser = "UPDATE users SET username = ?, discriminator = ?, avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
                 PreparedStatement updateStmt = connection.prepareStatement(updateUser);
@@ -1220,7 +1248,7 @@ public class DatabaseHandler {
 
     private boolean isUserInDatabase(String userId) {
         String checkUser = "SELECT id FROM users WHERE id = ?";
-        try {
+        try (Connection connection = getConnection()) {
             PreparedStatement stmt = connection.prepareStatement(checkUser);
             stmt.setString(1, userId);
             ResultSet rs = stmt.executeQuery();
@@ -1236,7 +1264,7 @@ public class DatabaseHandler {
      * Insert or update guild data in the guilds table
      */
     public void insertOrUpdateGuild(String guildId, String guildName) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32)
             String upsertGuild = "INSERT INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
                     "VALUES (?, ?, '!', 'de', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1) " +
@@ -1256,7 +1284,7 @@ public class DatabaseHandler {
 
 
     public String getGuildPrefix(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32)
             String query = "SELECT prefix FROM guilds WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -1279,7 +1307,7 @@ public class DatabaseHandler {
      * Sprache der Guild aus der Datenbank holen
      */
     public String getGuildLanguage(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32)
             String query = "SELECT language FROM guilds WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -1302,7 +1330,7 @@ public class DatabaseHandler {
      * Update guild prefix
      */
     public boolean updateGuildPrefix(String guildId, String prefix) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: guildId ist VARCHAR(32)
             String updatePrefix = "UPDATE guilds SET prefix = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(updatePrefix);
@@ -1322,7 +1350,7 @@ public class DatabaseHandler {
      * Update guild language
      */
     public boolean updateGuildLanguage(String guildId, String language) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: guildId ist VARCHAR(32)
             String updateLanguage = "UPDATE guilds SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND active = 1";
             PreparedStatement stmt = connection.prepareStatement(updateLanguage);
@@ -1342,7 +1370,7 @@ public class DatabaseHandler {
      * Deactivate a guild when the bot leaves it
      */
     public void deactivateGuild(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "UPDATE guilds SET active = 0 WHERE id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1357,7 +1385,7 @@ public class DatabaseHandler {
      * Sync all guilds that the bot is currently in - called on startup
      */
     public void syncGuilds(java.util.List<Guild> currentGuilds) {
-        try {
+        try (Connection connection = getConnection()) {
             // Transaktion starten
             connection.setAutoCommit(false);
 
@@ -1381,20 +1409,13 @@ public class DatabaseHandler {
             connection.setAutoCommit(true);
 
         } catch (SQLException e) {
-            try {
-                // Bei Fehler: Rollback
-                connection.rollback();
-                connection.setAutoCommit(true);
-            } catch (SQLException ex) {
-                System.err.println("Error during rollback: " + ex.getMessage());
-            }
             System.err.println("Error syncing guilds: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     public boolean isTicketSystem(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String query = "SELECT ticket_category, ticket_channel FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -1423,7 +1444,7 @@ public class DatabaseHandler {
      * Get ticket category ID for a guild
      */
     public String getTicketCategory(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String query = "SELECT ticket_category FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -1448,7 +1469,7 @@ public class DatabaseHandler {
      * Get ticket channel ID for a guild
      */
     public String getTicketChannel(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT
             String query = "SELECT ticket_channel FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -1473,7 +1494,7 @@ public class DatabaseHandler {
      * Set ticket system settings for a guild
      */
     public boolean setTicketSettings(String guildId, String categoryId, String channelId, String roleId, boolean transcriptEnabled) {
-        try {
+        try (Connection connection = getConnection()) {
             // Zuerst prüfen, ob Einstellungen für die Guild existieren
             String checkQuery = "SELECT id FROM guild_settings WHERE guild_id = ?";
             PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
@@ -1549,7 +1570,7 @@ public class DatabaseHandler {
      * Create a new ticket
      */
     public int createTicket(String guildId, String userId, String channelId, String category, String subject, String priority, String username, String discriminator, String avatarUrl) {
-        try {
+        try (Connection connection = getConnection()) {
             // Sicherstellen, dass die Guild in der Tabelle existiert (MariaDB: discord_id als VARCHAR(32))
             String checkGuildQuery = "SELECT id FROM guilds WHERE id = ?";
             PreparedStatement checkGuildStmt = connection.prepareStatement(checkGuildQuery);
@@ -1595,7 +1616,7 @@ public class DatabaseHandler {
      * Close a ticket
      */
     public boolean closeTicket(int ticketId, String closedById, String reason) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT behandeln
             String closeTicket = "UPDATE tickets SET status = 'CLOSED', closed_by = ?, closed_reason = ?, closed_at = CURRENT_TIMESTAMP WHERE id = ?";
             PreparedStatement stmt = connection.prepareStatement(closeTicket);
@@ -1616,7 +1637,7 @@ public class DatabaseHandler {
      * Get ticket by channel ID
      */
     public String getTicketByChannelId(String channelId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT id, user_id, category, subject, status, priority, assigned_to, created_at FROM tickets WHERE channel_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, channelId); // VARCHAR(32) für channel_id (MariaDB)
@@ -1640,7 +1661,7 @@ public class DatabaseHandler {
      * Get ticket role ID for a guild
      */
     public String getTicketRole(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT ticket_role FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1661,7 +1682,7 @@ public class DatabaseHandler {
     }
 
     public boolean assignTicket(int ticketId, String assignedToId) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: assigned_to als VARCHAR(32) oder TEXT behandeln
             String assignTicket = "UPDATE tickets SET assigned_to = ?, status = 'IN_PROGRESS' WHERE id = ?";
             PreparedStatement stmt = connection.prepareStatement(assignTicket);
@@ -1681,7 +1702,7 @@ public class DatabaseHandler {
      * Prüft, ob Transkripte für eine Guild aktiviert sind (MariaDB-Syntax)
      */
     public boolean areTranscriptsEnabled(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT ticket_transcript FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1703,7 +1724,7 @@ public class DatabaseHandler {
      * Get ticket panel title for a guild
      */
     public String getTicketTitle(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT ticket_title FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1727,7 +1748,7 @@ public class DatabaseHandler {
      * Get ticket panel description for a guild
      */
     public String getTicketDescription(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT ticket_description FROM guild_settings WHERE guild_id = ?";
             PreparedStatement stmt = connection.prepareStatement(query);
             stmt.setString(1, guildId);
@@ -1751,7 +1772,7 @@ public class DatabaseHandler {
      * Set ticket panel title and description for a guild
      */
     public boolean setTicketConfig(String guildId, String title, String description) {
-        try {
+        try (Connection connection = getConnection()) {
             // Check if settings exist for the guild
             String checkQuery = "SELECT id FROM guild_settings WHERE guild_id = ?";
             PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
@@ -1790,7 +1811,7 @@ public class DatabaseHandler {
      * Ticket-Priorität aktualisieren (MariaDB-Syntax)
      */
     public boolean updateTicketPriority(int ticketId, String priority) {
-        try {
+        try (Connection connection = getConnection()) {
             String updatePriority = "UPDATE tickets SET priority = ? WHERE id = ?";
             PreparedStatement stmt = connection.prepareStatement(updatePriority);
             stmt.setString(1, priority);
@@ -1810,7 +1831,7 @@ public class DatabaseHandler {
      */
     public java.util.List<java.util.Map<String, String>> getTicketsByGuildWithPriority(String guildId) {
         java.util.List<java.util.Map<String, String>> tickets = new java.util.ArrayList<>();
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT behandeln
             String query = "SELECT channel_id, priority FROM tickets WHERE guild_id = ? AND status IN ('OPEN', 'IN_PROGRESS') ORDER BY " +
                     "CASE priority " +
@@ -1850,7 +1871,7 @@ public class DatabaseHandler {
      * Update statistics for a guild and specific action type
      */
     private void updateStatistics(String guildId, String actionType) {
-        try {
+        try (Connection connection = getConnection()) {
             String currentDate = getCurrentDate();
 
             // Spaltennamen validieren (nur erlaubte Aktionen zulassen)
@@ -1887,7 +1908,7 @@ public class DatabaseHandler {
     }
 
     private boolean guildExistsInStatisticsTable(String guildId, String currentDate) {
-        try {
+        try (Connection connection = getConnection()) {
             String checkQuery = "SELECT guild_id FROM statistics WHERE guild_id = ? AND date = ?";
             PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
             checkStmt.setString(1, guildId);
@@ -1964,7 +1985,7 @@ public class DatabaseHandler {
      * This method tracks how many times each command has been used globally
      */
     public void insertOrUpdateGlobalStatistic(String command) {
-        try {
+        try (Connection connection = getConnection()) {
             // Try to update existing record
             String updateQuery = "UPDATE global_statistics SET number = number + 1, last_used = ? WHERE command = ?";
             PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
@@ -1994,7 +2015,7 @@ public class DatabaseHandler {
      * Update statistics for a user and specific action type
      */
     private void updateUserStatistics(String guildId, String userId, String actionType) {
-        try {
+        try (Connection connection = getConnection()) {
             String currentDate = getCurrentDate();
 
             // Nur erlaubte Spaltennamen zulassen (SQL-Injection vermeiden)
@@ -2043,7 +2064,7 @@ public class DatabaseHandler {
     private boolean userExistsInUserStatistics(String guildId, String userId) {
         String currentDate = getCurrentDate();
         String checkQuery = "SELECT id FROM user_statistics WHERE guild_id = ? AND user_id = ? AND date = ?";
-        try {
+        try (Connection connection = getConnection()) {
             PreparedStatement checkStmt = connection.prepareStatement(checkQuery);
             checkStmt.setString(1, guildId);
             checkStmt.setString(2, userId);
@@ -2159,7 +2180,7 @@ public class DatabaseHandler {
      * Get user information and statistics embed
      */
     public EmbedBuilder getUserInfoEmbed(String guildId, String userId) {
-        try {
+        try (Connection connection = getConnection()) {
             // Hole Benutzerinformationen (MariaDB: id als VARCHAR(32))
             String userQuery = "SELECT username, discriminator, avatar, created_at FROM users WHERE id = ?";
             PreparedStatement userStmt = connection.prepareStatement(userQuery);
@@ -2296,7 +2317,7 @@ public class DatabaseHandler {
      * Get user statistics for a specific date
      */
     public EmbedBuilder getUserStatisticsForDateEmbed(String guildId, String userId, String date) {
-        try {
+        try (Connection connection = getConnection()) {
             // Hole Benutzerinformationen (MariaDB: id als VARCHAR(32) oder TEXT)
             String userQuery = "SELECT username, discriminator FROM users WHERE id = ?";
             PreparedStatement userStmt = connection.prepareStatement(userQuery);
@@ -2368,7 +2389,7 @@ public class DatabaseHandler {
      * Get statistics for a guild for a specific date
      */
     public String getStatisticsForDate(String guildId, String date) {
-        try {
+        try (Connection connection = getConnection()) {
             // MariaDB-Syntax: guild_id als VARCHAR(32) oder TEXT behandeln
             String query = "SELECT warnings_issued, kicks_performed, bans_performed, timeouts_performed, untimeouts_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date = ?";
@@ -2409,7 +2430,7 @@ public class DatabaseHandler {
      * Get statistics for a guild for the last 7 days
      */
     public String getWeeklyStatistics(String guildId) {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, timeouts_performed, untimeouts_performed, tickets_created, tickets_closed " +
                     "FROM statistics WHERE guild_id = ? AND date >= date('now', '-7 days') ORDER BY date DESC";
             PreparedStatement stmt = connection.prepareStatement(query);
@@ -2487,7 +2508,7 @@ public class DatabaseHandler {
                 .setColor(Color.BLUE)
                 .setTimestamp(java.time.Instant.now());
 
-        try {
+        try (Connection connection = getConnection()) {
             // Get counts from moderation_actions table
             ArrayList<String> actionTypes = new ArrayList<>();
             actionTypes.add("warnings_issued");
@@ -2586,7 +2607,7 @@ public class DatabaseHandler {
                 "SUM(untimeouts_performed) AS total_untimeouts " +
                 "FROM statistics WHERE guild_id = ? AND user_id = ?";
 
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
 
@@ -2638,7 +2659,7 @@ public class DatabaseHandler {
         StringBuilder dailyBreakdown = new StringBuilder();
         int totalWarnings = 0, totalKicks = 0, totalBans = 0, totalTimeouts = 0, totalUntimeouts = 0, totalTicketsCreated = 0, totalTicketsClosed = 0, totalVerifications = 0;
 
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT date, warnings_issued, kicks_performed, bans_performed, timeouts_performed, " +
                     "untimeouts_performed, tickets_created, tickets_closed, verifications_performed " +
                     "FROM statistics WHERE guild_id = ? AND date > ? ORDER BY date ASC";
@@ -2741,7 +2762,7 @@ public class DatabaseHandler {
                 .setColor(Color.MAGENTA)
                 .setTimestamp(java.time.Instant.now());
 
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT * FROM global_statistics";
             PreparedStatement stmt = connection.prepareStatement(query);
             ResultSet rs = stmt.executeQuery();
@@ -2821,7 +2842,7 @@ public class DatabaseHandler {
 
     public String getJustVerifyButtonRoleToGiveID(String guildId) {
         String query = "SELECT role_to_give_id FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -2841,7 +2862,7 @@ public class DatabaseHandler {
 
     public String getJustVerifyButtonRoleToRemoveID(String guildId) {
         String query = "SELECT role_to_remove_id FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -2861,7 +2882,7 @@ public class DatabaseHandler {
 
     public String getJustVerifyButtonLabel (String guildId) {
         String query = "SELECT button_label FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -2881,7 +2902,7 @@ public class DatabaseHandler {
 
     public String getJustVerifyButtonEmojiID (String guildId) {
         String query = "SELECT button_emoji_id FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -2901,7 +2922,7 @@ public class DatabaseHandler {
 
     public boolean isJustVerifyButton(String guildId) {
         String query = "SELECT * FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -2921,7 +2942,7 @@ public class DatabaseHandler {
     public void setJustVerifyButton(String guildId, String roleToGiveId, String roleToRemoveId, String buttonLabel, String buttonEmojiId) {
         if (!isJustVerifyButton(guildId)) {
             String query = "INSERT INTO just_verify_button (guild_id, role_to_give_id, role_to_remove_id, button_label, button_emoji_id) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE guild_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, guildId);
                 pstmt.setString(2, roleToGiveId);
                 pstmt.setString(3, roleToRemoveId);
@@ -2936,7 +2957,7 @@ public class DatabaseHandler {
             }
         } else {
             String query = "UPDATE just_verify_button SET role_to_give_id = ?, role_to_remove_id = ?, button_label = ?, button_emoji_id = ? WHERE guild_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, roleToGiveId);
                 pstmt.setString(2, roleToRemoveId);
                 pstmt.setString(3, buttonLabel);
@@ -2956,7 +2977,7 @@ public class DatabaseHandler {
     }
     public void removeJustVerifyButton(String guildId) {
         String query = "DELETE FROM just_verify_button WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             int rowsAffected = pstmt.executeUpdate();
             if (rowsAffected > 0) {
@@ -2985,7 +3006,7 @@ public class DatabaseHandler {
     }
     public void updateGuildActivityStatus(List<Guild> guilds) {
         String query = "SELECT * FROM guilds";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             ResultSet rs = pstmt.executeQuery();
             Set<String> activeGuildIds = guilds.stream().map(Guild::getId).collect(Collectors.toSet());
 
@@ -3019,7 +3040,7 @@ public class DatabaseHandler {
 
     public boolean isRoleAlreadyAdded (String guildId, String roleSelectId) {
         String query = "SELECT * FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, roleSelectId);
             ResultSet rs = pstmt.executeQuery();
@@ -3034,7 +3055,7 @@ public class DatabaseHandler {
     public boolean addRoleSelectToGuild (String guildId, String roleSelectId, String description, String emojiId) {
         if (!isRoleAlreadyAdded(guildId, roleSelectId)) {
             String query = "INSERT INTO role_select (guild_id, role_id, description,emoji_id) VALUES (?, ?, ?, ?)";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, guildId);
                 pstmt.setString(2, roleSelectId);
                 pstmt.setString(3, description);
@@ -3057,7 +3078,7 @@ public class DatabaseHandler {
     public boolean removeRoleSelectFromGuild (String guildId, String roleSelectId) {
         if (isRoleAlreadyAdded(guildId, roleSelectId)) {
             String query = "DELETE FROM role_select WHERE guild_id = ? AND role_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, guildId);
                 pstmt.setString(2, roleSelectId);
                 int rowsAffected = pstmt.executeUpdate();
@@ -3081,7 +3102,7 @@ public class DatabaseHandler {
 
     public int getRoleSelectID (String guildId, String roleSelectId) {
         String query = "SELECT id FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, roleSelectId);
             ResultSet rs = pstmt.executeQuery();
@@ -3102,7 +3123,7 @@ public class DatabaseHandler {
 
     public boolean addSelectRolesEmbed (String guildId, String channelId, String messageId, String description) {
         String query = "INSERT INTO select_roles_embeds (guild_id, channel_id, message_id) VALUES (?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, channelId);
             pstmt.setString(3, messageId);
@@ -3125,7 +3146,7 @@ public class DatabaseHandler {
             displayType = "BUTTON"; // Default to BUTTON if invalid
         }
         String query = "INSERT INTO role_select_embeds (guild_id, channel_id, message_id, display_type, title, description, footer, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, channelId);
             pstmt.setString(3, messageId);
@@ -3146,7 +3167,7 @@ public class DatabaseHandler {
 
     public boolean removeEmbedFromDatabase (String guildId, String messageId) {
         String query = "DELETE FROM role_select_embeds WHERE guild_id = ? AND message_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, messageId);
             int rowsAffected = pstmt.executeUpdate();
@@ -3167,7 +3188,7 @@ public class DatabaseHandler {
     public List<String> getAllRoleSelectForGuild (String guildId) {
         List<String> embedMessageIds = new ArrayList<>();
         String query = "SELECT role_id FROM role_select WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
@@ -3184,7 +3205,7 @@ public class DatabaseHandler {
 
     public String getRoleSelectDescription(String id, String id1) {
         String query = "SELECT description FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, id);
             pstmt.setString(2, id1);
             ResultSet rs = pstmt.executeQuery();
@@ -3205,7 +3226,7 @@ public class DatabaseHandler {
 
     public String getRoleSelectEmoji(String guildId, String roleSelectId) {
         String query = "SELECT emoji_id FROM role_select WHERE guild_id = ? AND role_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, roleSelectId);
             ResultSet rs = pstmt.executeQuery();
@@ -3226,7 +3247,7 @@ public class DatabaseHandler {
 
     public String getRoleSelectRoleIDByEmoji (String guildId, String emoji) {
         String query = "SELECT role_id FROM role_select WHERE guild_id = ? AND emoji_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, emoji);
             ResultSet rs = pstmt.executeQuery();
@@ -3246,7 +3267,7 @@ public class DatabaseHandler {
     }
 
     public EmbedBuilder getGlobalModStats() {
-        try {
+        try (Connection connection = getConnection()) {
             String query = "SELECT " +
                     "SUM(warnings_issued) AS total_warnings, " +
                     "SUM(kicks_performed) AS total_kicks, " +
@@ -3297,7 +3318,7 @@ public class DatabaseHandler {
 
     public boolean isSelectRoleEmbedExist (String guildId) {
         String query = "SELECT * FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -3317,7 +3338,7 @@ public class DatabaseHandler {
     public void editSelectRoleEmbed (String title, String description, String footer, String color, String guildId) {
         if (isSelectRoleEmbedExist(guildId)) {
             String query = "UPDATE role_select_embeds SET title = ?, description = ?, footer = ?, color = ? WHERE guild_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, title);
                 pstmt.setString(2, description);
                 pstmt.setString(3, footer);
@@ -3335,7 +3356,7 @@ public class DatabaseHandler {
             }
         } else {
             String query = "INSERT INTO role_select_embeds SET title = ?, description = ?, footer = ?, color = ?, guild_id = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setString(1, title);
                 pstmt.setString(2, description);
                 pstmt.setString(3, footer);
@@ -3356,7 +3377,7 @@ public class DatabaseHandler {
 
     public String getSelectRoleEmbedTitle (String guildId) {
         String query = "SELECT title FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -3376,7 +3397,7 @@ public class DatabaseHandler {
 
     public String getSelectRolesDescription (String guildId) {
         String query = "SELECT description FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -3396,7 +3417,7 @@ public class DatabaseHandler {
 
     public String getSelectRolesFooter (String guildId) {
         String query = "SELECT footer FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
@@ -3416,7 +3437,7 @@ public class DatabaseHandler {
 
     public String getSelectRolesColor (String guildId) {
         String query = "SELECT color FROM role_select_embeds WHERE guild_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
