@@ -56,7 +56,7 @@ import java.util.*;
  */
 public class DatabaseMigrationManager {
     
-    private final Connection connection;
+    private final DatabaseHandler databaseHandler;
     
     /**
      * Represents a column definition with its SQL properties
@@ -109,8 +109,8 @@ public class DatabaseMigrationManager {
         }
     }
     
-    public DatabaseMigrationManager(Connection connection) {
-        this.connection = connection;
+    public DatabaseMigrationManager(DatabaseHandler databaseHandler) {
+        this.databaseHandler = databaseHandler;
     }
     
     /**
@@ -424,9 +424,11 @@ public class DatabaseMigrationManager {
      * Check if a table exists in the database
      */
     private boolean tableExists(String tableName) throws SQLException {
-        DatabaseMetaData meta = connection.getMetaData();
-        try (ResultSet rs = meta.getTables(null, null, tableName, null)) {
-            return rs.next();
+        try (Connection connection = databaseHandler.getConnection()) {
+            DatabaseMetaData meta = connection.getMetaData();
+            try (ResultSet rs = meta.getTables(null, null, tableName, null)) {
+                return rs.next();
+            }
         }
     }
     
@@ -471,7 +473,8 @@ public class DatabaseMigrationManager {
     private Set<String> getExistingColumns(String tableName) throws SQLException {
         Set<String> columns = new HashSet<>();
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             String query = "SHOW COLUMNS FROM " + tableName;
             try (ResultSet rs = stmt.executeQuery(query)) {
                 while (rs.next()) {
@@ -489,7 +492,8 @@ public class DatabaseMigrationManager {
     private void addColumnToTable(String tableName, String columnName, String columnDefinition) throws SQLException {
         String alterQuery = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             stmt.execute(alterQuery);
             System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "'");
         } catch (SQLException e) {
@@ -501,7 +505,8 @@ public class DatabaseMigrationManager {
                 String modifiedDefinition = columnDefinition.replace("DEFAULT CURRENT_TIMESTAMP", "");
                 String alterQueryNoDefault = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + modifiedDefinition;
                 
-                try (Statement stmt = connection.createStatement()) {
+                try (Connection conn = databaseHandler.getConnection();
+                     Statement stmt = conn.createStatement()) {
                     stmt.execute(alterQueryNoDefault);
                     
                     // Update all existing rows to have the current timestamp
@@ -531,7 +536,8 @@ public class DatabaseMigrationManager {
             "success INTEGER DEFAULT 1" +
             ")";
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
         }
     }
@@ -540,7 +546,7 @@ public class DatabaseMigrationManager {
      * Record a migration run in the tracking table
      */
     private void recordMigrationRun(String migrationName, String version, long executionTimeMs, boolean success) {
-        try {
+        try (Connection connection = databaseHandler.getConnection()) {
             String insertMigration = "INSERT INTO database_migrations " +
                 "(migration_name, version, execution_time_ms, success) VALUES (?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
@@ -571,7 +577,8 @@ public class DatabaseMigrationManager {
         String query = "SELECT migration_name, version, applied_at, execution_time_ms, success " +
                       "FROM database_migrations ORDER BY applied_at DESC";
         
-        try (Statement stmt = connection.createStatement();
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
@@ -594,7 +601,8 @@ public class DatabaseMigrationManager {
     public void applyIndexes(String tableName, TableSchema schema) throws SQLException {
         // Apply indexes
         for (String indexDefinition : schema.indexes) {
-            try (Statement stmt = connection.createStatement()) {
+            try (Connection connection = databaseHandler.getConnection();
+                 Statement stmt = connection.createStatement()) {
                 stmt.execute(indexDefinition);
             } catch (SQLException e) {
                 // Index might already exist, which is fine
