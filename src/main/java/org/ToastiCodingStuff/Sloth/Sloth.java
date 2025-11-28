@@ -60,7 +60,7 @@ public class Sloth {
                 try {
                     dashboardPort = Integer.parseInt(portStr);
                 } catch (NumberFormatException e) {
-                    System.out.println("Invalid DASHBOARD_PORT, using default 8080");
+                    System.err.println("Invalid DASHBOARD_PORT, using default 8080");
                 }
             }
             

@@ -15,27 +15,30 @@ import java.util.List;
 /**
  * Simple web dashboard for the Sloth Discord bot.
  * Provides a basic HTTP interface to view bot statistics and status.
+ * 
+ * Note: Uses com.sun.net.httpserver which is included in the JDK since Java 6.
+ * While technically an internal API, it's widely used and stable for simple HTTP servers.
  */
 public class WebDashboard {
     
     private final HttpServer server;
     private final JDA jda;
-    private final DatabaseHandler databaseHandler;
     private final int port;
     
     /**
      * Creates a new WebDashboard instance.
+     * The server binds to localhost only for security.
      * 
      * @param jda The JDA instance for accessing Discord data
-     * @param databaseHandler The database handler for statistics
+     * @param databaseHandler The database handler (reserved for future use)
      * @param port The port to run the dashboard on
      * @throws IOException If the server cannot be created
      */
     public WebDashboard(JDA jda, DatabaseHandler databaseHandler, int port) throws IOException {
         this.jda = jda;
-        this.databaseHandler = databaseHandler;
         this.port = port;
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        // Bind to localhost only for security - prevents external access
+        this.server = HttpServer.create(new InetSocketAddress("localhost", port), 0);
         
         setupRoutes();
     }
