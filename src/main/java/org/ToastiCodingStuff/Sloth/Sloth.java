@@ -50,6 +50,27 @@ public class Sloth {
         List<Guild> guilds = api.getGuilds();
         handler.syncGuilds(guilds);
         handler.updateGuildActivityStatus(guilds);
+
+        // Start web dashboard if enabled
+        String dashboardEnabled = dotenv.get("DASHBOARD_ENABLED");
+        if ("true".equalsIgnoreCase(dashboardEnabled)) {
+            int dashboardPort = 8080; // Default port
+            String portStr = dotenv.get("DASHBOARD_PORT");
+            if (portStr != null && !portStr.isEmpty()) {
+                try {
+                    dashboardPort = Integer.parseInt(portStr);
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid DASHBOARD_PORT, using default 8080");
+                }
+            }
+            
+            try {
+                WebDashboard dashboard = new WebDashboard(api, handler, dashboardPort);
+                dashboard.start();
+            } catch (Exception e) {
+                System.err.println("Failed to start web dashboard: " + e.getMessage());
+            }
+        }
     }
 
     /**

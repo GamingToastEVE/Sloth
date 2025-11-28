@@ -38,6 +38,12 @@ Sloth offers several systems that can be used:
 - Customizable rule formatting and styling
 - Easy rule distribution across your server
 
+### 🌐 Web Dashboard
+- Simple web-based dashboard for monitoring bot status
+- View connected servers and member counts
+- REST API endpoints for integration with external tools
+- Real-time bot statistics and gateway ping
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -58,6 +64,10 @@ DB_PORT=3306
 DB_NAME=delta_bot
 DB_USER=delta_bot
 DB_PASSWORD=delta_bot
+
+# Web Dashboard (optional)
+DASHBOARD_ENABLED=true
+DASHBOARD_PORT=8080
 ```
 
 **Important**: The bot now uses MariaDB instead of SQLite. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed database setup instructions.
@@ -117,6 +127,27 @@ Navigate between help sections using the interactive buttons.
 - `/add-rules-embed` - Add a formatted rules embed to a channel
 - Supports custom formatting and styling options
 
+## Web Dashboard
+
+The bot includes an optional web dashboard for monitoring and status information.
+
+### Enabling the Dashboard
+
+Set the following environment variables in your `.env` file:
+```env
+DASHBOARD_ENABLED=true
+DASHBOARD_PORT=8080
+```
+
+### Dashboard Features
+
+Once enabled, the dashboard provides:
+- **Main Dashboard** (`/`) - Visual overview of bot status, connected servers, and member counts
+- **Stats API** (`/api/stats`) - JSON endpoint returning bot statistics
+- **Guilds API** (`/api/guilds`) - JSON endpoint returning list of connected guilds
+
+Access the dashboard at `http://localhost:8080` (or your configured port) when the bot is running.
+
 ## Database
 
 Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
@@ -146,6 +177,7 @@ Sloth/
 │   ├── LogChannelSlashCommandListener.java     # Logging system
 │   ├── StatisticsCommandListener.java          # Statistics tracking
 │   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
+│   ├── WebDashboard.java                       # Web dashboard server
 │   └── GuildEventListener.java                 # Guild event handling
 ├── build.gradle.kts                            # Build configuration
 ├── .env.example                                 # Environment variables template
