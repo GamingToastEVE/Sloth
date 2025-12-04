@@ -4,7 +4,7 @@ Sloth is a comprehensive Discord moderation and management bot that provides mul
 
 ## Features
 
-Sloth offers several modular systems that can be independently activated per server:
+Sloth offers several systems that can be used:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
@@ -103,7 +103,6 @@ Navigate between help sections using the interactive buttons.
 - `/close-ticket` - Close a ticket
 - `/assign-ticket` - Assign ticket to staff member
 - `/ticket-info` - Get ticket information
-- `/ticket-transcript` - Generate ticket transcript
 
 #### Moderation System
 - `/kick` - Kick a user from the server

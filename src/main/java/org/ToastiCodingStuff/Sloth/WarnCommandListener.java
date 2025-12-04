@@ -20,22 +20,31 @@ public class WarnCommandListener extends ListenerAdapter {
     }
 
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (!event.getName().equals("warn")) {
+            return;
+        }
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
         String guildId = event.getGuild().getId();
 
-        switch (event.getName()) {
-            case "warn":
+        switch (subcommand) {
+            case "user":
                 if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {return;}
-                handler.insertOrUpdateGlobalStatistic("warn");
+                handler.insertOrUpdateGlobalStatistic("warn-user");
                 handleWarnCommand(event, guildId);
                 break;
-            case "set-warn-settings":
+            case "settings-set":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("set-warn-settings");
+                handler.insertOrUpdateGlobalStatistic("warn-settings-set");
                 handleSetWarnSettingsCommand(event, guildId);
                 break;
-            case "get-warn-settings":
+            case "settings-get":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("get-warn-settings");
+                handler.insertOrUpdateGlobalStatistic("warn-settings-get");
                 handleGetWarnSettingsCommand(event, guildId);
                 break;
         }
@@ -166,7 +175,7 @@ public class WarnCommandListener extends ListenerAdapter {
 
     private void handleGetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
         if (!handler.hasWarnSystemSettings(guildId)) {
-            event.reply("No warn system settings configured for this server. Use `/set-warn-settings` to configure.").setEphemeral(true).queue();
+            event.reply("No warn system settings configured for this server. Use `/warn settings-set` to configure.").setEphemeral(true).queue();
             return;
         }
 
