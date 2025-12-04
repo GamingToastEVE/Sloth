@@ -5,6 +5,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,15 +31,15 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> allCommands = new ArrayList<>();
 
         // Add commands for all systems
-        allCommands.addAll(getLogChannelCommands());
-        allCommands.addAll(getWarnCommands());
-        allCommands.addAll(getTicketCommands());
-        allCommands.addAll(getModerationCommands());
-        allCommands.addAll(getStatisticsCommands());
-        allCommands.addAll(getRuleCommands());
-        allCommands.addAll(getJustVerifyButtonCommand());
+        allCommands.add(getLogChannelCommand());
+        allCommands.add(getWarnCommand());
+        allCommands.add(getTicketCommand());
+        allCommands.add(getModerationCommand());
+        allCommands.add(getStatisticsCommand());
+        allCommands.add(getRulesCommand());
+        allCommands.add(getVerifyButtonCommand());
         allCommands.addAll(getFeedbackCommands());
-        allCommands.addAll(getSelectRolesCommands());
+        allCommands.add(getSelectRolesCommand());
         return allCommands;
     }
 
@@ -63,38 +64,47 @@ public class AddGuildSlashCommands {
     }
 
     /**
-     * Get log channel commands without updating guild
+     * Get log channel command with subcommands
      */
-    private List<SlashCommandData> getLogChannelCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("set-log-channel", "Sets the log channel.")
-                .addOption(OptionType.CHANNEL, "logchannel", "Specified Channel will be log channel", true));
-        commands.add(Commands.slash("get-log-channel", "gets the log channel"));
-        return commands;
+    private SlashCommandData getLogChannelCommand() {
+        return Commands.slash("log-channel", "Manage the log channel")
+                .addSubcommands(
+                        new SubcommandData("set", "Set the log channel")
+                                .addOption(OptionType.CHANNEL, "channel", "Channel to use as log channel", true),
+                        new SubcommandData("get", "Get the current log channel")
+                );
     }
 
-    private List<SlashCommandData> getSelectRolesCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("send-select-roles", "Sends a select roles message in the current channel"));
-        commands.add(Commands.slash("add-select-role", "Adds a role to the select roles message")
-                .addOption(OptionType.ROLE, "role", "Role to add to the select roles message", true)
-                .addOption(OptionType.STRING, "description", "Description for the role in the select menu", false)
-                .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false));
-        commands.add(Commands.slash("remove-select-role", "Removes a role from the select roles message")
-                .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true));
-        return commands;
+    /**
+     * Get select roles command with subcommands
+     */
+    private SlashCommandData getSelectRolesCommand() {
+        return Commands.slash("select-roles", "Manage role selection")
+                .addSubcommands(
+                        new SubcommandData("send", "Send a select roles message in the current channel"),
+                        new SubcommandData("add", "Add a role to the select roles message")
+                                .addOption(OptionType.ROLE, "role", "Role to add to the select roles message", true)
+                                .addOption(OptionType.STRING, "description", "Description for the role in the select menu", false)
+                                .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false),
+                        new SubcommandData("remove", "Remove a role from the select roles message")
+                                .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true)
+                );
     }
 
-    private List<SlashCommandData> getJustVerifyButtonCommand() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("send-just-verify-button", "Sends a message with a button that gives a role"));
-        commands.add(Commands.slash("remove-just-verify-button", "Removes the Just Verify Button embed from the current channel"));
-        commands.add(Commands.slash("add-just-verify-button", "Adds a Just Verify Button embed to the database (max 3)")
-                .addOption(OptionType.ROLE, "role-to-give", "Role to give members after pressing the verify button", true)
-                .addOption(OptionType.ROLE, "role-to-remove", "Role to remove from members after pressing the verify button", false)
-                .addOption(OptionType.STRING, "button-label", "Name of the button", false)
-                .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false));
-        return commands;
+    /**
+     * Get verify button command with subcommands
+     */
+    private SlashCommandData getVerifyButtonCommand() {
+        return Commands.slash("verify-button", "Manage verification buttons")
+                .addSubcommands(
+                        new SubcommandData("send", "Send a message with a button that gives a role"),
+                        new SubcommandData("remove", "Remove the verify button embed from the current channel"),
+                        new SubcommandData("add", "Add a verify button configuration (max 3)")
+                                .addOption(OptionType.ROLE, "role-to-give", "Role to give members after pressing the verify button", true)
+                                .addOption(OptionType.ROLE, "role-to-remove", "Role to remove from members after pressing the verify button", false)
+                                .addOption(OptionType.STRING, "button-label", "Name of the button", false)
+                                .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false)
+                );
     }
 
     private List<SlashCommandData> getFeedbackCommands() {
@@ -105,110 +115,113 @@ public class AddGuildSlashCommands {
     }
 
     /**
-     * Get Rule Commands without updating guild
+     * Get rules command with subcommands
      */
-    private List<SlashCommandData> getRuleCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("setup-rules", "Sets up the rules in the current channel"));
-        commands.add(Commands.slash("add-rules-embed", "Adds a rules embed to the database (max 3)")
-                .addOption(OptionType.ROLE, "role_to_give", "Role to give members after pressing the verify button", true)
-                .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false));
-        commands.add(Commands.slash("list-rules-embeds", "Lists all rules embeds in this server"));
-        commands.add(Commands.slash("remove-rules-embed", "Removes a rules embed from the database")
-                .addOption(OptionType.INTEGER, "embed_id", "ID of the embed to remove", true));
-        return commands;
+    private SlashCommandData getRulesCommand() {
+        return Commands.slash("rules", "Manage server rules")
+                .addSubcommands(
+                        new SubcommandData("setup", "Set up the rules in the current channel"),
+                        new SubcommandData("add", "Add a rules embed to the database (max 3)")
+                                .addOption(OptionType.ROLE, "role_to_give", "Role to give members after pressing the verify button", true)
+                                .addOption(OptionType.STRING, "color", "Color of the embed (e.g., green)", false),
+                        new SubcommandData("list", "List all rules embeds in this server"),
+                        new SubcommandData("remove", "Remove a rules embed from the database")
+                                .addOption(OptionType.INTEGER, "embed_id", "ID of the embed to remove", true)
+                );
     }
 
     /**
-     * Get warn commands without updating guild
+     * Get warn command with subcommands
      */
-    private List<SlashCommandData> getWarnCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("warn", "Issue a warning to a user")
-                .addOption(OptionType.USER, "user", "User to warn", true)
-                .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
-                .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false));
-        commands.add(Commands.slash("set-warn-settings", "Configure warning system settings")
-                .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
-                .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
-                .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false));
-        commands.add(Commands.slash("get-warn-settings", "View current warning system settings"));
-        return commands;
+    private SlashCommandData getWarnCommand() {
+        return Commands.slash("warn", "Manage warnings")
+                .addSubcommands(
+                        new SubcommandData("user", "Issue a warning to a user")
+                                .addOption(OptionType.USER, "user", "User to warn", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
+                                .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
+                        new SubcommandData("settings-set", "Configure warning system settings")
+                                .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
+                                .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
+                                .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
+                        new SubcommandData("settings-get", "View current warning system settings")
+                );
     }
 
     /**
-     * Get moderation commands without updating guild
+     * Get moderation command with subcommands
      */
-    private List<SlashCommandData> getModerationCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("kick", "Kick a user from the server")
-                .addOption(OptionType.USER, "user", "User to kick", true)
-                .addOption(OptionType.STRING, "reason", "Reason for the kick", false));
-        commands.add(Commands.slash("ban", "Ban a user from the server")
-                .addOption(OptionType.USER, "user", "User to ban", true)
-                .addOption(OptionType.STRING, "reason", "Reason for the ban", false));
-        commands.add(Commands.slash("unban", "Unban a user from the server")
-                .addOption(OptionType.STRING, "userid", "User ID to unban", true)
-                .addOption(OptionType.STRING, "reason", "Reason for the unban", false));
-        commands.add(Commands.slash("timeout", "Timeout a user for a specified duration")
-                .addOption(OptionType.USER, "user", "User to timeout", true)
-                .addOption(OptionType.INTEGER, "minutes", "Duration in minutes (max 40320 = 28 days)", true)
-                .addOption(OptionType.STRING, "reason", "Reason for the timeout", false));
-        commands.add(Commands.slash("untimeout", "Remove timeout from a user")
-                .addOption(OptionType.USER, "user", "User to remove timeout from", true)
-                .addOption(OptionType.STRING, "reason", "Reason for removing timeout", false));
-        commands.add(Commands.slash("purge", "Delete multiple messages from the channel")
-                .addOption(OptionType.INTEGER, "amount", "Number of messages to delete (1-100)", true)
-                .addOption(OptionType.USER, "user", "Only delete messages from this user", false));
-        commands.add(Commands.slash("slowmode", "Set slowmode for the current channel")
-                .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true));
-        return commands;
+    private SlashCommandData getModerationCommand() {
+        return Commands.slash("mod", "Moderation commands")
+                .addSubcommands(
+                        new SubcommandData("kick", "Kick a user from the server")
+                                .addOption(OptionType.USER, "user", "User to kick", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for the kick", false),
+                        new SubcommandData("ban", "Ban a user from the server")
+                                .addOption(OptionType.USER, "user", "User to ban", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for the ban", false),
+                        new SubcommandData("unban", "Unban a user from the server")
+                                .addOption(OptionType.STRING, "userid", "User ID to unban", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for the unban", false),
+                        new SubcommandData("timeout", "Timeout a user for a specified duration")
+                                .addOption(OptionType.USER, "user", "User to timeout", true)
+                                .addOption(OptionType.INTEGER, "minutes", "Duration in minutes (max 40320 = 28 days)", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for the timeout", false),
+                        new SubcommandData("untimeout", "Remove timeout from a user")
+                                .addOption(OptionType.USER, "user", "User to remove timeout from", true)
+                                .addOption(OptionType.STRING, "reason", "Reason for removing timeout", false),
+                        new SubcommandData("purge", "Delete multiple messages from the channel")
+                                .addOption(OptionType.INTEGER, "amount", "Number of messages to delete (1-100)", true)
+                                .addOption(OptionType.USER, "user", "Only delete messages from this user", false),
+                        new SubcommandData("slowmode", "Set slowmode for the current channel")
+                                .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true)
+                );
     }
 
     /**
-     * Get ticket commands without updating guild
+     * Get ticket command with subcommands
      */
-    private List<SlashCommandData> getTicketCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("ticket-setup", "Configure the ticket system for this server")
-                .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
-                .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
-                .addOption(OptionType.ROLE, "support-role", "Role that can manage tickets", false));
-                //.addOption(OptionType.BOOLEAN, "transcript_enabled", "Enable ticket transcripts", false));
-        commands.add(Commands.slash("ticket-panel", "Create a ticket creation panel in current channel"));
-        commands.add(Commands.slash("set-ticket-config", "Set custom title and description for the ticket panel")
-                .addOption(OptionType.STRING, "title", "Title for the ticket panel embed", true)
-                .addOption(OptionType.STRING, "description", "Description for the ticket panel embed", true));
-        commands.add(Commands.slash("close-ticket", "Close the current ticket")
-                .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false));
-        commands.add(Commands.slash("assign-ticket", "Assign current ticket to a staff member")
-                .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true));
-        commands.add(Commands.slash("set-ticket-priority", "Change the priority of the current ticket")
-                .addOptions(new OptionData(OptionType.STRING, "priority", "Priority level", true)
-                        .addChoice("Low", "LOW")
-                        .addChoice("Medium", "MEDIUM")
-                        .addChoice("High", "HIGH")
-                        .addChoice("Urgent", "URGENT")));
-        commands.add(Commands.slash("ticket-info", "Get information about the current ticket"));
-        //commands.add(Commands.slash("ticket-transcript", "Generate a transcript of the current ticket"));
-        return commands;
+    private SlashCommandData getTicketCommand() {
+        return Commands.slash("ticket", "Manage tickets")
+                .addSubcommands(
+                        new SubcommandData("setup", "Configure the ticket system for this server")
+                                .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
+                                .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
+                                .addOption(OptionType.ROLE, "support-role", "Role that can manage tickets", false),
+                        new SubcommandData("panel", "Create a ticket creation panel in current channel"),
+                        new SubcommandData("config", "Set custom title and description for the ticket panel")
+                                .addOption(OptionType.STRING, "title", "Title for the ticket panel embed", true)
+                                .addOption(OptionType.STRING, "description", "Description for the ticket panel embed", true),
+                        new SubcommandData("close", "Close the current ticket")
+                                .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
+                        new SubcommandData("assign", "Assign current ticket to a staff member")
+                                .addOption(OptionType.USER, "staff", "Staff member to assign ticket to", true),
+                        new SubcommandData("priority", "Change the priority of the current ticket")
+                                .addOptions(new OptionData(OptionType.STRING, "priority", "Priority level", true)
+                                        .addChoice("Low", "LOW")
+                                        .addChoice("Medium", "MEDIUM")
+                                        .addChoice("High", "HIGH")
+                                        .addChoice("Urgent", "URGENT")),
+                        new SubcommandData("info", "Get information about the current ticket")
+                );
     }
 
 
     /**
-     * Get statistics commands without updating guild
+     * Get statistics command with subcommands
      */
-    private List<SlashCommandData> getStatisticsCommands() {
-        List<SlashCommandData> commands = new ArrayList<>();
-        commands.add(Commands.slash("stats", "View lifetime server moderation statistics"));
-        commands.add(Commands.slash("stats-today", "View today's server moderation statistics"));
-        commands.add(Commands.slash("stats-week", "View this week's server moderation statistics"));
-        commands.add(Commands.slash("stats-date", "View server statistics for a specific date")
-                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true));
-        commands.add(Commands.slash("stats-user", "View user information and statistics")
-                .addOption(OptionType.USER, "user", "User to view information for", true)
-                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false));
-        return commands;
+    private SlashCommandData getStatisticsCommand() {
+        return Commands.slash("stats", "View server statistics")
+                .addSubcommands(
+                        new SubcommandData("lifetime", "View lifetime server moderation statistics"),
+                        new SubcommandData("today", "View today's server moderation statistics"),
+                        new SubcommandData("week", "View this week's server moderation statistics"),
+                        new SubcommandData("date", "View server statistics for a specific date")
+                                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format (e.g., 2024-01-15)", true),
+                        new SubcommandData("user", "View user information and statistics")
+                                .addOption(OptionType.USER, "user", "User to view information for", true)
+                                .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false)
+                );
     }
 
     // The old methods are kept for backwards compatibility but now use the new approach

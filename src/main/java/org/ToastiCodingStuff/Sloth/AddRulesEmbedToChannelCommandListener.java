@@ -165,30 +165,39 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (!event.getName().equals("rules")) {
+            return;
+        }
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
         String guildId = event.getGuild().getId();
 
-        switch (event.getName()) {
-            case "add-rules-embed":
+        switch (subcommand) {
+            case "add":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("add-rules-embed");
+                handler.insertOrUpdateGlobalStatistic("rules-add");
                 handleAddRulesEmbedCommand(event, guildId);
                 break;
-            case "setup-rules":
+            case "setup":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("setup-rules");
+                handler.insertOrUpdateGlobalStatistic("rules-setup");
                 handleSetupRulesCommand(event, guildId);
                 break;
-            case "remove-rules-embed":
+            case "remove":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("remove-rules-embed");
+                handler.insertOrUpdateGlobalStatistic("rules-remove");
                 handleRemoveEmbedCommand(event, guildId);
                 break;
-            case "list-rules-embeds":
+            case "list":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("list-rules-embeds");
+                handler.insertOrUpdateGlobalStatistic("rules-list");
                 List<DatabaseHandler.RulesEmbedData> embeds = handler.getAllRulesEmbedDataFromDatabase(guildId);
                 if (embeds.isEmpty()) {
-                    event.reply("❌ No rules embeds found in the database! Use `/add-rules-embed` to create some first.").setEphemeral(true).queue();
+                    event.reply("❌ No rules embeds found in the database! Use `/rules add` to create some first.").setEphemeral(true).queue();
                     return;
                 }
 
@@ -290,7 +299,7 @@ public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
         ArrayList<DatabaseHandler.RulesEmbedData> embedDataList = handler.getAllRulesEmbedDataFromDatabase(guildId);
         
         if (embedDataList.isEmpty()) {
-            event.reply("❌ No rules embeds found in the database! Use `/add-rules-embed` to create some first.").setEphemeral(true).queue();
+            event.reply("❌ No rules embeds found in the database! Use `/rules add` to create some first.").setEphemeral(true).queue();
             return;
         }
 

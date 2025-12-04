@@ -16,19 +16,31 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (event.getName().equals("add-just-verify-button")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("add-just-verify-button");
-            handleJustVerifyButtonCommand(event);
+        if (!event.getName().equals("verify-button")) {
+            return;
         }
-        else if (event.getName().equals("remove-verify-button")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("remove-verify-button");
-            handleJustVerifyButtonRemove(event);
-        } else if (event.getName().equals("send-just-verify-button")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("send-just-verify-button");
-            handleSendJustVerifyButtonCommand(event);
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
+        switch (subcommand) {
+            case "add":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("verify-button-add");
+                handleJustVerifyButtonCommand(event);
+                break;
+            case "remove":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("verify-button-remove");
+                handleJustVerifyButtonRemove(event);
+                break;
+            case "send":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("verify-button-send");
+                handleSendJustVerifyButtonCommand(event);
+                break;
         }
     }
 
@@ -79,10 +91,6 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
     }
 
     private void handleSendJustVerifyButtonCommand(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("send-just-verify-button")) {
-            return; // Ignore other commands
-        }
-
         String guildId = event.getGuild().getId();
 
         // Check if user has manage server permission
@@ -96,22 +104,17 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         String buttonEmoji = handler.getJustVerifyButtonEmojiID(guildId);
 
         if (roleToGiveID == null) {
-            event.reply("❌ No Just Verify button configured for this server. Please set it up first.").setEphemeral(true).queue();
+            event.reply("❌ No verify button configured for this server. Please use `/verify-button add` first.").setEphemeral(true).queue();
             return;
         }
 
         event.getChannel().sendMessage("Click the button below to verify!").setActionRow(
             handler.createJustVerifyButton(roleToGiveID, roleToRemoveID, buttonLabel, buttonEmoji)
         ).queue();
-        event.reply("✅ Just Verify button sent!").setEphemeral(true).queue();
+        event.reply("✅ Verify button sent!").setEphemeral(true).queue();
     }
 
     private void handleJustVerifyButtonCommand(SlashCommandInteractionEvent event) {
-
-        if (!event.getName().equals("add-just-verify-button")) {
-            return; // Ignore other commands
-        }
-
         String guildId = event.getGuild().getId();
 
         // Check if user has manage server permission
@@ -127,14 +130,10 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         handler.setJustVerifyButton(guildId, roleToGiveID, roleToRemoveID, buttonLabel, buttonEmoji);
 
-        event.reply("✅ Just Verify button added!").setEphemeral(true).queue();
+        event.reply("✅ Verify button configuration added!").setEphemeral(true).queue();
     }
 
     private void handleJustVerifyButtonRemove(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("remove-just-verify-button")) {
-            return; // Ignore other commands
-        }
-
         String guildId = event.getGuild().getId();
 
         // Check if user has manage server permission
@@ -145,6 +144,6 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         handler.removeJustVerifyButton(guildId);
 
-        event.reply("✅ Just Verify button removed!").setEphemeral(true).queue();
+        event.reply("✅ Verify button configuration removed!").setEphemeral(true).queue();
     }
 }

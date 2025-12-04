@@ -30,25 +30,31 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (event.getName().equals("remove-select-role")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("remove-select-role");
-            handleRemoveSelectRole(event, Objects.requireNonNull(event.getOption("role")).getAsRole());
+        if (!event.getName().equals("select-roles")) {
+            return;
         }
-        if (event.getName().equals("add-select-role")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("add-select-role");
-            handleAddSelectRole(event);
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
         }
-        if (event.getName().equals("send-select-roles")) {
-            if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("send-select-roles");
-            handleSendSelectRole(event);
-        }
-        if (event.getName().equals("edit-select-role-embed")) {
-            if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-            handler.insertOrUpdateGlobalStatistic("edit-select-role-embed");
-            handleEditSelectRoleEmbed(event);
+
+        switch (subcommand) {
+            case "remove":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("select-roles-remove");
+                handleRemoveSelectRole(event, Objects.requireNonNull(event.getOption("role")).getAsRole());
+                break;
+            case "add":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("select-roles-add");
+                handleAddSelectRole(event);
+                break;
+            case "send":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("select-roles-send");
+                handleSendSelectRole(event);
+                break;
         }
     }
 
