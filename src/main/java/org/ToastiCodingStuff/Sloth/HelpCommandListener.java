@@ -157,12 +157,12 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
                                 "• Configure only the ones you need", false)
                         .addField("**Step 2: Configure Systems**", 
-                                "**Log Channel:** `/set-log-channel #channel`\n" +
-                                "**Warning System:** `/set-warn-settings`\n" +
-                                "**Ticket System:** `/ticket-setup`\n" +
-                                "**Moderation:** Ready to use after activation!", false)
+                                "**Log Channel:** `/log-channel set #channel`\n" +
+                                "**Warning System:** `/warn settings-set`\n" +
+                                "**Ticket System:** `/ticket setup`\n" +
+                                "**Moderation:** Ready to use with `/mod` commands!", false)
                         .addField("**Step 3: Create Panels (Optional)**", 
-                                "**Ticket Panel:** `/ticket-panel` - Creates user-friendly ticket creation\n" +
+                                "**Ticket Panel:** `/ticket panel` - Creates user-friendly ticket creation\n" +
                                 "Place in a public channel for easy access", false)
                         .addField("**Step 4: Set Permissions**", 
                                 "• Ensure staff have appropriate Discord permissions\n" +
@@ -191,42 +191,48 @@ public class HelpCommandListener extends ListenerAdapter {
                 embed.setTitle("📖 Command Reference")
                         .setDescription("Complete list of available commands by system:\n\n")
                         .addField("**Log Channel System**",
-                                "`/set-log-channel` - Configure logging channel\n" +
-                                "`/get-log-channel` - View current log channel", false)
+                                "`/log-channel set` - Configure logging channel\n" +
+                                "`/log-channel get` - View current log channel", false)
                         .addField("**Warning System**",
-                                "`/warn` - Issue warning to user\n" +
-                                "`/set-warn-settings` - Configure warning thresholds\n" +
-                                "`/get-warn-settings` - View warning configuration", false)
+                                "`/warn user` - Issue warning to user\n" +
+                                "`/warn settings-set` - Configure warning thresholds\n" +
+                                "`/warn settings-get` - View warning configuration", false)
                         .addField("**Ticket System**",
-                                "`/ticket-setup` - Configure ticket system\n" +
-                                "`/ticket-panel` - Create ticket creation panel\n" +
-                                "`/close-ticket` - Close current ticket\n" +
-                                "`/assign-ticket` - Assign to staff member\n" +
-                                "`/set-ticket-priority` - Change ticket priority\n" +
-                                "`/ticket-info` - Get ticket information\n", false)
+                                "`/ticket setup` - Configure ticket system\n" +
+                                "`/ticket panel` - Create ticket creation panel\n" +
+                                "`/ticket close` - Close current ticket\n" +
+                                "`/ticket assign` - Assign to staff member\n" +
+                                "`/ticket priority` - Change ticket priority\n" +
+                                "`/ticket info` - Get ticket information\n", false)
                         .addField("**Moderation System**",
-                                "`/kick` `/ban` `/unban` - User management\n" +
-                                "`/timeout` `/untimeout` - Temporary restrictions\n" +
-                                "`/purge` - Delete multiple messages\n" +
-                                "`/slowmode` - Set channel slowmode", false)
+                                "`/mod kick` `/mod ban` `/mod unban` - User management\n" +
+                                "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
+                                "`/mod purge` - Delete multiple messages\n" +
+                                "`/mod slowmode` - Set channel slowmode", false)
                         .addField("**Statistics System**",
-                                "`/stats-today` - Today's server statistics\n" +
-                                "`/stats-week` - Weekly statistics\n" +
-                                "`/stats-date` - Statistics for specific date\n" +
-                                "`/user-info` - View user information and statistics\n" +
-                                "`/user-stats-date` - View user statistics for specific date", false)
+                                "`/stats lifetime` - Lifetime server statistics\n" +
+                                "`/stats today` - Today's server statistics\n" +
+                                "`/stats week` - Weekly statistics\n" +
+                                "`/stats date` - Statistics for specific date\n" +
+                                "`/stats user` - View user information and statistics", false)
                         .addField("**Select Roles System**",
-                                "`/add-select-role` - Add role to selection list\n" +
-                                "`/remove-select-role` - Remove role from selection list\n" +
-                                "`/send-select-roles` - Send role selection interface\n" +
-                                "`/edit-select-role-embed` - Edit title/description/footer/color of selection embed\n" +
+                                "`/select-roles add` - Add role to selection list\n" +
+                                "`/select-roles remove` - Remove role from selection list\n" +
+                                "`/select-roles send` - Send role selection interface\n" +
                                 "*Supports reactions, dropdowns, and buttons*", false)
                         .addField("**Rules/Verification System**",
-                                "`/add-rules-embed` - Create rules embeds with verification\n" +
-                                "`/setup-rules` - Display rules in current channel\n" +
+                                "`/rules add` - Create rules embeds with verification\n" +
+                                "`/rules setup` - Display rules in current channel\n" +
+                                "`/rules list` - List all rules embeds\n" +
+                                "`/rules remove` - Remove a rules embed\n" +
                                 "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
+                        .addField("**Verify Button System**",
+                                "`/verify-button add` - Add verify button configuration\n" +
+                                "`/verify-button remove` - Remove verify button configuration\n" +
+                                "`/verify-button send` - Send verify button message", false)
                         .addField("**General Commands**",
-                                "`/help` - Show this help system", false)
+                                "`/help` - Show this help system\n" +
+                                "`/feedback` - Send feedback to the developer", false)
                         .setColor(Color.MAGENTA)
                         .setFooter("All commands require appropriate permissions");
 

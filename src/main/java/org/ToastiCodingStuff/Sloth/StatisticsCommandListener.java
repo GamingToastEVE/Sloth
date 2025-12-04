@@ -18,32 +18,43 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (!event.getName().equals("stats")) {
+            return;
+        }
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
         String guildId = event.getGuild().getId();
 
-        switch (event.getName()) {
-            case "stats-today":
+        switch (subcommand) {
+            case "today":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("stats-today");
                 handleTodayStatsCommand(event, guildId);
                 break;
-            case "stats-week":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}handler.insertOrUpdateGlobalStatistic("stats-week");
+            case "week":
+                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
+                handler.insertOrUpdateGlobalStatistic("stats-week");
                 handleWeeklyStatsCommand(event, guildId);
                 break;
-            case "stats-date":
+            case "date":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("stats-date");
                 handleDateStatsCommand(event, guildId);
                 break;
-            case "stats-user":
+            case "user":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("stats-user");
                 handleUserInfoCommand(event, guildId);
                 break;
-            case "stats":
+            case "lifetime":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("stats");
+                handler.insertOrUpdateGlobalStatistic("stats-lifetime");
                 handleStatsCommand(event, guildId);
+                break;
         }
     }
 

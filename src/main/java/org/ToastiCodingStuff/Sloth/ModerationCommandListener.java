@@ -23,42 +23,51 @@ public class ModerationCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (!event.getName().equals("mod")) {
+            return;
+        }
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
         String guildId = event.getGuild().getId();
 
-        switch (event.getName()) {
+        switch (subcommand) {
             case "kick":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
-                handler.insertOrUpdateGlobalStatistic("kick");
+                handler.insertOrUpdateGlobalStatistic("mod-kick");
                 handleKickCommand(event, guildId);
                 break;
             case "ban":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
-                handler.insertOrUpdateGlobalStatistic("ban");
+                handler.insertOrUpdateGlobalStatistic("mod-ban");
                 handleBanCommand(event, guildId);
                 break;
             case "unban":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
-                handler.insertOrUpdateGlobalStatistic("unban");
+                handler.insertOrUpdateGlobalStatistic("mod-unban");
                 handleUnbanCommand(event, guildId);
                 break;
             case "timeout":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
-                handler.insertOrUpdateGlobalStatistic("timeout");
+                handler.insertOrUpdateGlobalStatistic("mod-timeout");
                 handleTimeoutCommand(event, guildId);
                 break;
             case "untimeout":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {return;}
-                handler.insertOrUpdateGlobalStatistic("untimeout");
+                handler.insertOrUpdateGlobalStatistic("mod-untimeout");
                 handleUntimeoutCommand(event, guildId);
                 break;
             case "purge":
                 if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {return;}
-                handler.insertOrUpdateGlobalStatistic("purge");
+                handler.insertOrUpdateGlobalStatistic("mod-purge");
                 handlePurgeCommand(event, guildId);
                 break;
             case "slowmode":
                 if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {return;}
-                handler.insertOrUpdateGlobalStatistic("slowmode");
+                handler.insertOrUpdateGlobalStatistic("mod-slowmode");
                 handleSlowmodeCommand(event, guildId);
                 break;
         }

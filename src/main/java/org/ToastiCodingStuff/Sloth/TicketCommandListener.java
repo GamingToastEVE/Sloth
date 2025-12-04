@@ -31,47 +31,51 @@ public class TicketCommandListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        if (!event.getName().equals("ticket")) {
+            return;
+        }
+
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) {
+            return;
+        }
+
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
 
-        switch (event.getName()) {
-            case "ticket-setup":
+        switch (subcommand) {
+            case "setup":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-setup");
                 handleTicketSetup(event, guildId);
                 break;
-            case "ticket-panel":
+            case "panel":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-panel");
                 handleTicketPanel(event, guildId);
                 break;
-            case "set-ticket-config":
+            case "config":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("set-ticket-config");
+                handler.insertOrUpdateGlobalStatistic("ticket-config");
                 handleSetTicketConfig(event, guildId);
                 break;
-            case "close-ticket":
+            case "close":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("close-ticket");
+                handler.insertOrUpdateGlobalStatistic("ticket-close");
                 handleCloseTicket(event, guildId);
                 break;
-            case "assign-ticket":
+            case "assign":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("assign-ticket");
+                handler.insertOrUpdateGlobalStatistic("ticket-assign");
                 handleAssignTicket(event, guildId);
                 break;
-            case "set-ticket-priority":
+            case "priority":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("set-ticket-priority");
+                handler.insertOrUpdateGlobalStatistic("ticket-priority");
                 handleSetTicketPriority(event, guildId);
                 break;
-            case "ticket-info":
+            case "info":
                 handler.insertOrUpdateGlobalStatistic("ticket-info");
                 handleTicketInfo(event, guildId);
-                break;
-            case "ticket-transcript":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("ticket-transcript");
-                handleTicketTranscript(event, guildId);
                 break;
         }
     }
