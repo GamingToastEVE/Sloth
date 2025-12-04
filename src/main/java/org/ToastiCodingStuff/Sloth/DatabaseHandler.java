@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import org.checkerframework.checker.units.qual.C;
 
 public class DatabaseHandler {
 
@@ -210,18 +211,12 @@ public class DatabaseHandler {
     /**
      * Check if database tables already exist
      */
-    private boolean tablesAlreadyExist() {
+    private boolean tableAlreadyExist (String tableName) {
         try (Connection connection = getConnection()) {
             DatabaseMetaData meta = connection.getMetaData();
-            String[] tableNames = {
-                "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel, just_verify_button", "user_statistics, role_select, role_select_embeds"
-            };
-            for (String tableName : tableNames) {
-                ResultSet rs = meta.getTables(null, null, tableName, null);
-                if (!rs.next()) {
-                    return false; // If any table does not exist, return false
-                }
+            ResultSet rs = meta.getTables(null, null, tableName, null);
+            if (!rs.next()) {
+                return false; // If any table does not exist, return false
             }
             return true; // All tables exist
         } catch (SQLException e) {
@@ -249,41 +244,67 @@ public class DatabaseHandler {
      * - Rollback safety (additive changes only)
      * - Migration history and performance tracking
      */
-    private void initializeTables() {
-        try (Connection connection = getConnection();
-             Statement stmt = connection.createStatement()) {
+    protected void initializeTables() {
+        try (Connection connection = getConnection()) {
 
             // Check for every table if already exist, if so apply migrations instead of full initialization
-            if (tablesAlreadyExist()) {
-                System.out.println("Database tables already exist. Running comprehensive migration check...");
-                
-                // Run the comprehensive migration system to detect and add missing columns
-                migrationManager.detectAndApplyMissingColumns();
-                
-                // Apply any missing indexes for existing tables
-                applyMissingIndexes();
-                
-                // Validate the final schema
-                migrationManager.validateDatabaseSchema();
-                
-                return;
+            String[] tableNames = {
+                    "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
+                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "active_timers", "role_events"
+            };
+            for (String tableName : tableNames) {
+                if (!tableAlreadyExist(tableName)) {
+                    System.out.println("Table '" + tableName + "' does not exist. Proceeding with full initialization.");
+                    switch (tableName) {
+                        case "users":
+                            createUsersTable();
+                            break;
+                        case "guilds":
+                            createGuildsTable();
+                            break;
+                        case "warnings":
+                            createWarningsTable();
+                            break;
+                        case "moderation_actions":
+                            createModerationActionsTable();
+                            break;
+                        case "tickets":
+                            createTicketsTable();
+                            break;
+                        case "ticket_messages":
+                            createTicketMessagesTable();
+                            break;
+                        case "guild_settings":
+                            createGuildSettingsTable();
+                            break;
+                        case "statistics":
+                            createStatisticsTable();
+                            break;
+                        case "user_statistics":
+                            createUserStatisticsTable();
+                            break;
+                        case "rules_embeds_channel":
+                            createRulesEmbedsChannel();
+                            break;
+                        case "just_verify_button":
+                            createJustVerifyButtonTable();
+                            break;
+                        case "role_select":
+                            createSelectRolesTable();
+                            break;
+                        case "role_select_embeds":
+                            createSelectRolesEmbedsTable();
+                            break;
+                        case "active_timers":
+                            createActiveTimersTable();
+                            break;
+                        case "role_events":
+                            createRoleEventsTable();
+                            break;
+                    }
+                    return;
+                }
             }
-
-            // If tables don't exist, create them from scratch
-            System.out.println("Creating database tables from scratch...");
-            createUsersTable();
-            createGuildsTable();
-            createWarningsTable();
-            createModerationActionsTable();
-            createTicketsTable();
-            createTicketMessagesTable();
-            createGuildSettingsTable();
-            createStatisticsTable();
-            createUserStatisticsTable();
-            createRulesEmbedsChannel();
-            createJustVerifyButtonTable();
-            createSelectRolesTable();
-            createSelectRolesEmbedsTable();
             
             // Handle statistics table migrations (legacy compatibility)
             migrateStatisticsTable();
@@ -575,7 +596,44 @@ public class DatabaseHandler {
                 "verifications_performed INT DEFAULT 0, " +
                 "messages_sent INT DEFAULT 0, " +
                 "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                "UNIQUE(guild_id, user_id, date))";
+                "UNIQUE(guild_id, user_id))";
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
+    }
+
+    /**
+     * Create role_events table for the Timed Roles feature
+     */
+    private void createRoleEventsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS role_events (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "event_type VARCHAR(32) NOT NULL, " +
+                "role_id VARCHAR(32) NOT NULL, " +
+                "action_type VARCHAR(16) DEFAULT 'ADD', " +
+                "duration_seconds BIGINT DEFAULT 0, " +
+                "stack_type VARCHAR(16) DEFAULT 'REFRESH', " +
+                "trigger_data TEXT, " +
+                "active TINYINT(1) DEFAULT 1, " +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
+
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
+    }
+
+    private void createActiveTimersTable () throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS active_timers (" +
+                "    id INTEGER PRIMARY KEY AUTO_INCREMENT," +
+                "    guild_id VARCHAR(32) NOT NULL," +
+                "    user_id VARCHAR(32) NOT NULL," +
+                "    role_id VARCHAR(32) NOT NULL," +
+                "    expires_at DATETIME NOT NULL," +
+                "    source_event_id INTEGER," +
+                "    created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ");";
         try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
         }
@@ -3460,5 +3518,414 @@ public class DatabaseHandler {
             e.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Erstellt einen neuen Event-Eintrag in der Datenbank.
+     * * @param guildId Die ID des Discord Servers
+     * @param name Der Name des Events (z.B. "Newbie Schutz")
+     * @param eventType Der Trigger (z.B. "MEMBER_JOIN", "WARN_THRESHOLD")
+     * @param roleId Die betroffene Rolle
+     * @param actionType "ADD" (geben) oder "REMOVE" (nehmen)
+     * @param durationSeconds Wie lange die Rolle bleibt (0 = permanent)
+     * @param stackType "REFRESH" (Zeit zurücksetzen) oder "EXTEND" (Zeit addieren)
+     * @param triggerData JSON-String für Bedingungen (z.B. "{\"threshold\": 3}")
+     */
+    public void createRoleEvent(String guildId, String name, String eventType, String roleId, String actionType, long durationSeconds, String stackType, String triggerData) {
+        String query = "INSERT INTO role_events (guild_id, name, event_type, role_id, action_type, duration_seconds, stack_type, trigger_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setString(3, eventType);
+            stmt.setString(4, roleId);
+            stmt.setString(5, actionType != null ? actionType : "ADD");
+            stmt.setLong(6, durationSeconds);
+            stmt.setString(7, stackType != null ? stackType : "REFRESH");
+            stmt.setString(8, triggerData); // Kann null sein
+
+            stmt.executeUpdate();
+            System.out.println("Created role event: " + name + " for guild " + guildId);
+
+        } catch (SQLException e) {
+            System.err.println("Error creating role event: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Löscht ein Role-Event aus der Datenbank.
+     * * @param guildId Die ID der Guild (Sicherheitscheck)
+     * @param eventId Die ID des zu löschenden Events
+     * @return true wenn erfolgreich gelöscht, sonst false
+     */
+    public boolean deleteRoleEvent(String guildId, int eventId) {
+        String query = "DELETE FROM role_events WHERE id = ? AND guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setInt(1, eventId);
+            stmt.setString(2, guildId);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Deleted role event " + eventId + " for guild " + guildId);
+                return true;
+            } else {
+                System.out.println("No role event found with ID " + eventId + " for guild " + guildId);
+                return false;
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error deleting role event: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Aktualisiert ein bestehendes Role-Event.
+     * * @param eventId Die ID des Events, das bearbeitet wird
+     * @param guildId Die ID der Guild (Sicherheitscheck)
+     * @param name Neuer Name (oder null/alter Wert)
+     * @param eventType Neuer Trigger-Typ (z.B. "WARN_THRESHOLD")
+     * @param roleId Neue Rolle
+     * @param actionType "ADD" oder "REMOVE"
+     * @param durationSeconds Neue Dauer
+     * @param stackType "REFRESH" oder "EXTEND"
+     * @param triggerData Neues JSON für Bedingungen
+     * @param active Ob das Event aktiv sein soll (true/false)
+     * @return true bei Erfolg
+     */
+    public boolean updateRoleEvent(int eventId, String guildId, String name, String eventType, String roleId,
+                                   String actionType, long durationSeconds, String stackType, String triggerData, boolean active) {
+
+        String query = "UPDATE role_events SET " +
+                "name = ?, event_type = ?, role_id = ?, action_type = ?, " +
+                "duration_seconds = ?, stack_type = ?, trigger_data = ?, active = ? " +
+                "WHERE id = ? AND guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, name);
+            stmt.setString(2, eventType);
+            stmt.setString(3, roleId);
+            stmt.setString(4, actionType);
+            stmt.setLong(5, durationSeconds);
+            stmt.setString(6, stackType);
+            stmt.setString(7, triggerData);
+            stmt.setInt(8, active ? 1 : 0); // Boolean zu TinyInt konvertieren
+
+            // WHERE clause
+            stmt.setInt(9, eventId);
+            stmt.setString(10, guildId);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("Updated role event " + eventId + " (" + name + ")");
+                return true;
+            } else {
+                System.out.println("Failed to update: Role event " + eventId + " not found for guild " + guildId);
+                return false;
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error updating role event: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Data class to hold active timer information
+     */
+    public static class ActiveTimerData {
+        public final int id;
+        public final String guildId;
+        public final String userId;
+        public final String roleId;
+        public final Timestamp expiresAt;
+        public final int sourceEventId;
+
+        public ActiveTimerData(int id, String guildId, String userId, String roleId, Timestamp expiresAt, int sourceEventId) {
+            this.id = id;
+            this.guildId = guildId;
+            this.userId = userId;
+            this.roleId = roleId;
+            this.expiresAt = expiresAt;
+            this.sourceEventId = sourceEventId;
+        }
+    }
+
+    /**
+     * Schaltet ein Event an oder aus (Toggle).
+     */
+    public boolean toggleRoleEventActive(String guildId, int eventId, boolean isActive) {
+        String query = "UPDATE role_events SET active = ? WHERE id = ? AND guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setInt(1, isActive ? 1 : 0);
+            stmt.setInt(2, eventId);
+            stmt.setString(3, guildId);
+
+            return stmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Error toggling role event status: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Startet einen Timer für eine Rolle.
+     * * @param guildId Die ID des Discord Servers
+     * @param userId Die ID des Users
+     * @param roleId Die ID der Rolle, die entfernt werden muss
+     * @param durationSeconds In wie vielen Sekunden der Timer abläuft
+     * @param sourceEventId (Optional) Die ID des Events, das diesen Timer ausgelöst hat
+     */
+    public void addActiveTimer(String guildId, String userId, String roleId, long durationSeconds, int sourceEventId) {
+        String query = "INSERT INTO active_timers (guild_id, user_id, role_id, expires_at, source_event_id) VALUES (?, ?, ?, ?, ?)";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            // Ablaufzeitpunkt in Java berechnen (Sicherer als DB-spezifische SQL-Funktionen)
+            long expiryMillis = System.currentTimeMillis() + (durationSeconds * 1000);
+            Timestamp expiresAt = new Timestamp(expiryMillis);
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, roleId);
+            stmt.setTimestamp(4, expiresAt);
+
+            if (sourceEventId > 0) {
+                stmt.setInt(5, sourceEventId);
+            } else {
+                stmt.setNull(5, java.sql.Types.INTEGER);
+            }
+
+            stmt.executeUpdate();
+            System.out.println("Added active timer for user " + userId + " (Expires: " + expiresAt + ")");
+
+        } catch (SQLException e) {
+            System.err.println("Error adding active timer: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Holt alle Timer, die abgelaufen sind (expires_at <= JETZT).
+     * Wird vom Background-Loop aufgerufen.
+     */
+    public List<ActiveTimerData> getExpiredTimers() {
+        List<ActiveTimerData> expiredTimers = new ArrayList<>();
+        String query = "SELECT * FROM active_timers WHERE expires_at <= CURRENT_TIMESTAMP";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                expiredTimers.add(new ActiveTimerData(
+                        rs.getInt("id"),
+                        rs.getString("guild_id"),
+                        rs.getString("user_id"),
+                        rs.getString("role_id"),
+                        rs.getTimestamp("expires_at"),
+                        rs.getInt("source_event_id")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error fetching expired timers: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return expiredTimers;
+    }
+
+    /**
+     * Löscht einen Timer anhand seiner ID.
+     * Aufrufen, NACHDEM die Rolle im Discord entfernt wurde.
+     */
+    public void removeTimer (int timerId) {
+        String query = "DELETE FROM active_timers WHERE id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setInt(1, timerId);
+            stmt.executeUpdate();
+            // System.out.println("Removed active timer with ID: " + timerId);
+
+        } catch (SQLException e) {
+            System.err.println("Error removing timer " + timerId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Löscht einen Timer basierend auf User und Rolle (z.B. bei manuellem Unmute).
+     */
+    public boolean removeTimerManual (String guildId, String userId, String roleId) {
+        String query = "DELETE FROM active_timers WHERE guild_id = ? AND user_id = ? AND role_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, roleId);
+
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Error removing specific timer: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Verlängert einen bestehenden Timer (Stacking / Extend).
+     * @param additionalSeconds Sekunden, die auf die aktuelle Ablaufzeit addiert werden.
+     */
+    public boolean extendTimer (String guildId, String userId, String roleId, long additionalSeconds) {
+        String query = "UPDATE active_timers SET expires_at = DATE_ADD(expires_at, INTERVAL ? SECOND) " +
+                "WHERE guild_id = ? AND user_id = ? AND role_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setLong(1, additionalSeconds);
+            stmt.setString(2, guildId);
+            stmt.setString(3, userId);
+            stmt.setString(4, roleId);
+
+            return stmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Error extending timer: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Holt alle aktiven Timer für einen spezifischen User.
+     */
+    public List<ActiveTimerData> getActiveTimersForUser(String guildId, String userId) {
+        List<ActiveTimerData> userTimers = new ArrayList<>();
+        String query = "SELECT * FROM active_timers WHERE guild_id = ? AND user_id = ? ORDER BY expires_at ASC";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    userTimers.add(new ActiveTimerData(
+                            rs.getInt("id"),
+                            rs.getString("guild_id"),
+                            rs.getString("user_id"),
+                            rs.getString("role_id"),
+                            rs.getTimestamp("expires_at"),
+                            rs.getInt("source_event_id")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error fetching user timers: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return userTimers;
+    }
+
+    // In DatabaseHandler.java einfügen:
+
+    public static class RoleEventData {
+        public final int id;
+        public final String name;
+        public final String eventType;
+        public final String roleId;
+        public final String actionType;
+        public final long durationSeconds;
+        public final String triggerData;
+        public final boolean active;
+
+        public RoleEventData(int id, String name, String eventType, String roleId, String actionType, long durationSeconds, String triggerData, boolean active) {
+            this.id = id;
+            this.name = name;
+            this.eventType = eventType;
+            this.roleId = roleId;
+            this.actionType = actionType;
+            this.durationSeconds = durationSeconds;
+            this.triggerData = triggerData;
+            this.active = active;
+        }
+    }
+
+    public RoleEventData getRoleEvent(int eventId) {
+        String query = "SELECT * FROM role_events WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, eventId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new RoleEventData(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("event_type"),
+                        rs.getString("role_id"),
+                        rs.getString("action_type"),
+                        rs.getLong("duration_seconds"),
+                        rs.getString("trigger_data"),
+                        rs.getInt("active") == 1
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Holt alle aktiven Events eines bestimmten Typs für eine Guild.
+     */
+    public List<RoleEventData> getRoleEventsByType(String guildId, RoleEventType type) {
+        List<RoleEventData> events = new ArrayList<>();
+        String query = "SELECT * FROM role_events WHERE guild_id = ? AND event_type = ? AND active = 1";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, type.toString());
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                events.add(new RoleEventData(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("event_type"),
+                        rs.getString("role_id"),
+                        rs.getString("action_type"),
+                        rs.getLong("duration_seconds"),
+                        rs.getString("trigger_data"),
+                        rs.getInt("active") == 1
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return events;
     }
 }

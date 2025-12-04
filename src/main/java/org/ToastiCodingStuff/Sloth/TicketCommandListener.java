@@ -180,13 +180,11 @@ public class TicketCommandListener extends ListenerAdapter {
         // Get customizable title and description from database
         String title = handler.getTicketTitle(guildId);
         String description = handler.getTicketDescription(guildId);
+        description = handler.processLinebreaks(description);
 
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(title)
-                .setDescription(description + "\n\n" +
-                        "**📋 What to include:**\n" +
-                        "• A clear description of your issue\n" +
-                        "• Any relevant information or screenshots\n")
+                .setDescription(description)
                 .setColor(Color.BLUE)
                 .setFooter("Ticket System • Click the button to get started");
 

@@ -91,7 +91,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         String roleId = handler.getRoleSelectRoleIDByEmoji(guildId, emoji);
         if (roleId != null) {
             Role role = event.getGuild().getRoleById(roleId);
-            if (event.getMember().getRoles().contains(role)) {
+            if (!event.getMember().getRoles().contains(role)) {
                 return;
             }
             if (role != null) {
@@ -308,11 +308,16 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
         assert mChannel != null;
         MessageCreateAction message = mChannel.sendMessageEmbeds(embedBuilder.build());
-        for (int i = 0; i < buttons.size(); i += 5) {
-            int end = Math.min(i + 5, buttons.size());
-            for (int j = 0; j < end; j += 5) {
-                message.addActionRow(buttons.get(i + j));
+        int size = buttons.size();
+        int remainder = buttons.size() % 5;
+        for (int i = 0; i < size; i += 5) {
+            if (remainder > 0) {
+                if (i + 5 > size) {
+                    message.addActionRow(buttons.subList(i, i + remainder));
+                    break;
+                }
             }
+            message.addActionRow(buttons.subList(i, i + 5));
         }
         message.queue();
     }

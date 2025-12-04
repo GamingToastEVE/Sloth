@@ -136,6 +136,9 @@ public class DatabaseMigrationManager {
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
         schemas.put("global_statistics", createGlobalStatisticsSchema());
         schemas.put("just_verify_button", createJustVerifyButtonSchema());
+        // In DatabaseMigrationManager.java -> getExpectedSchemas()
+        schemas.put("role_events", createRoleEventsSchema());
+        schemas.put("active_timers", createActiveTimersSchema());
 
         return schemas;
     }
@@ -371,6 +374,40 @@ public class DatabaseMigrationManager {
             .addColumn("command", "TEXT NOT NULL UNIQUE")
             .addColumn("number", "INTEGER DEFAULT 0")
             .addColumn("last_used", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the role_events table schema for timed roles configuration
+     */
+    private TableSchema createRoleEventsSchema() {
+        return new TableSchema("role_events")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(100) NOT NULL")
+                .addColumn("event_type", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("action_type", "VARCHAR(16) DEFAULT 'ADD'") // 'ADD' oder 'REMOVE'
+                .addColumn("duration_seconds", "BIGINT DEFAULT 0")
+                .addColumn("stack_type", "VARCHAR(16) DEFAULT 'REFRESH'")
+                .addColumn("trigger_data", "TEXT") // JSON String
+                .addColumn("active", "TINYINT(1) DEFAULT 1")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the active_timers table schema for currently running role timers
+     */
+    private TableSchema createActiveTimersSchema() {
+        return new TableSchema("active_timers")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("expires_at", "DATETIME NOT NULL")
+                .addColumn("source_event_id", "INTEGER")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                // Index für schnelle Abfragen im Background-Loop
+                .addIndex("CREATE INDEX IF NOT EXISTS idx_timers_expires ON active_timers(expires_at)");
     }
 
     /**
