@@ -42,7 +42,7 @@ Art. 6 (1)(f) GDPR – legitimate interest in maintaining a secure and stable se
 
 Personal data is stored only as long as necessary for the intended purpose.
 
-Temporary Data is only stored as long as its necessary.
+Temporary Data is only stored as long as its necessary and usually deleted after 30 days.
 
 Permanent storage (e.g., bans, blacklists, moderation logs) only occurs if explicitly required for functionality.
 
