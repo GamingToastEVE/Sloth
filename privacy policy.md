@@ -1,4 +1,5 @@
-Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot [Bot Name] ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
+Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot Soth ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
+This privacy policy only applies to the instance hosted by the developer.
 
 1. Data Controller
 
@@ -17,7 +18,7 @@ Interactions: commands you send to the Bot, related parameters.
 
 Log data: timestamps of requests, technical error logs.
 
-The Bot does not permanently store message content unless explicitly required for a specific feature (e.g., moderation logs, reminders). Such features will be clearly described.
+The Bot does NOT store any message contents.
 
 3. Purpose of Processing
 
@@ -41,7 +42,7 @@ Art. 6 (1)(f) GDPR – legitimate interest in maintaining a secure and stable se
 
 Personal data is stored only as long as necessary for the intended purpose.
 
-Temporary data (e.g., logs or command data) is usually deleted within [insert time period, e.g., 30 days].
+Temporary Data is only stored as long as its necessary.
 
 Permanent storage (e.g., bans, blacklists, moderation logs) only occurs if explicitly required for functionality.
 
@@ -51,8 +52,7 @@ No data is shared with third parties.
 
 Data is only processed through the Discord API.
 
-Discord itself may process data outside the EU (see the Discord Privacy Policy
-).
+Discord itself may process data outside the EU (see the Discord Privacy Policy).
 
 7. Your Rights (GDPR)
 
