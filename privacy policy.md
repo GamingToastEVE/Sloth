@@ -1,88 +1,74 @@
-Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot [Bot Name] ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
+Privacy Policy for Soth
+Last Updated: December 5, 2025
+
+Your privacy is important to us. This Privacy Policy explains what personal data the Discord bot Soth ("the Bot") processes, for what purpose, and what rights you have under the General Data Protection Regulation (GDPR).
 
 1. Data Controller
+The party responsible for data processing (Data Controller) is:
 
-The data controller responsible for processing is:
-
-
-Discord: gamingtoasti
+Developer: GamingToasti Contact Email: slothbotdev@gmail.com Discord: gamingtoasti
 
 2. Data We Collect
+The Bot processes data solely to provide its services. This includes:
 
-The Bot processes only the data necessary for its functionality. This may include:
+Discord User Data: User ID, Username, Discriminator, Avatar.
 
-Discord user data: username, user ID, server ID, channel ID.
+Guild (Server) Data: Server ID, Channel IDs, Role IDs.
 
-Interactions: commands you send to the Bot, related parameters.
+Interaction Data: Commands used, timestamps, and parameters provided by the user.
 
-Log data: timestamps of requests, technical error logs.
+Technical Logs: Error messages and system events for debugging.
 
-The Bot does not permanently store message content unless explicitly required for a specific feature (e.g., moderation logs, reminders). Such features will be clearly described.
+Message Content Policy: The Bot does not store message content (the text you write) in any database. Message content is processed briefly in the system's working memory (RAM) strictly to execute commands or filter content (if moderation modules are enabled) and is discarded immediately afterwards.
 
 3. Purpose of Processing
+We process your data for the following purposes:
 
-Data is processed solely to provide the Bot’s features, such as:
+Service Provision: To execute the commands you request (Art. 6(1)(b) GDPR).
 
-Executing commands and providing responses.
+Moderation & Management: To store warnings, bans, or configuration settings as requested by server administrators (Art. 6(1)(b) GDPR).
 
-Supporting moderation and server management (if enabled).
+Security & Stability: To detect bugs, prevent abuse, and ensure the Bot runs smoothly (Art. 6(1)(f) GDPR - Legitimate Interest).
 
-Ensuring stability, security, and preventing abuse.
+4. Data Storage and Retention
+We store data only as long as necessary:
 
-4. Legal Basis
+Configuration Data: Stored as long as the Bot is on your server. If the Bot is kicked/removed, data is deleted from our database within [z.B. 30] days.
 
-Processing is based on:
+Moderation Logs (Warns/Bans): Stored persistently to maintain server history until a server administrator requests deletion or resets the data.
 
-Art. 6 (1)(b) GDPR – performance of a contract (providing the Bot’s services).
+Technical Logs: Automatically deleted after [z.B. 14] days.
 
-Art. 6 (1)(f) GDPR – legitimate interest in maintaining a secure and stable service.
+5. Data Sharing and Hosting
+We do not sell or trade your data. However, to operate the Bot, we use technical infrastructure:
 
-5. Data Retention
+Discord API: All data is transmitted to and from Discord. Please refer to Discord’s Privacy Policy.
 
-Personal data is stored only as long as necessary for the intended purpose.
+Hosting Provider: The Bot is privately hosted on servers located in Germany. We have selected a provider that adheres to high security standards.
 
-Temporary data (e.g., logs or command data) is usually deleted within [insert time period, e.g., 30 days].
+6. Your Rights (GDPR)
+Under the GDPR, you have the right to:
 
-Permanent storage (e.g., bans, blacklists, moderation logs) only occurs if explicitly required for functionality.
+Access: Ask for a copy of the data we hold about your User ID.
 
-6. Data Sharing
+Rectification: Request correction of incorrect data.
 
-No data is shared with third parties.
+Erasure: Request that we delete your data ("Right to be forgotten").
 
-Data is only processed through the Discord API.
+Restriction & Objection: Restrict how we process your data or object to processing based on legitimate interest.
 
-Discord itself may process data outside the EU (see the Discord Privacy Policy
-).
+Complaint: You have the right to lodge a complaint with a data protection supervisory authority.
 
-7. Your Rights (GDPR)
+To exercise these rights, please contact us via the email address listed in Section 1 or join our Support Server.
 
-You have the following rights under the GDPR:
+7. Security
+We implement appropriate technical measures (e.g., access controls, minimal data collection) to protect your data against unauthorized access, loss, or misuse.
 
-Access (Art. 15) – request what data we hold about you.
+8. Contact
+If you have questions about this Privacy Policy, please contact us:
 
-Rectification (Art. 16) – correct inaccurate data.
+Support Server: https://discord.gg/8fce9j7fXA
 
-Erasure (Art. 17) – request deletion of your data.
+Email: slothbotdev@gmail.com
 
-Restriction (Art. 18) – limit how your data is used.
-
-Objection (Art. 21) – object to data processing.
-
-Data portability (Art. 20) – request transfer of your data.
-
-To exercise these rights, please contact us via the information above.
-
-8. Security
-
-We take appropriate technical and organizational measures to protect your data from unauthorized access, misuse, or loss.
-
-9. Changes to this Privacy Policy
-
-We may update this Privacy Policy from time to time, for example if the Bot is expanded or legal requirements change. The latest version will always be available.
-
-10. Contact
-
-If you have questions about this Privacy Policy, you can reach us at:
-
-https://discord.gg/8fce9j7fXA
-Or directly on discord: gamingtoasti
+Discord User: gamingtoasti

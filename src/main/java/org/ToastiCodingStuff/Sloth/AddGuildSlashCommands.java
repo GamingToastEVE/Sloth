@@ -1,6 +1,8 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -40,6 +42,8 @@ public class AddGuildSlashCommands {
         allCommands.add(getVerifyButtonCommand());
         allCommands.addAll(getFeedbackCommands());
         allCommands.add(getSelectRolesCommand());
+        allCommands.addAll(getTimedRoleCommands());
+        allCommands.addAll(getRoleEventCommands());
         return allCommands;
     }
 
@@ -205,6 +209,64 @@ public class AddGuildSlashCommands {
                         new SubcommandData("info", "Get information about the current ticket")
                 );
     }
+
+    // In AddGuildSlashCommands.java
+
+    /**
+     * Commands for the Timed Roles system
+     */
+    private List<SlashCommandData> getTimedRoleCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+
+        // 1. User Command: /my-roles
+        commands.add(Commands.slash("my-roles", "Zeigt an, wie lange deine temporären Rollen noch gültig sind."));
+
+        // 2. Admin Command: /temprole (mit Subcommands)
+        SubcommandData addCmd = new SubcommandData("add", "Vergibt eine Rolle für eine bestimmte Zeit")
+                .addOption(OptionType.USER, "user", "Der User", true)
+                .addOption(OptionType.ROLE, "role", "Die Rolle", true)
+                .addOption(OptionType.STRING, "duration", "Dauer (z.B. 30m, 12h, 7d)", true);
+
+        SubcommandData removeCmd = new SubcommandData("remove", "Entfernt eine temporäre Rolle vorzeitig")
+                .addOption(OptionType.USER, "user", "Der User", true)
+                .addOption(OptionType.ROLE, "role", "Die Rolle", true);
+
+        SlashCommandData tempRoleCmd = Commands.slash("temprole", "Verwaltet temporäre Rollen manuell")
+                .addSubcommands(addCmd, removeCmd)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_ROLES)); // Nur für Mods sichtbar
+
+        commands.add(tempRoleCmd);
+
+        return commands;
+    }
+
+    // In AddGuildSlashCommands.java
+
+    private List<SlashCommandData> getRoleEventCommands() {
+        List<SlashCommandData> commands = new ArrayList<>();
+
+        // Subcommand: Create
+        SubcommandData createCmd = new SubcommandData("create", "Erstellt ein neues Event")
+                .addOption(OptionType.STRING, "name", "Name des Events", true);
+
+        // Subcommand: List (und Editieren via UI)
+        SubcommandData listCmd = new SubcommandData("list", "Listet alle Events auf zum Bearbeiten");
+
+        // Hauptcommand
+        SlashCommandData eventCmd = Commands.slash("role-event", "Verwalte automatische Rollen-Events")
+                .addSubcommands(createCmd, listCmd)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.ADMINISTRATOR));
+
+        commands.add(eventCmd);
+        return commands;
+    }
+
+// Und in getAllCommands() hinzufügen:
+// allCommands.addAll(getRoleEventCommands()
+
+// NICHT VERGESSEN:
+// In der Methode getAllCommands() diese Zeile hinzufügen:
+// allCommands.addAll(getTimedRoleCommands());
 
 
     /**

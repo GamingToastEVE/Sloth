@@ -56,7 +56,7 @@ import java.util.*;
  */
 public class DatabaseMigrationManager {
     
-    private final Connection connection;
+    private final DatabaseHandler databaseHandler;
     
     /**
      * Represents a column definition with its SQL properties
@@ -109,8 +109,8 @@ public class DatabaseMigrationManager {
         }
     }
     
-    public DatabaseMigrationManager(Connection connection) {
-        this.connection = connection;
+    public DatabaseMigrationManager(DatabaseHandler databaseHandler) {
+        this.databaseHandler = databaseHandler;
     }
     
     /**
@@ -136,6 +136,9 @@ public class DatabaseMigrationManager {
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
         schemas.put("global_statistics", createGlobalStatisticsSchema());
         schemas.put("just_verify_button", createJustVerifyButtonSchema());
+        // In DatabaseMigrationManager.java -> getExpectedSchemas()
+        schemas.put("role_events", createRoleEventsSchema());
+        schemas.put("active_timers", createActiveTimersSchema());
 
         return schemas;
     }
@@ -374,6 +377,40 @@ public class DatabaseMigrationManager {
     }
 
     /**
+     * Define the role_events table schema for timed roles configuration
+     */
+    private TableSchema createRoleEventsSchema() {
+        return new TableSchema("role_events")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(100) NOT NULL")
+                .addColumn("event_type", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("action_type", "VARCHAR(16) DEFAULT 'ADD'") // 'ADD' oder 'REMOVE'
+                .addColumn("duration_seconds", "BIGINT DEFAULT 0")
+                .addColumn("stack_type", "VARCHAR(16) DEFAULT 'REFRESH'")
+                .addColumn("trigger_data", "TEXT") // JSON String
+                .addColumn("active", "TINYINT(1) DEFAULT 1")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the active_timers table schema for currently running role timers
+     */
+    private TableSchema createActiveTimersSchema() {
+        return new TableSchema("active_timers")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("expires_at", "DATETIME NOT NULL")
+                .addColumn("source_event_id", "INTEGER")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                // Index für schnelle Abfragen im Background-Loop
+                .addIndex("CREATE INDEX IF NOT EXISTS idx_timers_expires ON active_timers(expires_at)");
+    }
+
+    /**
      * Core algorithm to detect and apply missing columns.
      * This method compares expected schemas with actual database schemas
      * and automatically adds any missing columns.
@@ -424,9 +461,11 @@ public class DatabaseMigrationManager {
      * Check if a table exists in the database
      */
     private boolean tableExists(String tableName) throws SQLException {
-        DatabaseMetaData meta = connection.getMetaData();
-        try (ResultSet rs = meta.getTables(null, null, tableName, null)) {
-            return rs.next();
+        try (Connection connection = databaseHandler.getConnection()) {
+            DatabaseMetaData meta = connection.getMetaData();
+            try (ResultSet rs = meta.getTables(null, null, tableName, null)) {
+                return rs.next();
+            }
         }
     }
     
@@ -471,7 +510,8 @@ public class DatabaseMigrationManager {
     private Set<String> getExistingColumns(String tableName) throws SQLException {
         Set<String> columns = new HashSet<>();
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             String query = "SHOW COLUMNS FROM " + tableName;
             try (ResultSet rs = stmt.executeQuery(query)) {
                 while (rs.next()) {
@@ -489,7 +529,8 @@ public class DatabaseMigrationManager {
     private void addColumnToTable(String tableName, String columnName, String columnDefinition) throws SQLException {
         String alterQuery = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             stmt.execute(alterQuery);
             System.out.println("Successfully added column '" + columnName + "' to table '" + tableName + "'");
         } catch (SQLException e) {
@@ -501,7 +542,8 @@ public class DatabaseMigrationManager {
                 String modifiedDefinition = columnDefinition.replace("DEFAULT CURRENT_TIMESTAMP", "");
                 String alterQueryNoDefault = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + modifiedDefinition;
                 
-                try (Statement stmt = connection.createStatement()) {
+                try (Connection conn = databaseHandler.getConnection();
+                     Statement stmt = conn.createStatement()) {
                     stmt.execute(alterQueryNoDefault);
                     
                     // Update all existing rows to have the current timestamp
@@ -531,7 +573,8 @@ public class DatabaseMigrationManager {
             "success INTEGER DEFAULT 1" +
             ")";
         
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
         }
     }
@@ -540,7 +583,7 @@ public class DatabaseMigrationManager {
      * Record a migration run in the tracking table
      */
     private void recordMigrationRun(String migrationName, String version, long executionTimeMs, boolean success) {
-        try {
+        try (Connection connection = databaseHandler.getConnection()) {
             String insertMigration = "INSERT INTO database_migrations " +
                 "(migration_name, version, execution_time_ms, success) VALUES (?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE " +
@@ -571,7 +614,8 @@ public class DatabaseMigrationManager {
         String query = "SELECT migration_name, version, applied_at, execution_time_ms, success " +
                       "FROM database_migrations ORDER BY applied_at DESC";
         
-        try (Statement stmt = connection.createStatement();
+        try (Connection connection = databaseHandler.getConnection();
+             Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
@@ -594,7 +638,8 @@ public class DatabaseMigrationManager {
     public void applyIndexes(String tableName, TableSchema schema) throws SQLException {
         // Apply indexes
         for (String indexDefinition : schema.indexes) {
-            try (Statement stmt = connection.createStatement()) {
+            try (Connection connection = databaseHandler.getConnection();
+                 Statement stmt = connection.createStatement()) {
                 stmt.execute(indexDefinition);
             } catch (SQLException e) {
                 // Index might already exist, which is fine
