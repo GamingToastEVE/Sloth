@@ -16,7 +16,6 @@ import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.LayoutComponent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.selections.EntitySelectMenu;
-import net.dv8tion.jda.api.interactions.components.selections.SelectOption;
 import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.interactions.components.text.TextInput;
@@ -37,7 +36,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("event")) return;
+        if (!event.getName().equals("role-event")) return;
         if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
             event.reply("❌ Nur Administratoren können Events verwalten.").setEphemeral(true).queue();
             return;

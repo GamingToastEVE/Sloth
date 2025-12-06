@@ -40,6 +40,7 @@ public class Sloth {
         api.addEventListener(new SelectRolesCommandListener(handler));
         api.addEventListener(new TimedRolesCommandListener(handler));
         api.addEventListener(new RoleEventConfigListener(handler));
+        api.addEventListener(new TimedRoleTriggerListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -69,16 +70,28 @@ public class Sloth {
                     if (guild1 != null) {
                         Role role = guild1.getRoleById(timer.roleId);
                         if (role != null) {
-                            // WICHTIG: retrieveMember nutzen, da User offline sein könnten (Cache miss)
-                            guild1.retrieveMemberById(timer.userId).queue(
-                                    member -> {
-                                        // 3. Rolle entfernen
-                                        guild1.removeRoleFromMember(member, role).reason("Timed Role expired").queue();
-                                        // Optional: User benachrichtigen
-                                        // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " ist abgelaufen.").queue());
-                                    },
-                                    error -> System.err.println("Member " + timer.userId + " not found/left guild.")
-                            );
+                            if (timer.actionType.equalsIgnoreCase(String.valueOf(ActionType.REMOVE))) {
+                                guild1.retrieveMemberById(timer.userId).queue(
+                                        member -> {
+                                            // 3. Rolle entfernen
+                                            guild1.removeRoleFromMember(member, role).reason("Timed Role expired").queue();
+                                            // Optional: User benachrichtigen
+                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " ist abgelaufen.").queue());
+                                        },
+                                        error -> System.err.println("Member " + timer.userId + " not found/left guild.")
+                                );
+                            } else if (timer.actionType.equalsIgnoreCase(String.valueOf(ActionType.ADD))) {
+                                guild1.retrieveMemberById(timer.userId).queue(
+                                        member -> {
+                                            // 3. Rolle hinzufügen
+                                            guild1.addRoleToMember(member, role).reason("Timed Role expired").queue();
+                                            // Optional: User benachrichtigen
+                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " wurde dir wieder hinzugefügt.").queue());
+                                        },
+                                        error -> System.err.println("Member " + timer.userId + " not found/left guild.")
+                                );
+                            }
+
                         }
                     }
                     // 4. Timer aus DB löschen (egal ob erfolgreich oder nicht, damit Loop nicht hängt)

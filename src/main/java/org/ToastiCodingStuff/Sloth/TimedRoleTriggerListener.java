@@ -20,7 +20,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
 
     // Trigger: Wenn ein User eine Rolle bekommt ("getrole")
     @Override
-    public void onGuildMemberRoleAdd(@NotNull GuildMemberRoleAddEvent event) {
+    public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
         // Wir prüfen für JEDE Rolle, die hinzugefügt wurde
         for (Role role : event.getRoles()) {
             processTrigger(event.getGuild(), event.getMember(), RoleEventType.ROLE_ADD, role.getId());
@@ -29,7 +29,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
 
     // Trigger: Wenn einem User eine Rolle weggenommen wird ("removerole")
     @Override
-    public void onGuildMemberRoleRemove(@NotNull GuildMemberRoleRemoveEvent event) {
+    public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
         for (Role role : event.getRoles()) {
             processTrigger(event.getGuild(), event.getMember(), RoleEventType.ROLE_REMOVE, role.getId());
         }
@@ -43,6 +43,9 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
      * @param type Der Event-Typ (ROLE_ADD, ROLE_REMOVE etc.)
      * @param triggerEntityId Die ID des Auslösers (z.B. die ID der Rolle, die hinzugefügt wurde)
      */
+    /**
+     * Die Hauptlogik: Prüft Bedingungen, vergibt Rollen und startet Timer.
+     */
     private void processTrigger(Guild guild, Member member, RoleEventType type, String triggerEntityId) {
         String guildId = guild.getId();
 
@@ -52,44 +55,48 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
         for (DatabaseHandler.RoleEventData eventConfig : events) {
 
             // 2. Prüfen, ob die Bedingung (trigger_data) passt
-            // Bei Rollen-Events wollen wir oft wissen: "Wurde genau Rolle X hinzugefügt?"
-            // Wir erwarten im JSON so etwas wie: {"trigger_role_id": "123456789"}
             if (!checkCondition(eventConfig.triggerData, triggerEntityId)) {
-                continue; // Bedingung nicht erfüllt, nächstes Event prüfen
+                continue;
             }
 
             // 3. Die Ziel-Rolle (Reward/Punishment) finden
             Role targetRole = guild.getRoleById(eventConfig.roleId);
             if (targetRole == null) {
-                System.out.println("RoleEvent " + eventConfig.id + ": Ziel-Rolle existiert nicht mehr.");
+                // System.out.println("RoleEvent " + eventConfig.id + ": Ziel-Rolle existiert nicht mehr.");
                 continue;
             }
 
-            // 4. Die Aktion ausführen (ADD oder REMOVE)
-            if ("REMOVE".equalsIgnoreCase(eventConfig.actionType)) {
-                // --- ROLLE ENTFERNEN ---
-                guild.removeRoleFromMember(member, targetRole)
-                        .reason("Auto-Trigger: " + eventConfig.name)
-                        .queue();
-
-                // Falls es einen Timer gab, löschen wir ihn (damit der Loop nicht meckert)
-                handler.removeTimerManual(guildId, member.getId(), targetRole.getId());
-
-            } else {
-                // --- ROLLE GEBEN (Standard) ---
-                guild.addRoleToMember(member, targetRole)
-                        .reason("Auto-Trigger: " + eventConfig.name)
-                        .queue();
-
-                // 5. Timer starten (nur wenn Dauer > 0)
-                if (eventConfig.durationSeconds > 0) {
-                    // Prüfen auf Stacking-Strategie (REFRESH vs EXTEND)
-                    // Hier vereinfacht: Wir überschreiben/starten neu (REFRESH)
-                    // Für EXTEND müsstest du prüfen, ob schon ein Timer existiert und die Zeit addieren
-
-                    // Alten Timer für gleiche Rolle/User löschen (Reset)
-                    handler.removeTimerManual(guildId, member.getId(), targetRole.getId());
+            // 4. Logik-Verzweigung basierend auf der Dauer
+            if (eventConfig.durationSeconds == 0) {
+                if ("REMOVE".equalsIgnoreCase(eventConfig.actionType)) {
+                    guild.removeRoleFromMember(member, targetRole)
+                            .reason("Auto-Trigger (Permanent): " + eventConfig.name).queue();
+                } else {
+                    guild.addRoleToMember(member, targetRole)
+                            .reason("Auto-Trigger (Permanent): " + eventConfig.name).queue();
                 }
+                handler.getActiveTimersForUser(guild.getId(), member.getId()).forEach(timer -> {
+                    if (timer.roleId.equals(targetRole.getId()) && timer.sourceEventId == eventConfig.id) {
+                        handler.removeTimer(timer.id);
+                    }
+                });
+            } else {
+                List<DatabaseHandler.ActiveTimerData> activeTimers = handler.getActiveTimersForUser(guildId, member.getId());
+                if (eventConfig.stackType.equalsIgnoreCase("EXTEND")) {
+                    for (DatabaseHandler.ActiveTimerData timer : activeTimers) {
+                        if (timer.roleId.equals(targetRole.getId()) && timer.sourceEventId == eventConfig.id) {
+                            handler.extendTimer(guildId, timer.userId, timer.roleId, eventConfig.durationSeconds);
+                            return; // Timer verlängert, kein neues Hinzufügen
+                        }
+                    }
+                } else {
+                    for (DatabaseHandler.ActiveTimerData timer : activeTimers) {
+                        if (timer.roleId.equals(targetRole.getId()) && timer.sourceEventId == eventConfig.id) {
+                            handler.removeTimer(timer.id);
+                        }
+                    }
+                }
+                handler.addActiveTimer(guildId, member.getId(), targetRole.getId(), eventConfig.durationSeconds, eventConfig.id);
             }
         }
     }

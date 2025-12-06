@@ -12,7 +12,6 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import org.checkerframework.checker.units.qual.C;
 
 public class DatabaseHandler {
 
@@ -3187,7 +3186,7 @@ public class DatabaseHandler {
     }
 
     public boolean addSelectRolesEmbed (String guildId, String channelId, String messageId, String description) {
-        String query = "INSERT INTO select_roles_embeds (guild_id, channel_id, message_id) VALUES (?, ?, ?)";
+        String query = "INSERT INTO role_select_embeds (guild_id, channel_id, message_id, description, title) VALUES (?, ?, ?, ?, ?)";
         try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, channelId);
@@ -3650,21 +3649,23 @@ public class DatabaseHandler {
         public final String roleId;
         public final Timestamp expiresAt;
         public final int sourceEventId;
+        public String actionType;
 
-        public ActiveTimerData(int id, String guildId, String userId, String roleId, Timestamp expiresAt, int sourceEventId) {
+        public ActiveTimerData(int id, String guildId, String userId, String roleId, Timestamp expiresAt, int sourceEventId, String actionType) {
             this.id = id;
             this.guildId = guildId;
             this.userId = userId;
             this.roleId = roleId;
             this.expiresAt = expiresAt;
             this.sourceEventId = sourceEventId;
+            this.actionType = actionType;
         }
     }
 
     /**
      * Schaltet ein Event an oder aus (Toggle).
      */
-    public boolean toggleRoleEventActive(String guildId, int eventId, boolean isActive) {
+    public void toggleRoleEventActive(String guildId, int eventId, boolean isActive) {
         String query = "UPDATE role_events SET active = ? WHERE id = ? AND guild_id = ?";
 
         try (Connection connection = getConnection();
@@ -3674,11 +3675,10 @@ public class DatabaseHandler {
             stmt.setInt(2, eventId);
             stmt.setString(3, guildId);
 
-            return stmt.executeUpdate() > 0;
+            stmt.executeUpdate();
 
         } catch (SQLException e) {
             System.err.println("Error toggling role event status: " + e.getMessage());
-            return false;
         }
     }
 
@@ -3726,7 +3726,7 @@ public class DatabaseHandler {
      */
     public List<ActiveTimerData> getExpiredTimers() {
         List<ActiveTimerData> expiredTimers = new ArrayList<>();
-        String query = "SELECT * FROM active_timers WHERE expires_at <= CURRENT_TIMESTAMP";
+        String query = "SELECT * FROM active_timers LEFT JOIN role_events ON source_event_id = role_events.id WHERE expires_at <= CURRENT_TIMESTAMP";
 
         try (Connection connection = getConnection();
              PreparedStatement stmt = connection.prepareStatement(query);
@@ -3739,7 +3739,8 @@ public class DatabaseHandler {
                         rs.getString("user_id"),
                         rs.getString("role_id"),
                         rs.getTimestamp("expires_at"),
-                        rs.getInt("source_event_id")
+                        rs.getInt("source_event_id"),
+                        rs.getString("role_events.action_type")
                 ));
             }
         } catch (SQLException e) {
@@ -3822,7 +3823,7 @@ public class DatabaseHandler {
      */
     public List<ActiveTimerData> getActiveTimersForUser(String guildId, String userId) {
         List<ActiveTimerData> userTimers = new ArrayList<>();
-        String query = "SELECT * FROM active_timers WHERE guild_id = ? AND user_id = ? ORDER BY expires_at ASC";
+        String query = "SELECT * FROM active_timers LEFT JOIN role_events ON source_event_id = role_events.id WHERE active_timers.guild_id = ? AND user_id = ? ORDER BY expires_at ASC";
 
         try (Connection connection = getConnection();
              PreparedStatement stmt = connection.prepareStatement(query)) {
@@ -3833,12 +3834,13 @@ public class DatabaseHandler {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     userTimers.add(new ActiveTimerData(
-                            rs.getInt("id"),
-                            rs.getString("guild_id"),
-                            rs.getString("user_id"),
-                            rs.getString("role_id"),
-                            rs.getTimestamp("expires_at"),
-                            rs.getInt("source_event_id")
+                            rs.getInt("active_timers.id"),
+                            rs.getString("active_timers.guild_id"),
+                            rs.getString("active_timers.user_id"),
+                            rs.getString("active_timers.role_id"),
+                            rs.getTimestamp("active_timers.expires_at"),
+                            rs.getInt("active_timers.source_event_id"),
+                            rs.getString("role_events.action_type")
                     ));
                 }
             }
@@ -3857,11 +3859,12 @@ public class DatabaseHandler {
         public final String eventType;
         public final String roleId;
         public final String actionType;
+        public final String stackType;
         public final long durationSeconds;
         public final String triggerData;
         public final boolean active;
 
-        public RoleEventData(int id, String name, String eventType, String roleId, String actionType, long durationSeconds, String triggerData, boolean active) {
+        public RoleEventData(int id, String name, String eventType, String roleId, String actionType, long durationSeconds, String triggerData, boolean active, String stackType) {
             this.id = id;
             this.name = name;
             this.eventType = eventType;
@@ -3870,6 +3873,7 @@ public class DatabaseHandler {
             this.durationSeconds = durationSeconds;
             this.triggerData = triggerData;
             this.active = active;
+            this.stackType = stackType;
         }
     }
 
@@ -3888,7 +3892,8 @@ public class DatabaseHandler {
                         rs.getString("action_type"),
                         rs.getLong("duration_seconds"),
                         rs.getString("trigger_data"),
-                        rs.getInt("active") == 1
+                        rs.getInt("active") == 1,
+                        rs.getString("stack_type")
                 );
             }
         } catch (SQLException e) {
@@ -3920,7 +3925,8 @@ public class DatabaseHandler {
                         rs.getString("action_type"),
                         rs.getLong("duration_seconds"),
                         rs.getString("trigger_data"),
-                        rs.getInt("active") == 1
+                        rs.getInt("active") == 1,
+                        rs.getString("stack_type")
                 ));
             }
         } catch (SQLException e) {
