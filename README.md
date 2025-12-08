@@ -33,10 +33,23 @@ Sloth offers several systems that can be used:
 - User engagement metrics
 - Command usage tracking
 
-### 📋 Rules Embed System
-- Create and manage rule embeds in channels
+### 📋 Rules/Verification System
+- Create and manage rule embeds with verification buttons
+- Role assignment upon verification
 - Customizable rule formatting and styling
-- Easy rule distribution across your server
+- Verification statistics tracking
+
+### 🔘 Verify Button System
+- Create custom verification buttons
+- Assign roles when users verify
+- Remove roles upon verification
+- Support for multiple verify button configurations (max 3)
+
+### 🎭 Select Roles System
+- Allow users to self-assign roles
+- Create role selection menus with descriptions and emojis
+- Support for reactions, dropdowns, and buttons
+- Easy role management for server members
 
 ## Setup
 
@@ -89,33 +102,58 @@ Navigate between help sections using the interactive buttons.
 ### Available Systems
 
 #### Log Channel System
-- `/set-log-channel` - Configure the server log channel
-- `/get-log-channel` - View current log channel
+- `/log-channel set` - Configure the server log channel
+- `/log-channel get` - View current log channel
 
 #### Warning System
-- `/warn` - Issue a warning to a user
-- `/set-warn-settings` - Configure warning system settings
-- `/get-warn-settings` - View current warning settings
+- `/warn user` - Issue a warning to a user with severity level
+- `/warn settings-set` - Configure warning system settings
+- `/warn settings-get` - View current warning settings
 
 #### Ticket System
-- `/ticket-setup` - Configure the ticket system
-- `/ticket-panel` - Create a ticket creation panel
-- `/close-ticket` - Close a ticket
-- `/assign-ticket` - Assign ticket to staff member
-- `/ticket-info` - Get ticket information
+- `/ticket setup` - Configure the ticket system
+- `/ticket panel` - Create a ticket creation panel
+- `/ticket config` - Set custom title and description for ticket panel
+- `/ticket close` - Close a ticket
+- `/ticket assign` - Assign ticket to staff member
+- `/ticket priority` - Change ticket priority
+- `/ticket info` - Get ticket information
 
 #### Moderation System
-- `/kick` - Kick a user from the server
-- `/ban` - Ban a user from the server
-- `/unban` - Unban a user from the server
-- `/timeout` - Timeout a user for a specified duration
-- `/untimeout` - Remove timeout from a user
-- `/purge` - Delete multiple messages from the channel
-- `/slowmode` - Set slowmode for the current channel
+- `/mod kick` - Kick a user from the server
+- `/mod ban` - Ban a user from the server
+- `/mod unban` - Unban a user from the server
+- `/mod timeout` - Timeout a user for a specified duration
+- `/mod untimeout` - Remove timeout from a user
+- `/mod purge` - Delete multiple messages from the channel
+- `/mod slowmode` - Set slowmode for the current channel
 
-#### Rules Embed System
-- `/add-rules-embed` - Add a formatted rules embed to a channel
-- Supports custom formatting and styling options
+#### Statistics System
+- `/stats lifetime` - Lifetime server moderation statistics
+- `/stats today` - Today's server moderation statistics
+- `/stats week` - Weekly statistics
+- `/stats date` - Statistics for specific date
+- `/stats user` - View user information and statistics
+
+#### General Commands
+- `/help` - Access interactive help system
+- `/feedback` - Send feedback to the developer
+
+#### Rules/Verification System
+- `/rules add` - Create rules embeds with verification buttons
+- `/rules setup` - Display rules in current channel
+- `/rules list` - List all rules embeds
+- `/rules remove` - Remove a rules embed
+
+#### Verify Button System
+- `/verify-button add` - Add verify button configuration (max 3)
+- `/verify-button send` - Send verify button message
+- `/verify-button remove` - Remove verify button from current channel
+
+#### Select Roles System
+- `/select-roles add` - Add role to selection list with optional description and emoji
+- `/select-roles remove` - Remove role from selection list
+- `/select-roles send` - Send role selection interface in current channel
 
 ## Database
 
@@ -146,6 +184,12 @@ Sloth/
 │   ├── LogChannelSlashCommandListener.java     # Logging system
 │   ├── StatisticsCommandListener.java          # Statistics tracking
 │   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
+│   ├── JustVerifyButtonCommandListener.java    # Verify button system
+│   ├── SelectRolesCommandListener.java         # Select roles system
+│   ├── FeedbackCommandListener.java            # Feedback system
+│   ├── TimedRolesCommandListener.java          # Timed roles system
+│   ├── TimedRoleTriggerListener.java           # Timed roles triggers
+│   ├── RoleEventConfigListener.java            # Role event configuration
 │   └── GuildEventListener.java                 # Guild event handling
 ├── build.gradle.kts                            # Build configuration
 ├── .env.example                                 # Environment variables template
