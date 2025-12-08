@@ -133,6 +133,18 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Custom rules embeds with verification buttons\n" +
                                 "• Role assignment upon verification\n" +
                                 "• Verification statistics tracking", false)
+                        .addField("🔘 **Verify Button System**", 
+                                "• Create custom verification buttons\n" +
+                                "• Assign/remove roles when users verify\n" +
+                                "• Support for multiple configurations (max 3)", false)
+                        .addField("🎭 **Select Roles System**", 
+                                "• Allow users to self-assign roles\n" +
+                                "• Role selection menus with descriptions and emojis\n" +
+                                "• Support for reactions, dropdowns, and buttons", false)
+                        .addField("⏱️ **Timed Roles System**", 
+                                "• Assign temporary roles that automatically expire\n" +
+                                "• Automated role management based on events\n" +
+                                "• Track active temporary roles per user", false)
                         .setColor(Color.ORANGE)
                         .setFooter("All systems are ready to use!");
 
@@ -200,6 +212,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         .addField("**Ticket System**",
                                 "`/ticket setup` - Configure ticket system\n" +
                                 "`/ticket panel` - Create ticket creation panel\n" +
+                                "`/ticket config` - Set custom title and description for ticket panel\n" +
                                 "`/ticket close` - Close current ticket\n" +
                                 "`/ticket assign` - Assign to staff member\n" +
                                 "`/ticket priority` - Change ticket priority\n" +
@@ -227,9 +240,15 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/rules remove` - Remove a rules embed\n" +
                                 "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
                         .addField("**Verify Button System**",
-                                "`/verify-button add` - Add verify button configuration\n" +
-                                "`/verify-button remove` - Remove verify button configuration\n" +
-                                "`/verify-button send` - Send verify button message", false)
+                                "`/verify-button add` - Add verify button configuration (max 3)\n" +
+                                "`/verify-button send` - Send verify button message\n" +
+                                "`/verify-button remove` - Remove verify button from current channel", false)
+                        .addField("**Timed Roles System**",
+                                "`/my-roles` - View your active temporary roles and expiration times\n" +
+                                "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
+                                "`/temprole remove` - Remove a temporary role from a user\n" +
+                                "`/role-event create` - Create automated role events based on triggers\n" +
+                                "`/role-event list` - List and manage all role events", false)
                         .addField("**General Commands**",
                                 "`/help` - Show this help system\n" +
                                 "`/feedback` - Send feedback to the developer", false)
