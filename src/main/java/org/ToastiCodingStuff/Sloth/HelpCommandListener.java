@@ -141,6 +141,10 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Allow users to self-assign roles\n" +
                                 "• Role selection menus with descriptions and emojis\n" +
                                 "• Support for reactions, dropdowns, and buttons", false)
+                        .addField("⏱️ **Timed Roles System**", 
+                                "• Assign temporary roles that automatically expire\n" +
+                                "• Automated role management based on events\n" +
+                                "• Track active temporary roles per user", false)
                         .setColor(Color.ORANGE)
                         .setFooter("All systems are ready to use!");
 
@@ -239,6 +243,12 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/verify-button add` - Add verify button configuration (max 3)\n" +
                                 "`/verify-button send` - Send verify button message\n" +
                                 "`/verify-button remove` - Remove verify button from current channel", false)
+                        .addField("**Timed Roles System**",
+                                "`/my-roles` - View your active temporary roles and expiration times\n" +
+                                "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
+                                "`/temprole remove` - Remove a temporary role from a user\n" +
+                                "`/role-event create` - Create automated role events based on triggers\n" +
+                                "`/role-event list` - List and manage all role events", false)
                         .addField("**General Commands**",
                                 "`/help` - Show this help system\n" +
                                 "`/feedback` - Send feedback to the developer", false)
