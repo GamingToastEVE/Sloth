@@ -51,6 +51,12 @@ Sloth offers several systems that can be used:
 - Support for reactions, dropdowns, and buttons
 - Easy role management for server members
 
+### ⏱️ Timed Roles System
+- Assign temporary roles that automatically expire
+- Automated role management based on events
+- Configure role triggers and durations
+- Track active temporary roles per user
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -154,6 +160,13 @@ Navigate between help sections using the interactive buttons.
 - `/select-roles add` - Add role to selection list with optional description and emoji
 - `/select-roles remove` - Remove role from selection list
 - `/select-roles send` - Send role selection interface in current channel
+
+#### Timed Roles System
+- `/my-roles` - View your active temporary roles and their expiration times
+- `/temprole add` - Assign a temporary role to a user for a specified duration
+- `/temprole remove` - Remove a temporary role from a user
+- `/role-event create` - Create automated role events based on triggers
+- `/role-event list` - List and manage all role events
 
 ## Database
 
