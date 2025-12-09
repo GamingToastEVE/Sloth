@@ -8,7 +8,7 @@ Sloth offers several systems that can be used:
 
 ### 🛡️ Moderation System
 - Advanced user moderation capabilities
-- Automated moderation actions
+- Automated moderation actions (depending on warn system settings)
 - Comprehensive logging of moderation activities
 
 ### ⚠️ Warning System
