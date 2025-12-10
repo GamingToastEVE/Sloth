@@ -1,15 +1,19 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent; // Wichtig!
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu; // Wichtig!
 
+import java.awt.Color;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
+import java.util.List;
 
 public class WarnCommandListener extends ListenerAdapter {
 
@@ -37,6 +41,11 @@ public class WarnCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("warn-user");
                 handleWarnCommand(event, guildId);
                 break;
+            case "list":
+                if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) return;
+                handler.insertOrUpdateGlobalStatistic("warn-list");
+                handleListWarningsCommand(event, guildId);
+                break;
             case "settings-set":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("warn-settings-set");
@@ -47,6 +56,132 @@ public class WarnCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("warn-settings-get");
                 handleGetWarnSettingsCommand(event, guildId);
                 break;
+        }
+    }
+
+    private void handleListWarningsCommand(SlashCommandInteractionEvent event, String guildId) {
+        Member targetMember = event.getOption("user").getAsMember();
+        if (targetMember == null) {
+            event.reply("User not found.").setEphemeral(true).queue();
+            return;
+        }
+
+        sendWarnListEmbed(event, guildId, targetMember.getUser());
+    }
+
+    // --- NEUE HELPER METHODE: Embed & Menü bauen ---
+    // Ausgelagert, damit wir sie auch nach dem Löschen eines Warns aufrufen können (Refresh)
+    private void sendWarnListEmbed(net.dv8tion.jda.api.interactions.callbacks.IReplyCallback event, String guildId, User targetUser) {
+        List<DatabaseHandler.WarningData> warnings = handler.getUserActiveWarnings(guildId, targetUser.getId());
+
+        EmbedBuilder embed = new EmbedBuilder();
+        embed.setTitle("⚠️ Active Warnings for " + targetUser.getName());
+        embed.setColor(Color.ORANGE);
+        embed.setThumbnail(targetUser.getAvatarUrl());
+
+        if (warnings.isEmpty()) {
+            embed.setDescription("✅ This user has no active warnings.");
+            embed.setColor(Color.GREEN);
+            // Wenn keine Warns da sind, senden wir nur das Embed ohne Menü
+            if (event instanceof SlashCommandInteractionEvent) {
+                event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+            } else if (event instanceof StringSelectInteractionEvent) {
+                // Wenn wir aus dem Dropdown kommen (letzter Warn gelöscht), updaten wir die Nachricht
+                ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build()).setComponents().queue();
+            }
+            return;
+        }
+
+        // Dropdown Menü erstellen
+        StringSelectMenu.Builder menuBuilder = StringSelectMenu.create("warn_delete_menu:" + targetUser.getId())
+                .setPlaceholder("🗑️ Select a warning to delete it")
+                .setMinValues(1)
+                .setMaxValues(1);
+
+        StringBuilder desc = new StringBuilder();
+
+        // Discord Limits beachten: Max 25 Optionen im Dropdown
+        int count = 0;
+        for (DatabaseHandler.WarningData warn : warnings) {
+            if (count >= 25) break;
+
+            // Text für Embed
+            desc.append("**ID: ").append(warn.id).append("** | ")
+                    .append(warn.date).append("\n")
+                    .append("Reason: `").append(warn.reason).append("`\n")
+                    .append("Mod: <@").append(warn.moderatorId).append(">\n\n");
+
+            // Option für Dropdown
+            // Label darf max 100 Zeichen haben
+            String label = "ID " + warn.id + ": " + warn.reason;
+            if (label.length() > 100) label = label.substring(0, 97) + "...";
+
+            menuBuilder.addOption(label, String.valueOf(warn.id));
+            count++;
+        }
+
+        embed.setDescription(desc.toString());
+        embed.setFooter("Select a warning below to remove it.");
+
+        // Antwort senden
+        if (event instanceof SlashCommandInteractionEvent) {
+            event.replyEmbeds(embed.build())
+                    .addActionRow(menuBuilder.build())
+                    .setEphemeral(true)
+                    .queue();
+        } else if (event instanceof StringSelectInteractionEvent) {
+            // Nachricht editieren (Refresh nach Löschung)
+            ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build())
+                    .setActionRow(menuBuilder.build())
+                    .queue();
+        }
+    }
+
+    // --- NEUES EVENT: Dropdown Interaktion ---
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        String componentId = event.getComponentId();
+
+        // Prüfen ob es unser Menü ist (Format: warn_delete_menu:USER_ID)
+        if (!componentId.startsWith("warn_delete_menu:")) {
+            return;
+        }
+
+        // Berechtigungscheck (Sicherheitshalber nochmal)
+        if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
+            event.reply("❌ No permission.").setEphemeral(true).queue();
+            return;
+        }
+
+        String guildId = event.getGuild().getId();
+        String targetUserId = componentId.split(":")[1]; // User ID aus der ID extrahieren
+        String selectedWarnIdStr = event.getValues().get(0); // Die ausgewählte Warn ID
+
+        try {
+            int warnId = Integer.parseInt(selectedWarnIdStr);
+            boolean success = handler.deactivateWarning(warnId, guildId);
+
+            if (success) {
+                // Wir holen den User (für den Namen im Refresh)
+                event.getJDA().retrieveUserById(targetUserId).queue(
+                        targetUser -> {
+                            // Embed aktualisieren (Warns neu laden)
+                            sendWarnListEmbed(event, guildId, targetUser);
+
+                            // Kleines Follow-up Feedback
+                            event.getHook().sendMessage("✅ Warning ID " + warnId + " removed.")
+                                    .setEphemeral(true).queue();
+
+                            // Stats updaten (optional, wenn du 'deleted warnings' tracken willst)
+                        },
+                        error -> event.reply("User not found via API, but warning removed.").setEphemeral(true).queue()
+                );
+            } else {
+                event.reply("❌ Failed to remove warning. It might be already deleted.").setEphemeral(true).queue();
+            }
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Invalid warning ID.").setEphemeral(true).queue();
         }
     }
 
@@ -90,16 +225,16 @@ public class WarnCommandListener extends ListenerAdapter {
             // Check if user has reached max warnings and apply timeout if needed
             int activeWarnings = handler.getActiveWarningsCount(guildId, userId);
             String timeoutMessage = "";
-            
+
             if (handler.hasWarnSystemSettings(guildId)) {
                 int maxWarns = handler.getMaxWarns(guildId);
                 int timeoutMinutes = handler.getTimeMuted(guildId);
-                
+
                 if (activeWarnings >= maxWarns) {
                     // Check timeout permissions
                     if (event.getGuild().getSelfMember().hasPermission(Permission.MODERATE_MEMBERS) &&
                         event.getGuild().getSelfMember().canInteract(targetMember)) {
-                        
+
                         // Apply Discord timeout
                         Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
                         targetMember.timeoutFor(timeoutDuration)
@@ -109,12 +244,12 @@ public class WarnCommandListener extends ListenerAdapter {
                                     // Log timeout action
                                     String timeoutExpiresAt = LocalDateTime.now().plusMinutes(timeoutMinutes)
                                             .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                                    handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT", 
+                                    handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT",
                                         "Maximum warnings reached", timeoutDuration.toString(), timeoutExpiresAt);
-                                    
+
                                     // Update statistics
                                     handler.incrementTimeoutsPerformed(guildId);
-                                    
+
                                     // Update user statistics
                                     handler.incrementUserTimeoutsReceived(guildId, userId);
                                     handler.incrementUserTimeoutsPerformed(guildId, moderatorId);
@@ -129,23 +264,23 @@ public class WarnCommandListener extends ListenerAdapter {
                     }
                 }
             }
-            
+
             event.reply("Warning issued to " + targetMember.getAsMention() + " for: " + reason +
                     "\nWarning ID: " + warningId +
                     (expiresAt != null ? "\nExpires: " + expiresAt : "") + timeoutMessage).queue();
 
             // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
-            
+
             // Update statistics for warnings issued
             handler.incrementWarningsIssued(guildId);
-            
+
             // Update user statistics
             handler.incrementUserWarningsReceived(guildId, userId);
             handler.incrementUserWarningsIssued(guildId, moderatorId);
-            
+
             // Send audit log entry to log channel
-            handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(), 
+            handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(),
                     event.getMember().getEffectiveName(), reason);
         } else {
             event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();

@@ -249,7 +249,7 @@ public class DatabaseHandler {
             // Check for every table if already exist, if so apply migrations instead of full initialization
             String[] tableNames = {
                     "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "active_timers", "role_events"
+                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "active_timers", "role_events", "custom_embeds"
             };
             for (String tableName : tableNames) {
                 if (!tableAlreadyExist(tableName)) {
@@ -299,6 +299,9 @@ public class DatabaseHandler {
                             break;
                         case "role_events":
                             createRoleEventsTable();
+                            break;
+                        case "custom_embeds":
+                            createCustomEmbedsTable();
                             break;
                     }
                     return;
@@ -635,6 +638,22 @@ public class DatabaseHandler {
                 ");";
         try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
+        }
+    }
+
+    private void createCustomEmbedsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS custom_embeds (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL, " +
+                "name VARCHAR(100) NOT NULL, " +
+                "data TEXT NOT NULL, " +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                "UNIQUE(guild_id, name))"; // Verhindert doppelte Namen pro Server
+
+        try (Connection connection = getConnection();
+             Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+            System.out.println("Table 'custom_embeds' created successfully.");
         }
     }
 
@@ -1112,6 +1131,70 @@ public class DatabaseHandler {
         }
     }
 
+    // Innerhalb von DatabaseHandler.java
+
+    // 1. Eine kleine Helper-Klasse für die Daten
+    public static class WarningData {
+        public final int id;
+        public final String reason;
+        public final String moderatorId;
+        public final String date;
+
+        public WarningData(int id, String reason, String moderatorId, String date) {
+            this.id = id;
+            this.reason = reason;
+            this.moderatorId = moderatorId;
+            this.date = date;
+        }
+    }
+
+    // 2. Methode zum Abrufen der aktiven Warns eines Users
+    public List<WarningData> getUserActiveWarnings(String guildId, String userId) {
+        List<WarningData> warnings = new ArrayList<>();
+        // Wir holen nur aktive Warns
+        String query = "SELECT id, reason, moderator_id, created_at FROM warnings WHERE guild_id = ? AND user_id = ? AND active = 1 OR active IS NULL ORDER BY id DESC LIMIT 25";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    warnings.add(new WarningData(
+                            rs.getInt("id"),
+                            rs.getString("reason"),
+                            rs.getString("moderator_id"),
+                            rs.getString("created_at")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return warnings;
+    }
+
+    // 3. Methode zum Deaktivieren (Löschen) eines Warns
+    public boolean deactivateWarning(int warningId, String guildId) {
+        // Sicherheitscheck: guild_id prüfen, damit man keine Warns von anderen Servern löscht
+        String query = "UPDATE warnings SET active = 0 WHERE id = ? AND guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setInt(1, warningId);
+            stmt.setString(2, guildId);
+
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public int getTimeMuted(String guildID) {
         try (Connection connection = getConnection()) {
             String getMinutesMutedString = "SELECT minutes_muted FROM warn_system_settings WHERE guild_id = ?";
@@ -1247,15 +1330,16 @@ public class DatabaseHandler {
 
     public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt) {
         try (Connection connection = getConnection()) {
-            String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, expires_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
+            String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, active, expires_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
             PreparedStatement stmt = connection.prepareStatement(insertWarning, Statement.RETURN_GENERATED_KEYS);
             stmt.setString(1, guildId);
             stmt.setString(2, userId);
             stmt.setString(3, moderatorId);
             stmt.setString(4, reason);
             stmt.setString(5, severity);
-            stmt.setString(6, expiresAt);
+            stmt.setInt(6, 1);
+            stmt.setString(7, expiresAt);
             
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected > 0) {
@@ -1269,6 +1353,17 @@ public class DatabaseHandler {
             System.err.println("Error inserting warning: " + e.getMessage());
             e.printStackTrace();
             return 0;
+        }
+    }
+
+    public void removeWarningTimer() {
+        try (Connection connection = getConnection()) {
+            String deleteTimers = "UPDATE warnings SET active = 0 WHERE expires_at <= CURRENT_TIMESTAMP AND active = 1 OR active IS NULL";
+            PreparedStatement stmt = connection.prepareStatement(deleteTimers);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error removing warning timers: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -3933,5 +4028,64 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return events;
+    }
+
+    // In DatabaseHandler.java
+
+    public void saveCustomEmbed(String guildId, String name, String jsonData) {
+        String query = "INSERT INTO custom_embeds (guild_id, name, data) VALUES (?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE data = VALUES(data)";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setString(3, jsonData);
+            stmt.executeUpdate();
+            System.out.println("Saved custom embed '" + name + "' for guild " + guildId);
+        } catch (SQLException e) {
+            System.err.println("Error saving custom embed: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public String getCustomEmbedData(String guildId, String name) {
+        String query = "SELECT data FROM custom_embeds WHERE guild_id = ? AND name = ?";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("data");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error fetching custom embed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public List<String> getCustomEmbedNames(String guildId) {
+        List<String> names = new ArrayList<>();
+        String query = "SELECT name FROM custom_embeds WHERE guild_id = ? ORDER BY name ASC";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                names.add(rs.getString("name"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error listing custom embeds: " + e.getMessage());
+        }
+        return names;
+    }
+
+    public boolean deleteCustomEmbed(String guildId, String name) {
+        String query = "DELETE FROM custom_embeds WHERE guild_id = ? AND name = ?";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting custom embed: " + e.getMessage());
+            return false;
+        }
     }
 }

@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
+@Deprecated
 public class AddRulesEmbedToChannelCommandListener extends ListenerAdapter {
 
     private final DatabaseHandler handler;

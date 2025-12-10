@@ -2,6 +2,7 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -44,6 +45,7 @@ public class AddGuildSlashCommands {
         allCommands.add(getSelectRolesCommand());
         allCommands.addAll(getTimedRoleCommands());
         allCommands.addAll(getRoleEventCommands());
+        allCommands.add(getEmbedEditorCommand());
         return allCommands;
     }
 
@@ -121,6 +123,7 @@ public class AddGuildSlashCommands {
     /**
      * Get rules command with subcommands
      */
+    @Deprecated
     private SlashCommandData getRulesCommand() {
         return Commands.slash("rules", "Manage server rules")
                 .addSubcommands(
@@ -134,9 +137,25 @@ public class AddGuildSlashCommands {
                 );
     }
 
+    // Ersetze die alte getEmbedEditorCommand Methode:
+    private SlashCommandData getEmbedEditorCommand() {
+        return Commands.slash("embed", "Erstelle und verwalte Embeds")
+                .addSubcommands(
+                        new SubcommandData("create", "Startet den Embed-Editor"),
+                        new SubcommandData("list", "Zeigt alle gespeicherten Embeds an"),
+                        new SubcommandData("load", "Lädt ein gespeichertes Embed in den Editor")
+                                .addOption(OptionType.STRING, "name", "Name des Embeds", true),
+                        new SubcommandData("delete", "Löscht ein gespeichertes Embed")
+                                .addOption(OptionType.STRING, "name", "Name des Embeds", true)
+                )
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
+    }
+
     /**
      * Get warn command with subcommands
      */
+    // Innerhalb von getWarnCommand() in AddGuildSlashCommands.java
+
     private SlashCommandData getWarnCommand() {
         return Commands.slash("warn", "Manage warnings")
                 .addSubcommands(
@@ -144,12 +163,18 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.USER, "user", "User to warn", true)
                                 .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
                                 .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
+                        // NEUER SUBCOMMAND HIER:
+                        new SubcommandData("list", "List and manage active warnings of a user")
+                                .addOption(OptionType.USER, "user", "The user to check", true),
+
                         new SubcommandData("settings-set", "Configure warning system settings")
+                                // ... deine existierenden Optionen ...
                                 .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
                                 .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
                                 .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
                         new SubcommandData("settings-get", "View current warning system settings")
-                );
+                )
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
     /**
@@ -250,12 +275,12 @@ public class AddGuildSlashCommands {
                 .addOption(OptionType.STRING, "name", "Name des Events", true);
 
         // Subcommand: List (und Editieren via UI)
-        SubcommandData listCmd = new SubcommandData("list", "Listet alle Events auf zum Bearbeiten");
+        SubcommandData listCmd = new SubcommandData("list", "lists all events and opens an editor UI");
 
         // Hauptcommand
-        SlashCommandData eventCmd = Commands.slash("role-event", "Verwalte automatische Rollen-Events")
+        SlashCommandData eventCmd = Commands.slash("role-event", "Manages automatic role events")
                 .addSubcommands(createCmd, listCmd)
-                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.ADMINISTRATOR));
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
 
         commands.add(eventCmd);
         return commands;
@@ -283,7 +308,7 @@ public class AddGuildSlashCommands {
                         new SubcommandData("user", "View user information and statistics")
                                 .addOption(OptionType.USER, "user", "User to view information for", true)
                                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false)
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
     // The old methods are kept for backwards compatibility but now use the new approach

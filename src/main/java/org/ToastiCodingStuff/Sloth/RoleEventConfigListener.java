@@ -37,10 +37,6 @@ public class RoleEventConfigListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("role-event")) return;
-        if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
-            event.reply("❌ Nur Administratoren können Events verwalten.").setEphemeral(true).queue();
-            return;
-        }
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) return;
@@ -50,7 +46,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         switch (subcommand) {
             case "create":
                 String name = event.getOption("name").getAsString();
-                // Standard: MEMBER_JOIN
+                // Default: MEMBER_JOIN
                 handler.createRoleEvent(guildId, name, "MEMBER_JOIN", "0", "ADD", 0, "REFRESH", null);
 
                 List<DatabaseHandler.RoleEventData> events = handler.getRoleEventsByType(guildId, RoleEventType.MEMBER_JOIN);
@@ -58,7 +54,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                     DatabaseHandler.RoleEventData newEvent = events.get(events.size() - 1);
                     sendEventDashboard(event, newEvent);
                 } else {
-                    event.reply("Fehler beim Erstellen des Events.").setEphemeral(true).queue();
+                    event.reply("Error creating event.").setEphemeral(true).queue();
                 }
                 break;
 
@@ -68,11 +64,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
     }
 
-    // ==========================================
-    // INTERACTION HANDLERS (Update Logic)
-    // ==========================================
-
-    // 1. ENTITY SELECT (Rollen Auswahl)
+    // --- ENTITY SELECT (Role Selection) ---
     @Override
     public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
         String id = event.getComponentId();
@@ -83,7 +75,6 @@ public class RoleEventConfigListener extends ListenerAdapter {
         Role selectedRole = roles.get(0);
 
         if (id.startsWith("event_role_select_")) {
-            // ZIEL-ROLLE ÄNDERN
             int eventId = Integer.parseInt(id.replace("event_role_select_", ""));
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data == null) return;
@@ -91,18 +82,14 @@ public class RoleEventConfigListener extends ListenerAdapter {
             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, selectedRole.getId(),
                     data.actionType, data.durationSeconds, "REFRESH", data.triggerData, data.active);
 
-            // Sofortiges Update des Dashboards
             sendEventDashboard(event, handler.getRoleEvent(eventId));
         }
         else if (id.startsWith("event_trigger_role_select_")) {
-            // TRIGGER-ROLLE ÄNDERN (für ROLE_ADD/REMOVE)
             int eventId = Integer.parseInt(id.replace("event_trigger_role_select_", ""));
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data == null) return;
 
-            // JSON automatisch bauen
             String json = "{\"trigger_role_id\": \"" + selectedRole.getId() + "\"}";
-
             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
                     data.actionType, data.durationSeconds, "REFRESH", json, data.active);
 
@@ -110,7 +97,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
     }
 
-    // 2. STRING SELECT (Menü Navigation & Trigger Typ)
+    // --- STRING SELECT ---
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
         String id = event.getComponentId();
@@ -127,23 +114,19 @@ public class RoleEventConfigListener extends ListenerAdapter {
             handleDashboardAction(event, eventId, action);
         }
         else if (id.startsWith("event_trigger_type_select_")) {
-            // TRIGGER TYP GEÄNDERT
             int eventId = Integer.parseInt(id.replace("event_trigger_type_select_", ""));
             String newType = event.getValues().get(0);
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
 
             if (data != null) {
-                // Reset trigger_data bei Typwechsel (Sicherheit)
                 handler.updateRoleEvent(eventId, guildId, data.name, newType, data.roleId,
                         data.actionType, data.durationSeconds, "REFRESH", null, data.active);
-
-                // Dashboard neu laden (zeigt jetzt ggf. neue Felder an)
                 sendEventDashboard(event, handler.getRoleEvent(eventId));
             }
         }
     }
 
-    // 3. BUTTONS (Toggle/Delete)
+    // --- BUTTONS ---
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
@@ -160,12 +143,12 @@ public class RoleEventConfigListener extends ListenerAdapter {
         else if (id.startsWith("event_delete_")) {
             int eventId = Integer.parseInt(id.replace("event_delete_", ""));
             handler.deleteRoleEvent(guildId, eventId);
-            event.reply("🗑️ Event gelöscht.").setEphemeral(true).queue();
+            event.reply("🗑️ Event deleted.").setEphemeral(true).queue();
             event.getMessage().delete().queue();
         }
     }
 
-    // 4. MODALS (Text Eingaben)
+    // --- MODALS ---
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
         String modalId = event.getModalId();
@@ -194,7 +177,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 case "name":
                     handler.updateRoleEvent(eventId, guildId, input, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", data.triggerData, data.active);
                     break;
-                case "data": // Manuelles JSON oder Zahl
+                case "data":
                     if (data.eventType.equals("WARN_THRESHOLD")) {
                         try {
                             int count = Integer.parseInt(input);
@@ -208,186 +191,150 @@ public class RoleEventConfigListener extends ListenerAdapter {
             }
 
             if (success) {
-                // WICHTIG: Das Embed aktualisieren!
-                // Bei Modals nutzen wir editMessageEmbeds auf der Source-Interaction, wenn möglich
-                // Da Modals "neue" Interaktionen sind, müssen wir die Originalnachricht bearbeiten.
-                // Trick: editMessageEmbeds auf dem Modal-Event bearbeitet die Nachricht, die das Modal ausgelöst hat (meistens).
                 sendEventDashboard(event, handler.getRoleEvent(eventId));
             } else {
-                event.reply("❌ Ungültige Eingabe.").setEphemeral(true).queue();
+                event.reply("❌ Invalid input.").setEphemeral(true).queue();
             }
         }
     }
 
     // ==========================================
-    // UI LOGIC & DASHBOARD
+    // UI BUILDER
     // ==========================================
 
     private void handleDashboardAction(StringSelectInteractionEvent event, int eventId, String action) {
         DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
+        String guildId = event.getGuild().getId();
 
         switch (action) {
             case "edit_name":
-                event.replyModal(createModal("modal_event_name_" + eventId, "Name ändern", "Neuer Name", data.name)).queue();
+                event.replyModal(createModal("modal_event_name_" + eventId, "Edit Name", "New Name", data.name)).queue();
                 break;
 
             case "edit_trigger":
-                // Dropdown für Trigger-Typen
                 StringSelectMenu.Builder typeMenu = StringSelectMenu.create("event_trigger_type_select_" + eventId)
-                        .setPlaceholder("Wähle einen Auslöser...");
+                        .setPlaceholder("Select a trigger...");
 
                 for (RoleEventType type : RoleEventType.values()) {
                     typeMenu.addOption(type.toString(), type.toString(), getTriggerDescription(type));
                 }
 
-                event.reply("Wann soll das Event ausgelöst werden?")
+                event.reply("When should this event fire?")
                         .addActionRow(typeMenu.build())
-                        .setEphemeral(true)
-                        .queue();
+                        .setEphemeral(true).queue();
                 break;
 
             case "edit_role":
-                // Ziel-Rolle (Entity Select)
                 EntitySelectMenu roleMenu = EntitySelectMenu.create("event_role_select_" + eventId, EntitySelectMenu.SelectTarget.ROLE)
-                        .setPlaceholder("Suche und wähle die Ziel-Rolle...")
-                        .setMinValues(1)
-                        .setMaxValues(1)
-                        .build();
-                event.reply("Welche Rolle soll vergeben/entfernt werden?")
+                        .setPlaceholder("Search and select target role...")
+                        .setMinValues(1).setMaxValues(1).build();
+                event.reply("Which role should be given/removed?")
                         .addActionRow(roleMenu)
-                        .setEphemeral(true)
-                        .queue();
+                        .setEphemeral(true).queue();
                 break;
 
             case "edit_action":
-                // Toggle ADD/REMOVE und sofort Refresh
                 String newAction = data.actionType.equals("ADD") ? "REMOVE" : "ADD";
-                handler.updateRoleEvent(eventId, event.getGuild().getId(), data.name, data.eventType, data.roleId, newAction, data.durationSeconds, "REFRESH", data.triggerData, data.active);
+                handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, newAction, data.durationSeconds, "REFRESH", data.triggerData, data.active);
                 sendEventDashboard(event, handler.getRoleEvent(eventId));
                 break;
 
             case "edit_duration":
-                event.replyModal(createModal("modal_event_duration_" + eventId, "Dauer ändern", "Dauer (z.B. 1d, 30m, 0 für permanent)", "0")).queue();
+                event.replyModal(createModal("modal_event_duration_" + eventId, "Edit Duration", "Duration (e.g. 1d, 30m, 0)", "0")).queue();
                 break;
 
             case "edit_data":
-                // Fallunterscheidung je nach Typ
                 if (data.eventType.equals("WARN_THRESHOLD")) {
-                    event.replyModal(createModal("modal_event_data_" + eventId, "Warn Limit", "Anzahl Warns (z.B. 3)", "3")).queue();
+                    event.replyModal(createModal("modal_event_data_" + eventId, "Warn Limit", "Count (e.g. 3)", "3")).queue();
                 } else {
-                    event.replyModal(createModal("modal_event_data_" + eventId, "Bedingungen (JSON)", "JSON Daten", data.triggerData)).queue();
+                    event.replyModal(createModal("modal_event_data_" + eventId, "Conditions", "JSON", data.triggerData)).queue();
                 }
                 break;
         }
     }
 
-    /**
-     * Baut das Dashboard und sendet es (oder editiert es).
-     * Hier passiert die Magie für dynamische Felder!
-     */
     public void sendEventDashboard(IReplyCallback event, DatabaseHandler.RoleEventData data) {
         if (data == null) return;
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⚙️ Konfiguration: " + data.name);
+        embed.setTitle("⚙️ Configuration: " + data.name);
         embed.setColor(data.active ? Color.GREEN : Color.RED);
+        embed.setDescription("Edit settings for this timed role event.");
 
-        String statusEmoji = data.active ? "✅ Aktiv" : "🔴 Inaktiv";
+        String statusEmoji = data.active ? "✅ Active" : "🔴 Inactive";
         embed.addField("Status", statusEmoji, true);
-        embed.addField("1. Auslöser", "`" + data.eventType + "`", true);
+        embed.addField("1. Trigger", "`" + data.eventType + "`", true);
 
-        // Rolle auflösen
         Role role = event.getGuild().getRoleById(data.roleId);
         String roleText = (role != null) ? role.getAsMention() : "❌ ID: " + data.roleId;
-        String actionText = data.actionType.equals("ADD") ? "Hinzufügen" : "Entfernen";
+        String actionText = data.actionType.equals("ADD") ? "Add" : "Remove";
 
-        embed.addField("2. Aktion", actionText + " -> " + roleText, false);
+        embed.addField("2. Action", actionText + " -> " + roleText, false);
 
-        String durationText = (data.durationSeconds > 0) ? formatDuration(data.durationSeconds) : "Permanent / Sofort";
-        embed.addField("3. Dauer", durationText, true);
+        String durationText = (data.durationSeconds > 0) ? formatDuration(data.durationSeconds) : "Permanent / Instant";
+        embed.addField("3. Duration", durationText, true);
 
-        // Bedingung lesbar machen
-        String conditionText = formatConditionText(event, data);
-        embed.addField("4. Bedingungen", conditionText, false);
-
+        // Conditions Text
+        String conditionText = "None";
+        if (data.triggerData != null && !data.triggerData.equals("{}") && !data.triggerData.isEmpty()) {
+            if (data.triggerData.contains("trigger_role_id")) {
+                String id = data.triggerData.replaceAll("[^0-9]", "");
+                Role tr = event.getGuild().getRoleById(id);
+                conditionText = "At Role: " + (tr != null ? tr.getAsMention() : id);
+            } else if (data.triggerData.contains("threshold")) {
+                conditionText = "From Warns: " + data.triggerData.replaceAll("[^0-9]", "");
+            } else {
+                conditionText = "`" + data.triggerData + "`";
+            }
+        } else if (data.eventType.equals("ROLE_ADD")) {
+            conditionText = "⚠️ None (Fires on ANY role!)";
+        }
+        embed.addField("4. Conditions", conditionText, false);
         embed.setFooter("Event-ID: " + data.id);
 
-        // --- KOMPONENTEN BAUEN ---
+        // COMPONENTS
         List<LayoutComponent> rows = new ArrayList<>();
 
-        // 1. Haupt-Menü (Einstellungen)
         StringSelectMenu menu = StringSelectMenu.create("event_edit_select_" + data.id)
-                .setPlaceholder("Einstellung bearbeiten...")
-                .addOption("Name ändern", "edit_name", Emoji.fromUnicode("📝"))
-                .addOption("Trigger ändern", "edit_trigger", Emoji.fromUnicode("⚡"))
-                .addOption("Ziel-Rolle ändern", "edit_role", Emoji.fromUnicode("🎭"))
-                .addOption("Aktion ändern (+/-)", "edit_action", Emoji.fromUnicode("🔄"))
-                .addOption("Dauer ändern", "edit_duration", Emoji.fromUnicode("⏱️"))
-                .addOption("Bedingungen ändern", "edit_data", Emoji.fromUnicode("📋"))
+                .setPlaceholder("Edit setting...")
+                .addOption("Change Name", "edit_name", Emoji.fromUnicode("📝"))
+                .addOption("Change Trigger", "edit_trigger", Emoji.fromUnicode("⚡"))
+                .addOption("Change Target Role", "edit_role", Emoji.fromUnicode("🎭"))
+                .addOption("Change Action (+/-)", "edit_action", Emoji.fromUnicode("🔄"))
+                .addOption("Change Duration", "edit_duration", Emoji.fromUnicode("⏱️"))
+                .addOption("Change Conditions", "edit_data", Emoji.fromUnicode("📋"))
                 .build();
         rows.add(ActionRow.of(menu));
 
-        // 2. DYNAMISCHE REIHE: Trigger-Rolle Auswahl
-        // Wenn der Trigger "ROLE_ADD" oder "ROLE_REMOVE" ist, zeigen wir direkt ein Rollen-Select an!
+        // Dynamic Menu for ROLE Trigger
         if (data.eventType.equals("ROLE_ADD") || data.eventType.equals("ROLE_REMOVE")) {
             EntitySelectMenu triggerRoleMenu = EntitySelectMenu.create("event_trigger_role_select_" + data.id, EntitySelectMenu.SelectTarget.ROLE)
-                    .setPlaceholder("Optional: Wähle die Auslöser-Rolle direkt hier...")
-                    .setMinValues(1)
-                    .setMaxValues(1)
-                    .build();
+                    .setPlaceholder("Optional: Select Trigger Role...")
+                    .setMinValues(1).setMaxValues(1).build();
             rows.add(ActionRow.of(triggerRoleMenu));
         }
 
-        // 3. Buttons
         Button toggleBtn = data.active
-                ? Button.secondary("event_toggle_" + data.id, "Deaktivieren")
-                : Button.success("event_toggle_" + data.id, "Aktivieren");
-        Button deleteBtn = Button.danger("event_delete_" + data.id, "Löschen");
+                ? Button.secondary("event_toggle_" + data.id, "Disable")
+                : Button.success("event_toggle_" + data.id, "Enable");
+        Button deleteBtn = Button.danger("event_delete_" + data.id, "Delete");
         rows.add(ActionRow.of(toggleBtn, deleteBtn));
 
-        // Senden oder Editieren
         if (event instanceof IMessageEditCallback) {
-            // Wenn wir schon eine Nachricht haben (Button/Select Klick oder Modal Submit)
-            ((IMessageEditCallback) event).editMessageEmbeds(embed.build())
-                    .setComponents(rows)
-                    .queue();
+            ((IMessageEditCallback) event).editMessageEmbeds(embed.build()).setComponents(rows).queue();
         } else {
-            // Wenn es ein neuer Slash Command ist
-            event.replyEmbeds(embed.build())
-                    .setComponents(rows)
-                    .setEphemeral(true)
-                    .queue();
+            event.replyEmbeds(embed.build()).setComponents(rows).setEphemeral(true).queue();
         }
-    }
-
-    // --- Helper für Text ---
-
-    private String formatConditionText(IReplyCallback event, DatabaseHandler.RoleEventData data) {
-        if (data.triggerData == null || data.triggerData.equals("{}") || data.triggerData.isEmpty()) {
-            // Warnung bei Role-Events ohne Bedingung
-            if (data.eventType.equals("ROLE_ADD")) return "⚠️ Keine (Feuert bei JEDER Rolle!)";
-            return "Keine";
-        }
-
-        if (data.triggerData.contains("trigger_role_id")) {
-            String id = data.triggerData.replaceAll("[^0-9]", "");
-            Role tr = event.getGuild().getRoleById(id);
-            return "Bei Rolle: " + (tr != null ? tr.getAsMention() : id);
-        } else if (data.triggerData.contains("threshold")) {
-            return "Ab " + data.triggerData.replaceAll("[^0-9]", "") + " Warns";
-        }
-
-        return "`" + data.triggerData + "`";
     }
 
     private String getTriggerDescription(RoleEventType type) {
         switch (type) {
-            case MEMBER_JOIN: return "User tritt Server bei";
-            case ROLE_ADD: return "User erhält eine Rolle";
-            case ROLE_REMOVE: return "User verliert eine Rolle";
-            case WARN_THRESHOLD: return "Warn-Limit erreicht";
-            case MEMBER_BOOST: return "User boostet Server";
-            case VOICE_LEAVE: return "Verlässt Voice";
+            case MEMBER_JOIN: return "User joins server";
+            case ROLE_ADD: return "User gets a role";
+            case ROLE_REMOVE: return "User loses a role";
+            case WARN_THRESHOLD: return "Warn limit reached";
+            case MEMBER_BOOST: return "User boosts server";
+            case VOICE_LEAVE: return "Leaves voice channel";
             default: return type.name();
         }
     }
@@ -399,19 +346,19 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
 
         if (allEvents.isEmpty()) {
-            event.reply("Keine Events gefunden.").setEphemeral(true).queue();
+            event.reply("No events found. (/event create)").setEphemeral(true).queue();
             return;
         }
 
         StringSelectMenu.Builder menu = StringSelectMenu.create("event_select_edit")
-                .setPlaceholder("Wähle ein Event zum Bearbeiten");
+                .setPlaceholder("Select an event to edit");
 
         for (DatabaseHandler.RoleEventData evt : allEvents) {
             if (menu.getOptions().size() >= 25) break;
             menu.addOption(evt.name, String.valueOf(evt.id), evt.eventType + " -> " + evt.actionType);
         }
 
-        event.reply("Wähle ein Event:")
+        event.reply("Select an event:")
                 .addActionRow(menu.build())
                 .setEphemeral(true)
                 .queue();
@@ -433,13 +380,12 @@ public class RoleEventConfigListener extends ListenerAdapter {
             if (input.endsWith("d")) return TimeUnit.DAYS.toSeconds(val);
             if (input.endsWith("h")) return TimeUnit.HOURS.toSeconds(val);
             if (input.endsWith("m")) return TimeUnit.MINUTES.toSeconds(val);
-            if (input.endsWith("s")) return val;
             return val * 60;
         } catch (Exception e) { return -1; }
     }
 
     private String formatDuration(long seconds) {
-        if (seconds == 0) return "Permanent";
+        if (seconds == 0) return "Permanent / Instant";
         if (seconds < 60) return seconds + "s";
         if (seconds < 3600) return (seconds/60) + "m";
         if (seconds < 86400) return (seconds/3600) + "h";

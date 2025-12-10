@@ -136,7 +136,7 @@ public class DatabaseMigrationManager {
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
         schemas.put("global_statistics", createGlobalStatisticsSchema());
         schemas.put("just_verify_button", createJustVerifyButtonSchema());
-        // In DatabaseMigrationManager.java -> getExpectedSchemas()
+        schemas.put("custom_embeds", createCustomEmbedsSchema());
         schemas.put("role_events", createRoleEventsSchema());
         schemas.put("active_timers", createActiveTimersSchema());
 
@@ -408,6 +408,16 @@ public class DatabaseMigrationManager {
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
                 // Index für schnelle Abfragen im Background-Loop
                 .addIndex("CREATE INDEX IF NOT EXISTS idx_timers_expires ON active_timers(expires_at)");
+    }
+
+    // Neue Methode hinzufügen:
+    private TableSchema createCustomEmbedsSchema() {
+        return new TableSchema("custom_embeds")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(100) NOT NULL")
+                .addColumn("data", "TEXT NOT NULL") // Speichert das komplette Embed als JSON
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 
     /**

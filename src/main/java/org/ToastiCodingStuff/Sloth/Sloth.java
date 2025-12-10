@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.util.List;
+import java.util.Random;
 
 public class Sloth {
     public static void main(String[] args) throws Exception {
@@ -32,7 +33,7 @@ public class Sloth {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
-        api.addEventListener(new AddRulesEmbedToChannelCommandListener(handler));
+        //api.addEventListener(new AddRulesEmbedToChannelCommandListener(handler));
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
         api.addEventListener(new OnGuildLeaveListener(handler));
         api.addEventListener(new GlobalCommandListener(handler));
@@ -41,10 +42,11 @@ public class Sloth {
         api.addEventListener(new TimedRolesCommandListener(handler));
         api.addEventListener(new RoleEventConfigListener(handler));
         api.addEventListener(new TimedRoleTriggerListener(handler));
+        api.addEventListener(new EmbedEditorCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
-        
+
         // Register all system commands globally
         registerGlobalCommands(api, handler);
 
@@ -56,6 +58,21 @@ public class Sloth {
         List<Guild> guilds = api.getGuilds();
         handler.syncGuilds(guilds);
         handler.updateGuildActivityStatus(guilds);
+
+        java.util.concurrent.ScheduledExecutorService activityRotator = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        activityRotator.scheduleAtFixedRate(() -> {
+            Random rand = new Random();
+            String[] activities = {
+                    "/help | in " + api.getGuilds().size() + " servers",
+                    "with " + api.getUsers().size() + " users",
+                    "Sloth Bot Development",
+                    "New Features out now!",
+                    "Check out /feedback",
+                    "For support, join our Discord"
+            };
+            String activity = activities[rand.nextInt(activities.length)];
+            api.getPresence().setActivity(Activity.playing(activity));
+        }, 0, 60, java.util.concurrent.TimeUnit.MINUTES);
 
         // Starte den Background-Check für abgelaufene Rollen (jede Minute)
         java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
@@ -96,6 +113,7 @@ public class Sloth {
                     }
                     // 4. Timer aus DB löschen (egal ob erfolgreich oder nicht, damit Loop nicht hängt)
                     handler.removeTimer(timer.id);
+                    handler.removeWarningTimer();
                 }
             } catch (Exception e) {
                 System.err.println("Error in TimedRole loop: " + e.getMessage());
@@ -118,8 +136,7 @@ public class Sloth {
 
 
         // Get all commands and register them globally
-        java.util.List<net.dv8tion.jda.api.interactions.commands.build.SlashCommandData> allCommands = new java.util.ArrayList<>();
-        allCommands.addAll(commandProvider.getAllCommands());
+        List<SlashCommandData> allCommands = new java.util.ArrayList<>(commandProvider.getAllCommands());
         allCommands.add(Commands.slash("help", "Show help and documentation for Sloth bot"));
 
         Guild testServer = api.getGuildById("1169699077986988112");
