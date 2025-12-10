@@ -57,6 +57,13 @@ Sloth offers several systems that can be used:
 - Configure role triggers and durations
 - Track active temporary roles per user
 
+### 🎨 Embed Editor System
+- Create custom embeds with an interactive visual editor
+- Edit title, description, footer, author, color, main image, thumbnail, and fields
+- Save embeds to database for reuse
+- Load and modify saved embeds
+- Publish embeds with optional verify button integration
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -113,6 +120,7 @@ Navigate between help sections using the interactive buttons.
 
 #### Warning System
 - `/warn user` - Issue a warning to a user with severity level
+- `/warn list` - View and manage active warnings for a user
 - `/warn settings-set` - Configure warning system settings
 - `/warn settings-get` - View current warning settings
 
@@ -168,6 +176,12 @@ Navigate between help sections using the interactive buttons.
 - `/role-event create` - Create automated role events based on triggers
 - `/role-event list` - List and manage all role events
 
+#### Embed Editor System
+- `/embed create` - Open the interactive embed editor
+- `/embed list` - View all saved embeds
+- `/embed load` - Load a saved embed into the editor
+- `/embed delete` - Delete a saved embed
+
 ## Database
 
 Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
@@ -203,11 +217,13 @@ Sloth/
 │   ├── TimedRolesCommandListener.java          # Timed roles system
 │   ├── TimedRoleTriggerListener.java           # Timed roles triggers
 │   ├── RoleEventConfigListener.java            # Role event configuration
+│   ├── EmbedEditorCommandListener.java         # Embed editor system
 │   └── GuildEventListener.java                 # Guild event handling
 ├── build.gradle.kts                            # Build configuration
 ├── .env.example                                 # Environment variables template
 ├── DATABASE_SETUP.md                           # Database setup guide
 ├── MIGRATION_SYSTEM.md                         # Migration system documentation
+├── PATCHNOTES.md                               # Version history and patch notes
 └── README.md                                   # This file
 ```
 
