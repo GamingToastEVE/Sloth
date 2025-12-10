@@ -28,7 +28,7 @@ public class HelpCommandListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
-        
+
         if (customId.startsWith("help_")) {
             handleHelpNavigation(event, customId);
         }
@@ -86,7 +86,9 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• **Comprehensive Logging** - Track all server activities\n" +
                                 "• **Advanced Moderation** - Powerful tools for maintaining order\n" +
                                 "• **Ticket System** - Professional support channel management\n" +
-                                "• **Statistics Tracking** - Monitor server engagement\n\n" +
+                                "• **Statistics Tracking** - Monitor server engagement\n" +
+                                "• **Role Management** - Timed roles, select roles, and verification\n" +
+                                "• **Embed Creator** - Create and manage custom embeds\n\n" +
                                 "**Getting Started:**\n" +
                                 "1. All systems are available to use immediately\n" +
                                 "2. Configure each system using setup commands\n" +
@@ -110,41 +112,45 @@ public class HelpCommandListener extends ListenerAdapter {
             case "systems":
                 embed.setTitle("⚙️ Available Systems")
                         .setDescription("Sloth offers several modular systems that can be independently activated:\n\n")
-                        .addField("🛡️ **Moderation System**", 
+                        .addField("🛡️ **Moderation System**",
                                 "• Kick, ban, timeout users\n" +
-                                "• Message purging and slowmode\n" +
-                                "• Comprehensive moderation logging", false)
-                        .addField("⚠️ **Warning System**", 
+                                        "• Message purging and slowmode\n" +
+                                        "• Comprehensive moderation logging", false)
+                        .addField("⚠️ **Warning System**",
                                 "• Issue warnings with severity levels\n" +
-                                "• Automatic actions on thresholds\n" +
-                                "• Warning history tracking", false)
-                        .addField("🎫 **Ticket System**", 
+                                        "• Automatic actions on thresholds\n" +
+                                        "• Warning history tracking", false)
+                        .addField("🎫 **Ticket System**",
                                 "• Professional support channels\n" +
-                                "• Staff assignment and priorities", false)
-                        .addField("📝 **Log Channel System**", 
+                                        "• Staff assignment and priorities", false)
+                        .addField("📝 **Log Channel System**",
                                 "• Dedicated logging channels\n" +
-                                "• Track server events\n" +
-                                "• Comprehensive audit trail", false)
-                        .addField("📊 **Statistics System**", 
+                                        "• Track server events\n" +
+                                        "• Comprehensive audit trail", false)
+                        .addField("📊 **Statistics System**",
                                 "• Server activity tracking\n" +
-                                "• Daily and weekly reports\n" +
-                                "• Engagement metrics", false)
-                        .addField("📋 **Rules/Verification System**", 
+                                        "• Daily and weekly reports\n" +
+                                        "• Engagement metrics", false)
+                        .addField("📋 **Rules/Verification System**",
                                 "• Custom rules embeds with verification buttons\n" +
-                                "• Role assignment upon verification\n" +
-                                "• Verification statistics tracking", false)
-                        .addField("🔘 **Verify Button System**", 
+                                        "• Role assignment upon verification\n" +
+                                        "• Verification statistics tracking", false)
+                        .addField("🔘 **Verify Button System**",
                                 "• Create custom verification buttons\n" +
-                                "• Assign/remove roles when users verify\n" +
-                                "• Support for multiple configurations (max 3)", false)
-                        .addField("🎭 **Select Roles System**", 
+                                        "• Assign/remove roles when users verify\n" +
+                                        "• Support for multiple configurations (max 3)", false)
+                        .addField("🎭 **Select Roles System**",
                                 "• Allow users to self-assign roles\n" +
-                                "• Role selection menus with descriptions and emojis\n" +
-                                "• Support for reactions, dropdowns, and buttons", false)
-                        .addField("⏱️ **Timed Roles System**", 
+                                        "• Role selection menus with descriptions and emojis\n" +
+                                        "• Support for reactions, dropdowns, and buttons", false)
+                        .addField("⏱️ **Timed Roles System**",
                                 "• Assign temporary roles that automatically expire\n" +
-                                "• Automated role management based on events\n" +
-                                "• Track active temporary roles per user", false)
+                                        "• Automated role management based on events\n" +
+                                        "• Track active temporary roles per user", false)
+                        .addField("📝 **Embed Creation System**",
+                                "• Create fully custom embeds\n" +
+                                        "• Save and load embeds\n" +
+                                        "• Manage your saved embeds", false)
                         .setColor(Color.ORANGE)
                         .setFooter("All systems are ready to use!");
 
@@ -164,25 +170,30 @@ public class HelpCommandListener extends ListenerAdapter {
             case "setup":
                 embed.setTitle("📋 System Setup Guide")
                         .setDescription("Follow these steps to configure Sloth for your server:\n\n")
-                        .addField("**Step 1: Choose Systems to Configure**", 
+                        .addField("**Step 1: Choose Systems to Configure**",
                                 "All systems are available to use:\n" +
-                                "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
-                                "• Configure only the ones you need", false)
-                        .addField("**Step 2: Configure Systems**", 
+                                        "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
+                                        "• Role Systems (Select Roles, Timed Roles, Verify)\n" +
+                                        "• Configure only the ones you need", false)
+                        .addField("**Step 2: Configure Systems**",
                                 "**Log Channel:** `/log-channel set #channel`\n" +
-                                "**Warning System:** `/warn settings-set`\n" +
-                                "**Ticket System:** `/ticket setup`\n" +
-                                "**Moderation:** Ready to use with `/mod` commands!", false)
-                        .addField("**Step 3: Create Panels (Optional)**", 
+                                        "**Warning System:** `/warn settings-set`\n" +
+                                        "**Ticket System:** `/ticket setup`\n" +
+                                        "**Moderation:** Ready to use with `/mod` commands!\n" +
+                                        "**Timed Roles:** Use `/role-event create` to automate", false)
+                        .addField("**Step 3: Create Panels (Optional)**",
                                 "**Ticket Panel:** `/ticket panel` - Creates user-friendly ticket creation\n" +
-                                "Place in a public channel for easy access", false)
-                        .addField("**Step 4: Set Permissions**", 
+                                        "**Rules Embed:** `/rules add` - Creates rules with verification button\n" +
+                                        "**Verify Button:** `/verify-button add` - Creates standalone verification button\n" +
+                                        "**Select Roles:** `/select-roles send` - Creates role selection menu\n" +
+                                        "**Embeds:** `/embed create` - Start creating custom embeds", false)
+                        .addField("**Step 4: Set Permissions**",
                                 "• Ensure staff have appropriate Discord permissions\n" +
-                                "• Bot needs Admin permissions for full functionality\n" +
-                                "• Configure role-based access for tickets", false)
-                        .addField("**Formatting Rules Embeds**", 
+                                        "• Bot needs Admin permissions for full functionality\n" +
+                                        "• Configure role-based access for tickets", false)
+                        .addField("**Formatting Rules Embeds**",
                                 "Need help formatting your rules descriptions? Use Discord markdown!\n" +
-                                "📝 Click the 🎨 Formatting button below for a complete guide.", false)
+                                        "📝 Click the 🎨 Formatting button below for a complete guide.", false)
                         .setColor(Color.CYAN)
                         .setFooter("Need help? Create a support ticket!");
 
@@ -204,54 +215,60 @@ public class HelpCommandListener extends ListenerAdapter {
                         .setDescription("Complete list of available commands by system:\n\n")
                         .addField("**Log Channel System**",
                                 "`/log-channel set` - Configure logging channel\n" +
-                                "`/log-channel get` - View current log channel", false)
+                                        "`/log-channel get` - View current log channel", false)
                         .addField("**Warning System**",
                                 "`/warn user` - Issue warning to user\n" +
-                                "`/warn settings-set` - Configure warning thresholds\n" +
-                                "`/warn settings-get` - View warning configuration", false)
+                                        "`/warn settings-set` - Configure warning thresholds\n" +
+                                        "`/warn settings-get` - View warning configuration", false)
                         .addField("**Ticket System**",
                                 "`/ticket setup` - Configure ticket system\n" +
-                                "`/ticket panel` - Create ticket creation panel\n" +
-                                "`/ticket config` - Set custom title and description for ticket panel\n" +
-                                "`/ticket close` - Close current ticket\n" +
-                                "`/ticket assign` - Assign to staff member\n" +
-                                "`/ticket priority` - Change ticket priority\n" +
-                                "`/ticket info` - Get ticket information\n", false)
+                                        "`/ticket panel` - Create ticket creation panel\n" +
+                                        "`/ticket config` - Set custom title and description for ticket panel\n" +
+                                        "`/ticket close` - Close current ticket\n" +
+                                        "`/ticket assign` - Assign to staff member\n" +
+                                        "`/ticket priority` - Change ticket priority\n" +
+                                        "`/ticket info` - Get ticket information\n", false)
                         .addField("**Moderation System**",
                                 "`/mod kick` `/mod ban` `/mod unban` - User management\n" +
-                                "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
-                                "`/mod purge` - Delete multiple messages\n" +
-                                "`/mod slowmode` - Set channel slowmode", false)
+                                        "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
+                                        "`/mod purge` - Delete multiple messages\n" +
+                                        "`/mod slowmode` - Set channel slowmode", false)
                         .addField("**Statistics System**",
                                 "`/stats lifetime` - Lifetime server statistics\n" +
-                                "`/stats today` - Today's server statistics\n" +
-                                "`/stats week` - Weekly statistics\n" +
-                                "`/stats date` - Statistics for specific date\n" +
-                                "`/stats user` - View user information and statistics", false)
+                                        "`/stats today` - Today's server statistics\n" +
+                                        "`/stats week` - Weekly statistics\n" +
+                                        "`/stats date` - Statistics for specific date\n" +
+                                        "`/stats user` - View user information and statistics", false)
                         .addField("**Select Roles System**",
                                 "`/select-roles add` - Add role to selection list\n" +
-                                "`/select-roles remove` - Remove role from selection list\n" +
-                                "`/select-roles send` - Send role selection interface\n" +
-                                "*Supports reactions, dropdowns, and buttons*", false)
+                                        "`/select-roles remove` - Remove role from selection list\n" +
+                                        "`/select-roles send` - Send role selection interface\n" +
+                                        "*Supports reactions, dropdowns, and buttons*", false)
                         .addField("**Rules/Verification System**",
                                 "`/rules add` - Create rules embeds with verification\n" +
-                                "`/rules setup` - Display rules in current channel\n" +
-                                "`/rules list` - List all rules embeds\n" +
-                                "`/rules remove` - Remove a rules embed\n" +
-                                "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
+                                        "`/rules setup` - Display rules in current channel\n" +
+                                        "`/rules list` - List all rules embeds\n" +
+                                        "`/rules remove` - Remove a rules embed\n" +
+                                        "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
                         .addField("**Verify Button System**",
                                 "`/verify-button add` - Add verify button configuration (max 3)\n" +
-                                "`/verify-button send` - Send verify button message\n" +
-                                "`/verify-button remove` - Remove verify button from current channel", false)
+                                        "`/verify-button send` - Send verify button message\n" +
+                                        "`/verify-button remove` - Remove verify button from current channel", false)
                         .addField("**Timed Roles System**",
                                 "`/my-roles` - View your active temporary roles and expiration times\n" +
-                                "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
-                                "`/temprole remove` - Remove a temporary role from a user\n" +
-                                "`/role-event create` - Create automated role events based on triggers\n" +
-                                "`/role-event list` - List and manage all role events", false)
+                                        "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
+                                        "`/temprole remove` - Remove a temporary role from a user\n" +
+                                        "`/role-event create` - Create automated role events based on triggers\n" +
+                                        "`/role-event list` - List and manage all role events", false)
+                        .addField("**Embed Creation System**",
+                                "`/embed create` - Create a new custom embed\n" +
+                                        "`/embed list` - List your saved embeds\n" +
+                                        "`/embed load` - Load a saved embed\n" +
+                                        "`/embed delete` - Delete a saved embed", false)
                         .addField("**General Commands**",
                                 "`/help` - Show this help system\n" +
-                                "`/feedback` - Send feedback to the developer", false)
+                                        "`/feedback` - Send feedback to the developer\n" +
+                                        "`/global-stats` - Show global bot statistics", false)
                         .setColor(Color.MAGENTA)
                         .setFooter("All commands require appropriate permissions");
 
@@ -296,26 +313,26 @@ public class HelpCommandListener extends ListenerAdapter {
             case "legal":
                 embed.setTitle("📜 Legal Information")
                         .setDescription("Important legal documents and policies for using Sloth Bot:\n\n")
-                        .addField("**📋 Terms of Service**", 
+                        .addField("**📋 Terms of Service**",
                                 "By using Sloth Bot, you agree to our Terms of Service.\n" +
-                                "**Key Points:**\n" +
-                                "• Must be 16+ to use (Discord ToS compliance)\n" +
-                                "• Use in accordance with Discord Guidelines\n" +
-                                "• No misuse, harassment, or exploitation\n" +
-                                "• Service provided \"as is\" without guarantees\n" +
-                                "\n📄 **Full document:** `Terms of Service.md` in repository", false)
-                        .addField("**🔒 Privacy Policy**", 
+                                        "**Key Points:**\n" +
+                                        "• Must be 16+ to use (Discord ToS compliance)\n" +
+                                        "• Use in accordance with Discord Guidelines\n" +
+                                        "• No misuse, harassment, or exploitation\n" +
+                                        "• Service provided \"as is\" without guarantees\n" +
+                                        "\n📄 **Full document:** `Terms of Service.md` in repository", false)
+                        .addField("**🔒 Privacy Policy**",
                                 "We respect your privacy and follow GDPR compliance.\n" +
-                                "**What we collect:**\n" +
-                                "• Discord user/server IDs (necessary for functionality)\n" +
-                                "• Command interactions and parameters\n" +
-                                "• Technical logs for stability and security\n" +
-                                "\n**Your rights:** Access, rectification, erasure, data portability\n" +
-                                "\n📄 **Full document:** `privacy policy.md` in repository", false)
-                        .addField("**📞 Contact Information**", 
+                                        "**What we collect:**\n" +
+                                        "• Discord user/server IDs (necessary for functionality)\n" +
+                                        "• Command interactions and parameters\n" +
+                                        "• Technical logs for stability and security\n" +
+                                        "\n**Your rights:** Access, rectification, erasure, data portability\n" +
+                                        "\n📄 **Full document:** `privacy policy.md` in repository", false)
+                        .addField("**📞 Contact Information**",
                                 "For questions about Terms of Service or Privacy Policy:\n" +
-                                "• Discord: **gamingtoasti**\n" +
-                                "• Support Server: https://discord.gg/dQT53fD8M5", false)
+                                        "• Discord: **gamingtoasti**\n" +
+                                        "• Support Server: https://discord.gg/dQT53fD8M5", false)
                         .setColor(Color.GRAY)
                         .setFooter("Last updated: 06.09.25 • Navigate using buttons below");
 
@@ -336,40 +353,40 @@ public class HelpCommandListener extends ListenerAdapter {
             case "rules_formatting":
                 embed.setTitle("📝 Rules Embed Formatting Guide")
                         .setDescription("Learn how to format your rules embed descriptions using Discord markdown:\n\n")
-                        .addField("**Basic Text Formatting**", 
+                        .addField("**Basic Text Formatting**",
                                 "• `**bold text**` → **bold text**\n" +
-                                "• `*italic text*` → *italic text*\n" +
-                                "• `__underlined text__` → __underlined text__\n" +
-                                "• `~~strikethrough~~` → ~~strikethrough~~\n" +
-                                "• `||spoiler text||` → ||spoiler text||", false)
-                        .addField("**Code Formatting**", 
+                                        "• `*italic text*` → *italic text*\n" +
+                                        "• `__underlined text__` → __underlined text__\n" +
+                                        "• `~~strikethrough~~` → ~~strikethrough~~\n" +
+                                        "• `||spoiler text||` → ||spoiler text||", false)
+                        .addField("**Code Formatting**",
                                 "• `` `inline code` `` → `inline code`\n" +
-                                "• ```\\n```code block```\\n``` → Multi-line code blocks\n" +
-                                "• ```\\n```language\\ncode```\\n``` → Syntax highlighted code", false)
-                        .addField("**Lists and Structure**", 
+                                        "• ```\\n```code block```\\n``` → Multi-line code blocks\n" +
+                                        "• ```\\n```language\\ncode```\\n``` → Syntax highlighted code", false)
+                        .addField("**Lists and Structure**",
                                 "• `• Bullet point` → Bullet lists\n" +
-                                "• `1. Numbered item` → Numbered lists\n" +
-                                "• `> Quote text` → Block quotes\n" +
-                                "• `>>> Multi-line quote` → Multi-line quotes", false)
-                        .addField("**Links and Mentions**", 
+                                        "• `1. Numbered item` → Numbered lists\n" +
+                                        "• `> Quote text` → Block quotes\n" +
+                                        "• `>>> Multi-line quote` → Multi-line quotes", false)
+                        .addField("**Links and Mentions**",
                                 "• `[Link Text](https://example.com)` → Clickable links\n" +
-                                "• `<@userid>` → User mentions\n" +
-                                "• `<#channelid>` → Channel mentions\n" +
-                                "• `<@&roleid>` → Role mentions", false)
-                        .addField("**Special Characters**", 
+                                        "• `<@userid>` → User mentions\n" +
+                                        "• `<#channelid>` → Channel mentions\n" +
+                                        "• `<@&roleid>` → Role mentions", false)
+                        .addField("**Special Characters**",
                                 "• `:emoji_name:` → Discord emojis\n" +
-                                "• `<:name:id>` → Custom server emojis\n" +
-                                "• `\\n` → Line breaks in descriptions\n" +
-                                "• `\\*` → Escape special characters", false)
-                        .addField("**Tips for Rules Embeds**", 
+                                        "• `<:name:id>` → Custom server emojis\n" +
+                                        "• `\\n` → Line breaks in descriptions\n" +
+                                        "• `\\*` → Escape special characters", false)
+                        .addField("**Tips for Rules Embeds**",
                                 "• **Titles**: Only support plain text (no formatting)\n" +
-                                "• **Descriptions & Footers**: Support all Discord markdown\n" +
-                                "• Use **bold** for rule headers\n" +
-                                "• Use `code blocks` for examples\n" +
-                                "• Keep descriptions under 4096 characters\n" +
-                                "• Use line breaks (\\n) for better readability\n" +
-                                "• Test formatting before publishing\n" +
-                                "• Bot will warn if you use formatting in titles", false)
+                                        "• **Descriptions & Footers**: Support all Discord markdown\n" +
+                                        "• Use **bold** for rule headers\n" +
+                                        "• Use `code blocks` for examples\n" +
+                                        "• Keep descriptions under 4096 characters\n" +
+                                        "• Use line breaks (\\n) for better readability\n" +
+                                        "• Test formatting before publishing\n" +
+                                        "• Bot will warn if you use formatting in titles", false)
                         .setColor(Color.YELLOW)
                         .setFooter("Navigate using buttons below");
 

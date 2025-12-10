@@ -141,12 +141,12 @@ public class AddGuildSlashCommands {
     private SlashCommandData getEmbedEditorCommand() {
         return Commands.slash("embed", "Erstelle und verwalte Embeds")
                 .addSubcommands(
-                        new SubcommandData("create", "Startet den Embed-Editor"),
-                        new SubcommandData("list", "Zeigt alle gespeicherten Embeds an"),
-                        new SubcommandData("load", "Lädt ein gespeichertes Embed in den Editor")
-                                .addOption(OptionType.STRING, "name", "Name des Embeds", true),
-                        new SubcommandData("delete", "Löscht ein gespeichertes Embed")
-                                .addOption(OptionType.STRING, "name", "Name des Embeds", true)
+                        new SubcommandData("create", "Starts Embed-Editor"),
+                        new SubcommandData("list", "Shows all saved Embeds"),
+                        new SubcommandData("load", "Loads a saved Embed into the editor")
+                                .addOption(OptionType.STRING, "name", "Name of the embed", true),
+                        new SubcommandData("delete", "Deletes a saved Embed")
+                                .addOption(OptionType.STRING, "name", "Name of the embed", true)
                 )
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
