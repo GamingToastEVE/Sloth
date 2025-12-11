@@ -1152,7 +1152,7 @@ public class DatabaseHandler {
     public List<WarningData> getUserActiveWarnings(String guildId, String userId) {
         List<WarningData> warnings = new ArrayList<>();
         // Wir holen nur aktive Warns
-        String query = "SELECT id, reason, moderator_id, created_at FROM warnings WHERE guild_id = ? AND user_id = ? AND active = 1 OR active IS NULL ORDER BY id DESC LIMIT 25";
+        String query = "SELECT id, reason, moderator_id, created_at FROM warnings WHERE guild_id = ? AND user_id = ? AND (active = 1 OR active IS NULL) ORDER BY created_at ASC LIMIT 25";
 
         try (Connection connection = getConnection();
              PreparedStatement stmt = connection.prepareStatement(query)) {
