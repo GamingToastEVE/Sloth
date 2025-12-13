@@ -6,7 +6,6 @@ import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -96,7 +95,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                         }
                     }
                 }
-                handler.addActiveTimer(guildId, member.getId(), targetRole.getId(), eventConfig.durationSeconds, eventConfig.id);
+                handler.addActiveTimer(guildId, member.getId(), targetRole.getId(), eventConfig.id, eventConfig.durationSeconds);
             }
         }
     }

@@ -45,7 +45,7 @@ import java.util.*;
  * <h2>Adding New Features:</h2>
  * To add new columns for a feature:
  * <ol>
- *   <li>Update the table schema definition in the appropriate create*Schema() method</li>
+ *   <li>Update the table schema definition in the appropriate creation*Schema() method</li>
  *   <li>Restart the application - migration runs automatically</li>
  *   <li>New columns are added with proper defaults, existing data is preserved</li>
  * </ol>

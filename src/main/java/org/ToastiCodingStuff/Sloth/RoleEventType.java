@@ -3,11 +3,10 @@ package org.ToastiCodingStuff.Sloth;
 public enum RoleEventType {
     // Member Status
     MEMBER_JOIN,
-    MEMBER_BOOST,
+    /*MEMBER_BOOST,
     MEMBER_UNBOOST,
 
     // Moderation & Warns
-    WARN_ISSUED,
     WARN_THRESHOLD,
     WARN_EXPIRED,
 
@@ -20,7 +19,9 @@ public enum RoleEventType {
     MESSAGE_SPAM,
 
     // Custom
-    MESSAGE_THRESHOLD, ROLE_REMOVE, ROLE_ADD;
+    MESSAGE_THRESHOLD, */
+    ROLE_REMOVE,
+    ROLE_ADD;
 
     /**
      * Sichere Methode, um einen String aus der Datenbank in ein Enum zu wandeln.

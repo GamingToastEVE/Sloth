@@ -64,14 +64,13 @@ public class Sloth {
             Random rand = new Random();
             String[] activities = {
                     "/help | in " + api.getGuilds().size() + " servers",
-                    "with " + api.getUsers().size() + " users",
-                    "Sloth Bot Development",
                     "New Features out now!",
                     "Check out /feedback",
-                    "For support, join our Discord"
+                    "For support, join our Discord!",
+                    "ComponentsV2 Messages coming soon!"
             };
             String activity = activities[rand.nextInt(activities.length)];
-            api.getPresence().setActivity(Activity.playing(activity));
+            api.getPresence().setActivity(Activity.customStatus(activity));
         }, 0, 60, java.util.concurrent.TimeUnit.MINUTES);
 
         // Starte den Background-Check für abgelaufene Rollen (jede Minute)

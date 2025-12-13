@@ -2,7 +2,6 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -39,7 +38,7 @@ public class AddGuildSlashCommands {
         allCommands.add(getTicketCommand());
         allCommands.add(getModerationCommand());
         allCommands.add(getStatisticsCommand());
-        allCommands.add(getRulesCommand());
+        //allCommands.add(getRulesCommand());
         allCommands.add(getVerifyButtonCommand());
         allCommands.addAll(getFeedbackCommands());
         allCommands.add(getSelectRolesCommand());
@@ -109,7 +108,8 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.ROLE, "role-to-give", "Role to give members after pressing the verify button", true)
                                 .addOption(OptionType.ROLE, "role-to-remove", "Role to remove from members after pressing the verify button", false)
                                 .addOption(OptionType.STRING, "button-label", "Name of the button", false)
-                                .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false)
+                                .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false),
+                        new SubcommandData("list", "List all verify button configurations in this server")
                 );
     }
 

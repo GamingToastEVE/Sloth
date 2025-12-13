@@ -2,6 +2,11 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.ModalTopLevelComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -10,13 +15,9 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.modals.Modal;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.text.TextInput;
-import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
+import net.dv8tion.jda.api.modals.Modal;
 
 import java.awt.*;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -191,7 +192,7 @@ public class TicketCommandListener extends ListenerAdapter {
         Button createTicketButton = Button.primary("create_ticket", "🎫 Create Ticket");
 
         event.getChannel().sendMessageEmbeds(embed.build())
-                .setActionRow(createTicketButton)
+                .setComponents(ActionRow.of(createTicketButton))
                 .queue(message -> {
                     event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue();
                     // Sort channels to ensure ticket panel channel stays on top
@@ -200,7 +201,7 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleCreateTicketButton(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getId(), "create_ticket")) {
+        if (!Objects.equals(event.getButton().getCustomId(), "create_ticket")) {
             return;
         }
 
@@ -211,12 +212,12 @@ public class TicketCommandListener extends ListenerAdapter {
             return;
         }
 
-        TextInput subjectInput = TextInput.create("subject", "Subject", TextInputStyle.SHORT)
+        TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
                 .setPlaceholder("Brief description of your issue...")
                 .setRequiredRange(5, 100)
                 .build();
 
-        TextInput descriptionInput = TextInput.create("description", "Detailed Description", TextInputStyle.PARAGRAPH)
+        TextInput descriptionInput = TextInput.create("description", TextInputStyle.PARAGRAPH)
                 .setPlaceholder("Please provide as much detail as possible...")
                 .setRequiredRange(10, 1000)
                 .build();
@@ -228,8 +229,7 @@ public class TicketCommandListener extends ListenerAdapter {
                 .build();
         */
         Modal modal = Modal.create("ticket_creation_modal", "Create New Ticket")
-                .addActionRow(subjectInput)
-                .addActionRow(descriptionInput)
+                .addComponents((ModalTopLevelComponent) subjectInput, (ModalTopLevelComponent) descriptionInput)
                 //.addActionRow(priorityInput)
                 .build();
 
@@ -307,11 +307,11 @@ public class TicketCommandListener extends ListenerAdapter {
                                 .setColor(getPriorityColor(priority))
                                 .setFooter("Ticket ID: " + ticketId);
 
-                        Button closeButton = Button.danger("close_ticket_confirm", "🔒 Close Ticket");
+                        net.dv8tion.jda.api.components.buttons.Button closeButton = net.dv8tion.jda.api.components.buttons.Button.danger("close_ticket_confirm", "🔒 Close Ticket");
 
                         channel.sendMessage(event.getUser().getAsMention() + " Welcome to your support ticket!")
                                 .addEmbeds(welcomeEmbed.build())
-                                .setActionRow(closeButton)
+                                .setComponents(ActionRow.of(closeButton))
                                 .queue();
 
                         // Sort channels by priority after creating new ticket
@@ -373,7 +373,7 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleCloseTicketConfirm(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getId(), "close_ticket_confirm")) {
+        if (!Objects.equals(event.getButton().getCustomId(), "close_ticket_confirm")) {
             return;
         }
 
@@ -412,7 +412,7 @@ public class TicketCommandListener extends ListenerAdapter {
 
             Button deleteChannelButton = Button.danger("delete_channel", "🗑️ Delete Channel");
 
-            event.replyEmbeds(embed.build()).setActionRow(deleteChannelButton).queue();
+            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(deleteChannelButton)).queue();
             channel.getManager().setName("closed-" + channel.getName()).queue();
         } else {
             event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
@@ -420,7 +420,7 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleDeleteChannel(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getId(), "delete_channel")) {
+        if (!Objects.equals(event.getButton().getCustomId(), "delete_channel")) {
             return;
         }
 

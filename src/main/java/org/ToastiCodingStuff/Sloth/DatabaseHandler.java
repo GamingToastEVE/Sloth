@@ -8,10 +8,10 @@ import java.util.stream.Collectors;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 public class DatabaseHandler {
 
@@ -2999,6 +2999,51 @@ public class DatabaseHandler {
         }
     }
 
+    /**
+     * Data class to hold verify button configuration
+     */
+    public static class VerifyButtonData {
+        public final String roleToGiveId;
+        public final String roleToRemoveId;
+        public final String buttonLabel;
+        public final String buttonEmoji;
+
+        public VerifyButtonData(String roleToGiveId, String roleToRemoveId, String buttonLabel, String buttonEmoji) {
+            this.roleToGiveId = roleToGiveId;
+            this.roleToRemoveId = roleToRemoveId;
+            this.buttonLabel = buttonLabel;
+            this.buttonEmoji = buttonEmoji;
+        }
+    }
+
+    /**
+     * Get all verify button configurations for a guild
+     */
+    public List<VerifyButtonData> getVerifyButtonConfigs(String guildId) {
+        List<VerifyButtonData> configs = new ArrayList<>();
+        String query = "SELECT role_to_give_id, role_to_remove_id, button_label, button_emoji_id FROM just_verify_button WHERE guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(query)) {
+
+            pstmt.setString(1, guildId);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                configs.add(new VerifyButtonData(
+                        rs.getString("role_to_give_id"),
+                        rs.getString("role_to_remove_id"),
+                        rs.getString("button_label"),
+                        rs.getString("button_emoji_id")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error fetching verify button configs: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return configs;
+    }
+
     public String getJustVerifyButtonRoleToGiveID(String guildId) {
         String query = "SELECT role_to_give_id FROM just_verify_button WHERE guild_id = ?";
         try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
@@ -3785,7 +3830,7 @@ public class DatabaseHandler {
      * @param durationSeconds In wie vielen Sekunden der Timer abläuft
      * @param sourceEventId (Optional) Die ID des Events, das diesen Timer ausgelöst hat
      */
-    public void addActiveTimer(String guildId, String userId, String roleId, long durationSeconds, int sourceEventId) {
+    public void addActiveTimer(String guildId, String userId, String roleId, int sourceEventId, long durationSeconds) {
         String query = "INSERT INTO active_timers (guild_id, user_id, role_id, expires_at, source_event_id) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection connection = getConnection();

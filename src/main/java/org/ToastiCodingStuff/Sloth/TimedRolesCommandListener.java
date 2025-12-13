@@ -5,13 +5,8 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
 
 import java.awt.Color;
 import java.util.List;
@@ -24,80 +19,6 @@ public class TimedRolesCommandListener extends ListenerAdapter {
 
     public TimedRolesCommandListener(DatabaseHandler handler) {
         this.handler = handler;
-    }
-
-    public void sendEventDashboard(IReplyCallback event, DatabaseHandler.RoleEventData data) {
-        String guildId = event.getGuild().getId();
-
-        // 1. Das Embed bauen (Die Anzeige)
-        EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⚙️ Konfiguration: " + data.name);
-        embed.setColor(data.active ? Color.GREEN : Color.RED);
-        embed.setDescription("Bearbeite hier die Einstellungen für das zeitgesteuerte Event.");
-
-        // Status-Indikator
-        String statusEmoji = data.active ? "✅ Aktiv" : "🔴 Inaktiv";
-        embed.addField("Status", statusEmoji, true);
-
-        // Trigger-Typ (z.B. MEMBER_JOIN)
-        embed.addField("1. Auslöser (Trigger)", "`" + data.eventType + "`", true);
-
-        // Ziel-Rolle
-        Role role = event.getGuild().getRoleById(data.roleId);
-        String roleText = (role != null) ? role.getAsMention() : "❌ Gelöschte Rolle (" + data.roleId + ")";
-        String actionText = data.actionType.equals("ADD") ? "Hinzufügen" : "Entfernen";
-        embed.addField("2. Aktion & Rolle", actionText + " -> " + roleText, false);
-
-        // Dauer (formatiert)
-        String durationText = (data.durationSeconds > 0) ? formatDuration(data.durationSeconds) : "Permanent (0s)";
-        embed.addField("3. Dauer", durationText, true);
-
-        // Trigger-Daten (z.B. Warn-Limit)
-        String conditionText = (data.triggerData != null && !data.triggerData.equals("{}")) ? data.triggerData : "Keine Bedingungen";
-        embed.addField("4. Bedingungen", "`" + conditionText + "`", true);
-
-        embed.setFooter("Event-ID: " + data.id);
-
-        // 2. Das Dropdown-Menü bauen (Die Auswahl)
-        StringSelectMenu.Builder menu = StringSelectMenu.create("event_edit_select_" + data.id)
-                .setPlaceholder("Wähle eine Einstellung zum Bearbeiten...")
-                .addOption("Name ändern", "edit_name", "Den internen Namen ändern", Emoji.fromUnicode("📝"))
-                .addOption("Auslöser ändern", "edit_trigger", "Wann soll das passieren?", Emoji.fromUnicode("⚡"))
-                .addOption("Rolle ändern", "edit_role", "Welche Rolle ist betroffen?", Emoji.fromUnicode("🎭"))
-                .addOption("Aktion ändern (Add/Remove)", "edit_action", "Rolle geben oder nehmen?", Emoji.fromUnicode("🔄"))
-                .addOption("Dauer ändern", "edit_duration", "Wie lange hält die Rolle?", Emoji.fromUnicode("⏱️"))
-                .addOption("Bedingungen ändern", "edit_data", "Z.B. Anzahl der Warns", Emoji.fromUnicode("📋"));
-
-        // 3. Buttons für schnelle Aktionen (Toggle & Delete)
-        Button toggleBtn = data.active
-                ? Button.secondary("event_toggle_" + data.id, "Deaktivieren").withEmoji(Emoji.fromUnicode("⏸️"))
-                : Button.success("event_toggle_" + data.id, "Aktivieren").withEmoji(Emoji.fromUnicode("▶️"));
-
-        Button deleteBtn = Button.danger("event_delete_" + data.id, "Löschen").withEmoji(Emoji.fromUnicode("🗑️"));
-
-        // 4. Nachricht senden
-        // Prüfen ob es ein SlashCommand (reply) oder ButtonClick (edit) ist
-        if (event.isAcknowledged()) {
-            event.getHook().editOriginalEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menu.build()), ActionRow.of(toggleBtn, deleteBtn))
-                    .queue();
-        } else {
-            event.replyEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menu.build()), ActionRow.of(toggleBtn, deleteBtn))
-                    .setEphemeral(true)
-                    .queue();
-        }
-    }
-
-    // Hilfsmethode: Sekunden in lesbaren Text umwandeln
-    private String formatDuration(long seconds) {
-        if (seconds < 60) return seconds + " Sekunden";
-        long minutes = seconds / 60;
-        if (minutes < 60) return minutes + " Minuten";
-        long hours = minutes / 60;
-        if (hours < 24) return hours + " Stunden";
-        long days = hours / 24;
-        return days + " Tage";
     }
 
     @Override
@@ -191,7 +112,7 @@ public class TimedRolesCommandListener extends ListenerAdapter {
             event.getGuild().addRoleToMember(target, role).queue(
                     success -> {
                         // Timer in DB eintragen (EventID 0, da manuell)
-                        handler.addActiveTimer(guildId, target.getId(), role.getId(), seconds, 0);
+                        handler.addActiveTimer(guildId, target.getId(), role.getId(), 0, seconds);
 
                         long unixExpiry = (System.currentTimeMillis() / 1000) + seconds;
                         event.reply("✅ Rolle " + role.getAsMention() + " an " + target.getAsMention() + " vergeben.\n" +

@@ -2,6 +2,12 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.ModalTopLevelComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
@@ -10,12 +16,7 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.EntitySelectMenu;
-import net.dv8tion.jda.api.interactions.components.text.TextInput;
-import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
-import net.dv8tion.jda.api.interactions.modals.Modal;
+import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 
@@ -137,13 +138,13 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // --- Speichern Logik ---
         if (id.equals("embed_save_db")) {
-            TextInput nameInput = TextInput.create("input_save_name", "Name des Embeds", TextInputStyle.SHORT)
+            TextInput nameInput = TextInput.create("input_save_name", TextInputStyle.SHORT)
                     .setPlaceholder("z.B. welcome_message")
                     .setRequired(true)
                     .setMaxLength(100)
                     .build();
 
-            event.replyModal(Modal.create("modal_embed_save", "Embed Speichern").addActionRow(nameInput).build()).queue();
+            event.replyModal(Modal.create("modal_embed_save", "Embed Speichern").addComponents((ModalTopLevelComponent) nameInput).build()).queue();
             return;
         }
 
@@ -189,49 +190,49 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         // --- Normale Editor Logik (Modals) ---
         switch (id) {
             case "embed_edit_title":
-                TextInput titleInput = TextInput.create("input_title", "Title", TextInputStyle.SHORT)
+                TextInput titleInput = TextInput.create("input_title", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null ? currentEmbed.getTitle() : "").setRequired(false).build();
-                TextInput urlInput = TextInput.create("input_url", "Title URL", TextInputStyle.SHORT)
+                TextInput urlInput = TextInput.create("input_url", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null ? currentEmbed.getUrl() : "").setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_title", "Title").addActionRow(titleInput).addActionRow(urlInput).build()).queue();
+                event.replyModal(Modal.create("modal_embed_title", "Title").addComponents((ModalTopLevelComponent) titleInput, (ModalTopLevelComponent) urlInput).build()).queue();
                 break;
 
             case "embed_edit_desc":
-                TextInput descInput = TextInput.create("input_desc", "Description", TextInputStyle.PARAGRAPH)
+                TextInput descInput = TextInput.create("input_desc", TextInputStyle.PARAGRAPH)
                         .setValue(currentEmbed != null ? currentEmbed.getDescription() : "").setMaxLength(4000).setRequired(true).build();
-                event.replyModal(Modal.create("modal_embed_desc", "Description").addActionRow(descInput).build()).queue();
+                event.replyModal(Modal.create("modal_embed_desc", "Description").addComponents((ModalTopLevelComponent) descInput).build()).queue();
                 break;
 
             case "embed_edit_footer":
-                TextInput footerInput = TextInput.create("input_footer", "Footer Text", TextInputStyle.SHORT)
+                TextInput footerInput = TextInput.create("input_footer", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getFooter() != null ? currentEmbed.getFooter().getText() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_footer", "Footer").addActionRow(footerInput).build()).queue();
+                event.replyModal(Modal.create("modal_embed_footer", "Footer").addComponents((ModalTopLevelComponent) footerInput).build()).queue();
                 break;
 
             case "embed_edit_author":
-                TextInput authorName = TextInput.create("input_author_name", "Author name", TextInputStyle.SHORT)
+                TextInput authorName = TextInput.create("input_author_name", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getAuthor() != null ? currentEmbed.getAuthor().getName() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_author", "Author").addActionRow(authorName).build()).queue();
+                event.replyModal(Modal.create("modal_embed_author", "Author").addComponents((ModalTopLevelComponent) authorName).build()).queue();
                 break;
 
             case "embed_edit_color":
-                TextInput colorInput = TextInput.create("input_color", "Colour (#Hex or name)", TextInputStyle.SHORT).setRequired(true).build();
-                event.replyModal(Modal.create("modal_embed_color", "Colour").addActionRow(colorInput).build()).queue();
+                TextInput colorInput = TextInput.create("input_color", TextInputStyle.SHORT).setRequired(true).build();
+                event.replyModal(Modal.create("modal_embed_color", "Colour").addComponents((ModalTopLevelComponent) colorInput).build()).queue();
                 break;
 
             case "embed_edit_image":
-                TextInput imgInput = TextInput.create("input_image", "Image URL", TextInputStyle.SHORT)
+                TextInput imgInput = TextInput.create("input_image", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getImage() != null ? currentEmbed.getImage().getUrl() : null).setRequired(false).build();
-                TextInput thumbInput = TextInput.create("input_thumb", "Thumbnail URL", TextInputStyle.SHORT)
+                TextInput thumbInput = TextInput.create("input_thumb", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getThumbnail() != null ? currentEmbed.getThumbnail().getUrl() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_image", "Image").addActionRow(imgInput).addActionRow(thumbInput).build()).queue();
+                event.replyModal(Modal.create("modal_embed_image", "Image").addComponents((ModalTopLevelComponent) imgInput, (ModalTopLevelComponent) thumbInput).build()).queue();
                 break;
 
             case "embed_add_field":
-                TextInput fName = TextInput.create("input_field_name", "Title", TextInputStyle.SHORT).setRequired(true).build();
-                TextInput fValue = TextInput.create("input_field_value", "content", TextInputStyle.PARAGRAPH).setRequired(true).build();
-                TextInput fInline = TextInput.create("input_field_inline", "Inline? (yes/no)", TextInputStyle.SHORT).setValue("no").setRequired(true).build();
-                event.replyModal(Modal.create("modal_embed_add_field", "field").addActionRows(ActionRow.of(fName), ActionRow.of(fValue), ActionRow.of(fInline)).build()).queue();
+                TextInput fName = TextInput.create("input_field_name", TextInputStyle.SHORT).setRequired(true).build();
+                TextInput fValue = TextInput.create("input_field_value", TextInputStyle.PARAGRAPH).setRequired(true).build();
+                TextInput fInline = TextInput.create("input_field_inline", TextInputStyle.SHORT).setValue("no").setRequired(true).build();
+                event.replyModal(Modal.create("modal_embed_add_field", "field").addComponents((ModalTopLevelComponent) fName, (ModalTopLevelComponent) fValue, (ModalTopLevelComponent) fInline).build()).queue();
                 break;
 
             case "embed_clear_fields":
@@ -271,7 +272,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 builder.setTitle(t.isEmpty() ? null : t, u.isEmpty() ? null : u);
                 break;
             case "modal_embed_desc":
-                builder.setDescription(event.getValue("input_desc").getAsString());
+                builder.setDescription(processLineBreaks(event.getValue("input_desc").getAsString()));
                 break;
             case "modal_embed_footer":
                 String f = event.getValue("input_footer").getAsString();
@@ -296,7 +297,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
             case "modal_embed_add_field":
                 String fn = event.getValue("input_field_name").getAsString();
-                String fv = event.getValue("input_field_value").getAsString();
+                String fv = processLineBreaks(event.getValue("input_field_value").getAsString());
                 boolean inline = event.getValue("input_field_inline").getAsString().toLowerCase().matches("^(ja|yes|true|y|j)$");
                 builder.addField(fn, fv, inline);
                 break;
@@ -334,7 +335,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             // Senden (mit oder ohne Button)
             var action = targetChannel.sendMessageEmbeds(embedToSend);
             if (verifyButton != null) {
-                action.setActionRow(verifyButton);
+                action.addComponents(ActionRow.of(verifyButton));
             }
 
             action.queue(
@@ -421,7 +422,16 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 text.contains("~~") || text.contains("`") || text.contains("[");
     }
 
-    private String processLineBreaks(String text) {
-        return text.replace("\\n", "\n");
+    public String processLineBreaks(String text) {
+        if (text == null) return "";
+
+        // 1. Replace literal "\r\n" (Windows style literal) with a real newline
+        String result = text.replaceAll("\\\\r\\\\n", "\n");
+
+        // 2. Replace literal "\n" (Unix style literal) with a real newline
+        // We use "\\\\n" in regex to match a literal "\n" string
+        result = result.replaceAll("\\\\n", "\n");
+
+        return result;
     }
 }

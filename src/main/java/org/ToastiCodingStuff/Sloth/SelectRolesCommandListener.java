@@ -2,6 +2,10 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.MessageTopLevelComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
@@ -102,18 +106,18 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     @Override
     public void onButtonInteraction (net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent event) {
-        if (event.getButton().getId().equals("send_select_roles_reaction")) {
+        if (event.getButton().getCustomId().equals("send_select_roles_reaction")) {
             handleSendSelectRolesReaction(event.getGuild(), event.getChannel());
             event.reply("Sent reaction role selection message!").setEphemeral(true).queue();
-        } else  if (event.getButton().getId().equals("send_select_roles_dropdown")) {
+        } else  if (event.getButton().getCustomId().equals("send_select_roles_dropdown")) {
             handleSendSelectRolesDropdown(event.getGuild(), event.getChannel());
             event.reply("Sent dropdown role selection message!").setEphemeral(true).queue();
-        } else  if (event.getButton().getId().equals("send_select_roles_buttons")) {
+        } else  if (event.getButton().getCustomId().equals("send_select_roles_buttons")) {
             handleSendSelectRolesButtons(event.getGuild(), event.getChannel());
             event.reply("Sent button role selection message!").setEphemeral(true).queue();
         } else {
-            if (event.getButton().getId().startsWith("role_select_button_")) {
-                String selectId = event.getButton().getId().replace("role_select_button_", "");
+            if (event.getButton().getCustomId().startsWith("role_select_button_")) {
+                String selectId = event.getButton().getCustomId().replace("role_select_button_", "");
                 String guildId = Objects.requireNonNull(event.getGuild()).getId();
                 List<String> roleId = handler.getAllRoleSelectForGuild(event.getGuild().getId());
                 for (String roleInfo : roleId) {
@@ -138,7 +142,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     @Override
     public void onStringSelectInteraction (StringSelectInteractionEvent event) {
-        if (event.getSelectMenu().getId().equals("role_select_dropdown")) {
+        if (event.getSelectMenu().getCustomId().equals("role_select_dropdown")) {
             String guildId = Objects.requireNonNull(event.getGuild()).getId();
             List<String> selectedRoleIds = event.getValues();
 
@@ -183,10 +187,10 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embedBuilder.setTitle("Select Role Selection Type");
         embedBuilder.setDescription("Please choose the type of role selection you want to send:");
         event.replyEmbeds(embedBuilder.build()).setEphemeral(true)
-                .addActionRow(
-                        net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_reaction", "Reaction Roles"),
-                        //net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_dropdown", "Dropdown Menu"),
-                        net.dv8tion.jda.api.interactions.components.buttons.Button.primary("send_select_roles_buttons", "Buttons")
+                .setComponents(
+                        (MessageTopLevelComponent) Button.primary("send_select_roles_reaction", "Reaction Roles"),
+                        //Button.primary("send_select_roles_dropdown", "Dropdown Menu"),
+                        (MessageTopLevelComponent) Button.primary("send_select_roles_buttons", "Buttons")
                 ).queue();
     }
 
@@ -256,8 +260,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embedBuilder.setTitle("Select Your Roles");
         embedBuilder.setDescription("Use the dropdown menu below to select your roles:");
 
-        net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu.Builder menuBuilder =
-            net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu.create("role_select_dropdown")
+        StringSelectMenu.Builder menuBuilder =
+            StringSelectMenu.create("role_select_dropdown")
                 .setPlaceholder("Choose your roles")
                 .setMinValues(0)
                 .setMaxValues(Math.min(roleList.size(), 25));
@@ -273,14 +277,10 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
         assert mChannel != null;
         mChannel.sendMessageEmbeds(embedBuilder.build())
-            .addActionRow(menuBuilder.build())
-            .queue();
+            .setComponents(ActionRow.of(menuBuilder.build()));
     }
 
     private void handleSendSelectRolesButtons (Guild guild, Channel channel) {
-        if (!channel.getType().isMessage()) {
-            return;
-        }
         MessageChannel mChannel = guild.getTextChannelById(channel.getId());
         List<String> roleList = handler.getAllRoleSelectForGuild(Objects.requireNonNull(guild.getId()));
 
@@ -288,14 +288,14 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embedBuilder.setTitle("Select Your Roles");
         embedBuilder.setDescription("Click the buttons below to toggle your roles:");
 
-        List<net.dv8tion.jda.api.interactions.components.buttons.Button> buttons = new ArrayList<>();
+        List<Button> buttons = new ArrayList<>();
 
         for (String roleInfo : roleList) {
             Role role = guild.getRoleById(roleInfo);
             if (role != null) {
                 String roleDescription = handler.getRoleSelectDescription(Objects.requireNonNull(guild.getId()), role.getId());
                 String roleEmoji = handler.getRoleSelectEmoji(Objects.requireNonNull(guild.getId()), role.getId());
-                buttons.add(net.dv8tion.jda.api.interactions.components.buttons.Button.primary(
+                buttons.add(Button.primary(
                         "role_select_button_" + handler.getRoleSelectID(Objects.requireNonNull(guild.getId()), role.getId()),
                         role.getName()
                 ).withEmoji(Emoji.fromFormatted(roleEmoji)));
@@ -313,11 +313,11 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         for (int i = 0; i < size; i += 5) {
             if (remainder > 0) {
                 if (i + 5 > size) {
-                    message.addActionRow(buttons.subList(i, i + remainder));
+                    message.addComponents(ActionRow.of(buttons.subList(i, i + remainder)));
                     break;
                 }
             }
-            message.addActionRow(buttons.subList(i, i + 5));
+            message.addComponents(ActionRow.of(buttons.subList(i, i + 5)));
         }
         message.queue();
     }

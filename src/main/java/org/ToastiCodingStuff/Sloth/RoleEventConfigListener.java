@@ -1,9 +1,16 @@
 package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.ModalTopLevelComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -12,14 +19,7 @@ import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionE
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.callbacks.IMessageEditCallback;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.LayoutComponent;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.EntitySelectMenu;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
-import net.dv8tion.jda.api.interactions.modals.Modal;
-import net.dv8tion.jda.api.interactions.components.text.TextInput;
-import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
+import net.dv8tion.jda.api.modals.Modal;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -32,6 +32,22 @@ public class RoleEventConfigListener extends ListenerAdapter {
 
     public RoleEventConfigListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        String guildId = event.getGuild().getId();
+        List<DatabaseHandler.RoleEventData> joinEvents = handler.getRoleEventsByType(guildId, RoleEventType.MEMBER_JOIN);
+        for (DatabaseHandler.RoleEventData data : joinEvents) {
+            if (data.durationSeconds > 0) {
+                handler.addActiveTimer(event.getGuild().getId(), event.getMember().getId(), data.roleId, data.id, data.durationSeconds);
+            }
+            if (data.actionType.equals("ADD")) {
+                event.getGuild().addRoleToMember(event.getMember(), event.getGuild().getRoleById(data.roleId)).queue();
+            } else if (data.actionType.equals("REMOVE")) {
+                event.getGuild().removeRoleFromMember(event.getMember(), event.getGuild().getRoleById(data.roleId)).queue();
+            }
+        }
     }
 
     @Override
@@ -220,7 +236,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 }
 
                 event.reply("When should this event fire?")
-                        .addActionRow(typeMenu.build())
+                        .setComponents(ActionRow.of(typeMenu.build()))
                         .setEphemeral(true).queue();
                 break;
 
@@ -229,7 +245,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                         .setPlaceholder("Search and select target role...")
                         .setMinValues(1).setMaxValues(1).build();
                 event.reply("Which role should be given/removed?")
-                        .addActionRow(roleMenu)
+                        .setComponents(ActionRow.of(roleMenu))
                         .setEphemeral(true).queue();
                 break;
 
@@ -293,7 +309,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         embed.setFooter("Event-ID: " + data.id);
 
         // COMPONENTS
-        List<LayoutComponent> rows = new ArrayList<>();
+        List<ActionRow> rows = new ArrayList<>();
 
         StringSelectMenu menu = StringSelectMenu.create("event_edit_select_" + data.id)
                 .setPlaceholder("Edit setting...")
@@ -332,9 +348,9 @@ public class RoleEventConfigListener extends ListenerAdapter {
             case MEMBER_JOIN: return "User joins server";
             case ROLE_ADD: return "User gets a role";
             case ROLE_REMOVE: return "User loses a role";
-            case WARN_THRESHOLD: return "Warn limit reached";
-            case MEMBER_BOOST: return "User boosts server";
-            case VOICE_LEAVE: return "Leaves voice channel";
+            //case WARN_THRESHOLD: return "Warn limit reached";
+            //case MEMBER_BOOST: return "User boosts server";
+            // case VOICE_LEAVE: return "Leaves voice channel";
             default: return type.name();
         }
     }
@@ -359,17 +375,17 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
 
         event.reply("Select an event:")
-                .addActionRow(menu.build())
+                .setComponents(ActionRow.of(menu.build()))
                 .setEphemeral(true)
                 .queue();
     }
 
     private Modal createModal(String id, String title, String label, String value) {
-        TextInput input = TextInput.create("input_field", label, TextInputStyle.SHORT)
+        TextInput input = TextInput.create("input_field", TextInputStyle.SHORT)
                 .setValue(value != null ? value : "")
                 .setRequired(true)
                 .build();
-        return Modal.create(id, title).addActionRow(input).build();
+        return Modal.create(id, title).addComponents((ModalTopLevelComponent) input).build();
     }
 
     private long parseDuration(String input) {

@@ -2,12 +2,13 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent; // Wichtig!
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu; // Wichtig!
+import net.dv8tion.jda.api.hooks.ListenerAdapter; // Wichtig!
 
 import java.awt.Color;
 import java.time.Duration;
@@ -126,13 +127,13 @@ public class WarnCommandListener extends ListenerAdapter {
         // Antwort senden
         if (event instanceof SlashCommandInteractionEvent) {
             event.replyEmbeds(embed.build())
-                    .addActionRow(menuBuilder.build())
+                    .setComponents(ActionRow.of(menuBuilder.build()))
                     .setEphemeral(true)
                     .queue();
         } else if (event instanceof StringSelectInteractionEvent) {
             // Nachricht editieren (Refresh nach Löschung)
             ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build())
-                    .setActionRow(menuBuilder.build())
+                    .setComponents(ActionRow.of(menuBuilder.build()))
                     .queue();
         }
     }
