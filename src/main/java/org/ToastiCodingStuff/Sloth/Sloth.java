@@ -33,7 +33,6 @@ public class Sloth {
         api.addEventListener(new TicketCommandListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
-        //api.addEventListener(new AddRulesEmbedToChannelCommandListener(handler));
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
         api.addEventListener(new OnGuildLeaveListener(handler));
         api.addEventListener(new GlobalCommandListener(handler));
@@ -43,6 +42,7 @@ public class Sloth {
         api.addEventListener(new RoleEventConfigListener(handler));
         api.addEventListener(new TimedRoleTriggerListener(handler));
         api.addEventListener(new EmbedEditorCommandListener(handler));
+        api.addEventListener(new SystemsCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -67,7 +67,7 @@ public class Sloth {
                     "New Features out now!",
                     "Check out /feedback",
                     "For support, join our Discord!",
-                    "ComponentsV2 Messages coming soon!"
+                    "Activate systems with /systems"
             };
             String activity = activities[rand.nextInt(activities.length)];
             api.getPresence().setActivity(Activity.customStatus(activity));
@@ -135,8 +135,7 @@ public class Sloth {
 
 
         // Get all commands and register them globally
-        List<SlashCommandData> allCommands = new java.util.ArrayList<>(commandProvider.getAllCommands());
-        allCommands.add(Commands.slash("help", "Show help and documentation for Sloth bot"));
+        List<SlashCommandData> allCommands = new java.util.ArrayList<>(commandProvider.getCoreCommands());
 
         Guild testServer = api.getGuildById("1169699077986988112");
 
@@ -149,10 +148,6 @@ public class Sloth {
         for (SlashCommandData command : allCommands) {
             System.out.println(" - " + command.getName());
         }
-
-        // Register each command globally
-        //guild.updateCommands().addCommands(allCommands).queue();
-        api.updateCommands().addCommands(allCommands).queue();
         assert testServer != null;
         //testServer.updateCommands().addCommands(allCommands).queue();
 

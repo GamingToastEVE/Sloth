@@ -4133,4 +4133,136 @@ public class DatabaseHandler {
             return false;
         }
     }
+
+    //
+    // REMOVED: createGuildSystemsTable() method
+
+    // Constants for all available systems
+    private static final String[] ALL_SYSTEMS = {
+            "log-channel", "warn", "ticket", "mod", "stats",
+            "verify-button", "select-roles", "temprole", "role-event",
+            "embed"
+    };
+
+    /**
+     * Check if a specific system is active for a guild.
+     * Uses the active_modules column in the guilds table.
+     */
+    public boolean isSystemActive(String guildId, String systemName) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT active_modules FROM guilds WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String modulesStr = rs.getString("active_modules");
+                if (modulesStr == null) return false;
+
+                List<String> modules = Arrays.asList(modulesStr.split(","));
+                return modules.contains(systemName);
+            }
+            return false; // Default to true if guild not found (shouldn't happen)
+        } catch (SQLException e) {
+            System.err.println("Error checking system status: " + e.getMessage());
+            e.printStackTrace();
+            return true;
+        }
+    }
+
+    /**
+     * Toggle a system's status for a guild in the guilds table.
+     */
+    public boolean toggleSystem(String guildId, String systemName) {
+        List<String> currentModules = new ArrayList<>();
+        boolean wasActive = true; // Default state
+
+        try (Connection connection = getConnection()) {
+            // 1. Get current modules
+            String query = "SELECT active_modules FROM guilds WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String modulesStr = rs.getString("active_modules");
+                if (modulesStr == null) {
+                    // First time setup: Initialize with ALL systems
+                    currentModules = new ArrayList<>(List.of(""));
+                } else if (modulesStr.isEmpty()) {
+                    currentModules = new ArrayList<>();
+                } else {
+                    currentModules = new ArrayList<>(Arrays.asList(modulesStr.split(",")));
+                }
+            } else {
+                // Guild not found, assume defaults
+                currentModules = new ArrayList<>(Arrays.asList(ALL_SYSTEMS));
+            }
+
+            wasActive = currentModules.contains(systemName);
+            boolean newStatus = !wasActive;
+
+            // 2. Modify list
+            if (newStatus) {
+                if (!currentModules.contains(systemName)) {
+                    currentModules.add(systemName);
+                }
+            } else {
+                currentModules.remove(systemName);
+            }
+
+            // 3. Save back to database
+            String newModulesStr = String.join(",", currentModules);
+
+            String updateQuery = "UPDATE guilds SET active_modules = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setString(1, newModulesStr);
+            updateStmt.setString(2, guildId);
+            updateStmt.executeUpdate();
+
+            return newStatus;
+
+        } catch (SQLException e) {
+            System.err.println("Error toggling system: " + e.getMessage());
+            e.printStackTrace();
+            return !wasActive; // Return old status on error
+        }
+    }
+
+    /**
+     * Get all system statuses for a guild from the active_modules column
+     */
+    public Map<String, Boolean> getGuildSystemsStatus(String guildId) {
+        Map<String, Boolean> statuses = new HashMap<>();
+        List<String> activeModules = new ArrayList<>();
+
+        try (Connection connection = getConnection()) {
+            String query = "SELECT active_modules FROM guilds WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                String modulesStr = rs.getString("active_modules");
+                if (modulesStr == null) {
+                    // Default: All systems disabled
+                    activeModules = List.of("");
+                } else if (!modulesStr.isEmpty()) {
+                    activeModules = Arrays.asList(modulesStr.split(","));
+                }
+            } else {
+                activeModules = List.of("");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            activeModules = List.of("");
+        }
+
+        // Populate map
+        for (String sys : ALL_SYSTEMS) {
+            statuses.put(sys, activeModules.contains(sys));
+        }
+
+        return statuses;
+    }
 }

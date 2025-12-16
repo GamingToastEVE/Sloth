@@ -2,6 +2,7 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -11,6 +12,7 @@ import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class AddGuildSlashCommands {
     private final Guild guild;
@@ -38,7 +40,6 @@ public class AddGuildSlashCommands {
         allCommands.add(getTicketCommand());
         allCommands.add(getModerationCommand());
         allCommands.add(getStatisticsCommand());
-        //allCommands.add(getRulesCommand());
         allCommands.add(getVerifyButtonCommand());
         allCommands.addAll(getFeedbackCommands());
         allCommands.add(getSelectRolesCommand());
@@ -286,6 +287,71 @@ public class AddGuildSlashCommands {
         return commands;
     }
 
+    //
+// Add these methods
+
+    /**
+     * Get the /systems control command
+     */
+    private SlashCommandData getSystemsCommand() {
+        return Commands.slash("systems", "Enable or disable bot systems for this server")
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
+    }
+
+    /**
+     * Returns the list of CORE commands that should be registered GLOBALLY.
+     * These commands are always active.
+     */
+    public List<SlashCommandData> getCoreCommands() {
+        List<SlashCommandData> core = new ArrayList<>();
+        core.add(getSystemsCommand());
+        core.add(Commands.slash("help", "Show help and documentation for Sloth bot"));
+        core.add(getFeedbackCommands().get(0));
+        return core;
+    }
+
+    /**
+     * Returns the list of commands associated with a specific system.
+     */
+    public List<SlashCommandData> getCommandsForSystem(String systemName) {
+        List<SlashCommandData> cmds = new ArrayList<>();
+        switch (systemName.toLowerCase()) {
+            case "log-channel": cmds.add(getLogChannelCommand()); break;
+            case "warn": cmds.add(getWarnCommand()); break;
+            case "ticket": cmds.add(getTicketCommand()); break;
+            case "mod": cmds.add(getModerationCommand()); break;
+            case "stats": cmds.add(getStatisticsCommand()); break;
+            case "verify-button": cmds.add(getVerifyButtonCommand()); break;
+            case "select-roles": cmds.add(getSelectRolesCommand()); break;
+            case "temprole": cmds.addAll(getTimedRoleCommands()); break;
+            case "role-event": cmds.addAll(getRoleEventCommands()); break;
+            case "embed": cmds.add(getEmbedEditorCommand()); break;
+        }
+        return cmds;
+    }
+
+    /**
+     * Updates the slash commands for the specified guild based on active systems.
+     * This replaces all guild-specific commands with the current active set.
+     */
+    public void updateGuildCommandsFromActiveSystems() {
+        if (guild == null || databaseHandler == null) return;
+
+        java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
+        List<SlashCommandData> activeCommands = new ArrayList<>();
+
+        for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
+            if (entry.getValue()) { // If system is active
+                activeCommands.addAll(getCommandsForSystem(entry.getKey()));
+            }
+        }
+
+        guild.updateCommands().addCommands(activeCommands).queue(
+                success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
+                error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
+        );
+    }
+
 // Und in getAllCommands() hinzufügen:
 // allCommands.addAll(getRoleEventCommands()
 
@@ -331,6 +397,4 @@ public class AddGuildSlashCommands {
     public void addStatisticsCommands() {
         updateAllGuildCommands();
     }
-
-
 }

@@ -148,13 +148,14 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildsSchema() {
         return new TableSchema("guilds")
-            .addColumn("id", "INTEGER PRIMARY KEY")
-            .addColumn("name", "TEXT NOT NULL")
-            .addColumn("prefix", "TEXT DEFAULT '!'")
-            .addColumn("language", "TEXT DEFAULT 'de'")
-            .addColumn("created_at", "TEXT")
-            .addColumn("updated_at", "TEXT")
-            .addColumn("active", "INTEGER DEFAULT 1");
+                .addColumn("id", "VARCHAR(32) PRIMARY KEY")
+                .addColumn("name", "TEXT NOT NULL")
+                .addColumn("prefix", "TEXT DEFAULT '!'")
+                .addColumn("language", "TEXT DEFAULT 'de'")
+                .addColumn("created_at", "TEXT")
+                .addColumn("updated_at", "TEXT")
+                .addColumn("active", "INTEGER DEFAULT 1")
+                .addColumn("active_modules", "TEXT");
     }
 
     private TableSchema createJustVerifyButtonSchema() {
