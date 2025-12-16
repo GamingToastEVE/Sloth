@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.ModalTopLevelComponent;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.components.textinput.TextInput;
@@ -385,7 +386,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 .setValue(value != null ? value : "")
                 .setRequired(true)
                 .build();
-        return Modal.create(id, title).addComponents((ModalTopLevelComponent) input).build();
+        return Modal.create(id, title).addComponents(Label.of(label, input)).build();
     }
 
     private long parseDuration(String input) {

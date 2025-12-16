@@ -50,6 +50,11 @@ public class HelpCommandListener extends ListenerAdapter {
         ActionRow actionRow;
         ActionRow actionRow2;
 
+        // Redirect generic commands button to page 1
+        if (page.equals("commands")) {
+            page = "commands_1";
+        }
+
         switch (page) {
             case "home":
                 embed.setTitle("🤖 Sloth Bot - Help & Wiki")
@@ -70,11 +75,11 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands_1", "📖 Commands")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -100,11 +105,11 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_systems", "⚙️ Systems"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands_1", "📖 Commands")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -158,11 +163,11 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands_1", "📖 Commands")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
@@ -174,7 +179,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "All systems are available to use:\n" +
                                         "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
                                         "• Role Systems (Select Roles, Timed Roles, Verify)\n" +
-                                        "• Configure only the ones you need", false)
+                                        "• Configure only the ones you need with /systems", false)
                         .addField("**Step 2: Configure Systems**",
                                 "**Log Channel:** `/log-channel set #channel`\n" +
                                         "**Warning System:** `/warn settings-set`\n" +
@@ -183,13 +188,13 @@ public class HelpCommandListener extends ListenerAdapter {
                                         "**Timed Roles:** Use `/role-event create` to automate", false)
                         .addField("**Step 3: Create Panels (Optional)**",
                                 "**Ticket Panel:** `/ticket panel` - Creates user-friendly ticket creation\n" +
-                                        "**Rules Embed:** `/rules add` - Creates rules with verification button\n" +
+                                        "**Embeds:** `/embed create` - Creates an embed to edit\n" +
                                         "**Verify Button:** `/verify-button add` - Creates standalone verification button\n" +
                                         "**Select Roles:** `/select-roles send` - Creates role selection menu\n" +
                                         "**Embeds:** `/embed create` - Start creating custom embeds", false)
                         .addField("**Step 4: Set Permissions**",
                                 "• Ensure staff have appropriate Discord permissions\n" +
-                                        "• Bot needs Admin permissions for full functionality\n" +
+                                        "• Bot needs Admin permissions for flawless functionality\n" +
                                         "• Configure role-based access for tickets", false)
                         .addField("**Formatting Rules Embeds**",
                                 "Need help formatting your rules descriptions? Use Discord markdown!\n" +
@@ -201,25 +206,49 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home"),
                         Button.primary("help_overview", "🏠 Overview"),
                         Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_commands_1", "📖 Commands")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;
 
-            case "commands":
-                embed.setTitle("📖 Command Reference")
-                        .setDescription("Complete list of available commands by system:\n\n")
+            // --- COMMAND PAGES START ---
+
+            case "commands_1":
+                embed.setTitle("📖 Command Reference (Page 1/4)")
+                        .setDescription("Moderation, Warnings & Logging\n\n")
+                        .addField("**Moderation System**",
+                                "`/mod kick` `/mod ban` `/mod unban` - User management\n" +
+                                        "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
+                                        "`/mod purge` - Delete multiple messages\n" +
+                                        "`/mod slowmode` - Set channel slowmode", false)
+                        .addField("**Warning System**",
+                                "`/warn user` - Issue warning to user\n" +
+                                        "`/warn list` - List active warnings of a user\n" +
+                                        "`/warn settings-set` - Configure warning thresholds\n" +
+                                        "`/warn settings-get` - View warning configuration", false)
                         .addField("**Log Channel System**",
                                 "`/log-channel set` - Configure logging channel\n" +
                                         "`/log-channel get` - View current log channel", false)
-                        .addField("**Warning System**",
-                                "`/warn user` - Issue warning to user\n" +
-                                        "`/warn settings-set` - Configure warning thresholds\n" +
-                                        "`/warn settings-get` - View warning configuration", false)
+                        .setColor(Color.MAGENTA)
+                        .setFooter("Page 1 of 4 • All commands require appropriate permissions");
+
+                actionRow = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home"),
+                        Button.primary("help_commands_2", "Next Page ➡️")
+                );
+                actionRow2 = ActionRow.of(
+                        Button.primary("help_systems", "⚙️ Systems"),
+                        Button.primary("help_setup", "📋 Setup")
+                );
+                break;
+
+            case "commands_2":
+                embed.setTitle("📖 Command Reference (Page 2/4)")
+                        .setDescription("Tickets & Statistics\n\n")
                         .addField("**Ticket System**",
                                 "`/ticket setup` - Configure ticket system\n" +
                                         "`/ticket panel` - Create ticket creation panel\n" +
@@ -228,64 +257,80 @@ public class HelpCommandListener extends ListenerAdapter {
                                         "`/ticket assign` - Assign to staff member\n" +
                                         "`/ticket priority` - Change ticket priority\n" +
                                         "`/ticket info` - Get ticket information\n", false)
-                        .addField("**Moderation System**",
-                                "`/mod kick` `/mod ban` `/mod unban` - User management\n" +
-                                        "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
-                                        "`/mod purge` - Delete multiple messages\n" +
-                                        "`/mod slowmode` - Set channel slowmode", false)
                         .addField("**Statistics System**",
                                 "`/stats lifetime` - Lifetime server statistics\n" +
                                         "`/stats today` - Today's server statistics\n" +
                                         "`/stats week` - Weekly statistics\n" +
                                         "`/stats date` - Statistics for specific date\n" +
                                         "`/stats user` - View user information and statistics", false)
+                        .setColor(Color.MAGENTA)
+                        .setFooter("Page 2 of 4 • All commands require appropriate permissions");
+
+                actionRow = ActionRow.of(
+                        Button.secondary("help_commands_1", "⬅️ Prev Page"),
+                        Button.primary("help_commands_3", "Next Page ➡️")
+                );
+                actionRow2 = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home")
+                );
+                break;
+
+            case "commands_3":
+                embed.setTitle("📖 Command Reference (Page 3/4)")
+                        .setDescription("Roles & Verification\n\n")
                         .addField("**Select Roles System**",
                                 "`/select-roles add` - Add role to selection list\n" +
                                         "`/select-roles remove` - Remove role from selection list\n" +
                                         "`/select-roles send` - Send role selection interface\n" +
                                         "*Supports reactions, dropdowns, and buttons*", false)
-                        .addField("**Rules/Verification System**",
-                                "`/rules add` - Create rules embeds with verification\n" +
-                                        "`/rules setup` - Display rules in current channel\n" +
-                                        "`/rules list` - List all rules embeds\n" +
-                                        "`/rules remove` - Remove a rules embed\n" +
-                                        "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
+                        .addField("**Timed Roles System**",
+                                "`/my-roles` - View your active temporary roles\n" +
+                                        "`/temprole add/remove` - Manually manage temporary roles\n" +
+                                        "`/role-event create/list` - Manage automated role events for (timed) roles", false)
                         .addField("**Verify Button System**",
                                 "`/verify-button add` - Add verify button configuration (max 3)\n" +
                                         "`/verify-button send` - Send verify button message\n" +
                                         "`/verify-button remove` - Remove verify button from current channel", false)
-                        .addField("**Timed Roles System**",
-                                "`/my-roles` - View your active temporary roles and expiration times\n" +
-                                        "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
-                                        "`/temprole remove` - Remove a temporary role from a user\n" +
-                                        "`/role-event create` - Create automated role events based on triggers\n" +
-                                        "`/role-event list` - List and manage all role events", false)
+                        .setColor(Color.MAGENTA)
+                        .setFooter("Page 3 of 4 • All commands require appropriate permissions");
+
+                actionRow = ActionRow.of(
+                        Button.secondary("help_commands_2", "⬅️ Prev Page"),
+                        Button.primary("help_commands_4", "Next Page ➡️")
+                );
+                actionRow2 = ActionRow.of(
+                        Button.secondary("help_home", "🏠 Home")
+                );
+                break;
+
+            case "commands_4":
+                embed.setTitle("📖 Command Reference (Page 4/4)")
+                        .setDescription("Utilities & General\n\n")
                         .addField("**Embed Creation System**",
                                 "`/embed create` - Create a new custom embed\n" +
                                         "`/embed list` - List your saved embeds\n" +
                                         "`/embed load` - Load a saved embed\n" +
                                         "`/embed delete` - Delete a saved embed", false)
-                        .addField("**General Commands**",
+                        .addField("**Core Commands**",
                                 "`/help` - Show this help system\n" +
-                                        "`/feedback` - Send feedback to the developer\n" +
-                                        "`/global-stats` - Show global bot statistics", false)
+                                        "`/systems` - Enable/Disable specific systems\n" +
+                                        "`/feedback` - Send feedback to the developer\n", false)
                         .setColor(Color.MAGENTA)
-                        .setFooter("All commands require appropriate permissions");
+                        .setFooter("Page 4 of 4 • All commands require appropriate permissions");
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.secondary("help_commands_3", "⬅️ Prev Page"),
+                        Button.secondary("help_home", "🏠 Home")
                 );
                 actionRow2 = ActionRow.of(
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_support_development", "💡 Support")
                 );
                 break;
 
-            case "support_developement":
+            // --- COMMAND PAGES END ---
+
+            case "support_development":
                 embed.setTitle("💡 Support Development")
                         .setDescription("Sloth is free to use, but development and hosting incur costs.\n\n" +
                                 "**Ways to Support:**\n" +
@@ -303,7 +348,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_commands_1", "📖 Commands"),
                         Button.primary("help_rules_formatting", "🎨 Formatting"),
                         Button.primary("help_legal", "📜 Legal"),
                         Button.link("https://ko-fi.com/gamingtoast27542", "☕ Donate")
@@ -343,16 +388,16 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
+                        Button.primary("help_commands_1", "📖 Commands"),
                         Button.primary("help_legal", "📜 Legal"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.link("https://github.com/GamingToastEVE/Sloth", "📄 View on GitHub")
                 );
                 break;
 
             case "rules_formatting":
-                embed.setTitle("📝 Rules Embed Formatting Guide")
-                        .setDescription("Learn how to format your rules embed descriptions using Discord markdown:\n\n")
+                embed.setTitle("📝 Embed Formatting Guide")
+                        .setDescription("Learn how to format your embed descriptions using Discord markdown:\n\n")
                         .addField("**Basic Text Formatting**",
                                 "• `**bold text**` → **bold text**\n" +
                                         "• `*italic text*` → *italic text*\n" +
@@ -378,15 +423,14 @@ public class HelpCommandListener extends ListenerAdapter {
                                         "• `<:name:id>` → Custom server emojis\n" +
                                         "• `\\n` → Line breaks in descriptions\n" +
                                         "• `\\*` → Escape special characters", false)
-                        .addField("**Tips for Rules Embeds**",
+                        .addField("**Tips for Embeds**",
                                 "• **Titles**: Only support plain text (no formatting)\n" +
                                         "• **Descriptions & Footers**: Support all Discord markdown\n" +
                                         "• Use **bold** for rule headers\n" +
                                         "• Use `code blocks` for examples\n" +
                                         "• Keep descriptions under 4096 characters\n" +
                                         "• Use line breaks (\\n) for better readability\n" +
-                                        "• Test formatting before publishing\n" +
-                                        "• Bot will warn if you use formatting in titles", false)
+                                        "• Test formatting before publishing\n", false)
                         .setColor(Color.YELLOW)
                         .setFooter("Navigate using buttons below");
 
@@ -397,8 +441,8 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.primary("help_setup", "📋 Setup")
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_commands_1", "📖 Commands"),
+                        Button.primary("help_support_development", "💡 Support Development"),
                         Button.primary("help_legal", "📜 Legal")
                 );
                 break;

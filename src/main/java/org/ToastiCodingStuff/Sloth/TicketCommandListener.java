@@ -5,6 +5,7 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.ModalTopLevelComponent;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.*;
@@ -229,7 +230,7 @@ public class TicketCommandListener extends ListenerAdapter {
                 .build();
         */
         Modal modal = Modal.create("ticket_creation_modal", "Create New Ticket")
-                .addComponents((ModalTopLevelComponent) subjectInput, (ModalTopLevelComponent) descriptionInput)
+                .addComponents(Label.of("Subject", subjectInput), Label.of("Detailed Description", descriptionInput))
                 //.addActionRow(priorityInput)
                 .build();
 
