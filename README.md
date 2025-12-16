@@ -33,12 +33,6 @@ Sloth offers several systems that can be used:
 - User engagement metrics
 - Command usage tracking
 
-### 📋 Rules/Verification System
-- Create and manage rule embeds with verification buttons
-- Role assignment upon verification
-- Customizable rule formatting and styling
-- Verification statistics tracking
-
 ### 🔘 Verify Button System
 - Create custom verification buttons
 - Assign roles when users verify
