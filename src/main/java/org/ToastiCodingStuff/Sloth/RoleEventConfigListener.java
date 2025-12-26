@@ -31,6 +31,9 @@ import java.util.concurrent.TimeUnit;
 public class RoleEventConfigListener extends ListenerAdapter {
 
     private final DatabaseHandler handler;
+    
+    // Discord limits messages to 5 action rows maximum
+    private static final int MAX_ACTION_ROWS_BEFORE_REQUIRED_ROLES = 4;
 
     public RoleEventConfigListener(DatabaseHandler handler) {
         this.handler = handler;
@@ -416,7 +419,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         
         // Required roles selector - available for all event types
         // Only add if we have room (Discord limits to 5 action rows)
-        if (rows.size() < 4) {
+        if (rows.size() < MAX_ACTION_ROWS_BEFORE_REQUIRED_ROLES) {
             EntitySelectMenu requiredRoleMenu = EntitySelectMenu.create("event_required_role_select_" + data.id, EntitySelectMenu.SelectTarget.ROLE)
                     .setPlaceholder("Required Role(s) - user must have these...")
                     .setMinValues(1).setMaxValues(25).build();

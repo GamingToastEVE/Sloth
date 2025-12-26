@@ -129,17 +129,21 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
             JSONObject jsonObj = new JSONObject(json);
             
             // Check for trigger_role_ids (multiple trigger roles - OR logic within this condition)
+            // If trigger_role_ids is present, the actualId must match at least one of them
             if (jsonObj.has("trigger_role_ids")) {
                 JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
-                boolean found = false;
-                for (int i = 0; i < roleIds.length(); i++) {
-                    if (roleIds.getString(i).equals(actualId)) {
-                        found = true;
-                        break;
+                // Empty array means no trigger roles specified - skip this check
+                if (roleIds.length() > 0) {
+                    boolean found = false;
+                    for (int i = 0; i < roleIds.length(); i++) {
+                        if (roleIds.getString(i).equals(actualId)) {
+                            found = true;
+                            break;
+                        }
                     }
-                }
-                if (!found) {
-                    return false;
+                    if (!found) {
+                        return false;
+                    }
                 }
             }
             
@@ -162,12 +166,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                 }
             }
             
-            // If no specific trigger conditions were found, allow the event
-            // (This handles cases where only required_role_ids is set without trigger_role_ids)
-            if (!jsonObj.has("trigger_role_ids") && !jsonObj.has("trigger_role_id") && !jsonObj.has("threshold")) {
-                return true;
-            }
-            
+            // All conditions passed
             return true;
         } catch (JSONException e) {
             // If JSON parsing fails, fallback to simple contains check
