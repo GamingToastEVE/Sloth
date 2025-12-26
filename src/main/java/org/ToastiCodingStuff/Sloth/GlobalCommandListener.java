@@ -14,9 +14,11 @@ public class GlobalCommandListener extends ListenerAdapter {
     public void onSlashCommandInteraction(net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent event) {
         if (!event.getName().equals("global-stats")) {return;}
 
+        event.deferReply().queue();
+
         EmbedBuilder embed = handler.getGlobalStats();
         EmbedBuilder embed2 = handler.getGlobalModStats();
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).queue();
         event.getChannel().sendMessageEmbeds(embed2.build()).queue();
     }
 }

@@ -19,6 +19,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getAuthor().isBot()) { return; }
         handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());
     }
 
@@ -34,6 +35,8 @@ public class StatisticsCommandListener extends ListenerAdapter {
         }
 
         String guildId = event.getGuild().getId();
+
+        event.deferReply().setEphemeral(true).queue();
 
         switch (subcommand) {
             case "today":
@@ -67,42 +70,42 @@ public class StatisticsCommandListener extends ListenerAdapter {
     private void handleStatsCommand (SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getLifetimeModerationStatisticsEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleTodayStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getTodaysModerationStatisticsEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleWeeklyStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         String currentDate = LocalDate.now().minusDays(7).toString(); // Get date 7 days ago
 
         EmbedBuilder embed = handler.getWeeklyModerationStatisticsEmbed(guildId, currentDate);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleDateStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
@@ -112,18 +115,18 @@ public class StatisticsCommandListener extends ListenerAdapter {
         try {
             LocalDate.parse(dateString);
         } catch (DateTimeParseException e) {
-            event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getModerationStatisticsForDateEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleUserInfoCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view user statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view user statistics.").setEphemeral(true).queue();
             return;
         }
 
@@ -135,15 +138,15 @@ public class StatisticsCommandListener extends ListenerAdapter {
             try {
                 LocalDate.parse(dateString);
             } catch (DateTimeParseException e) {
-                event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+                event.getHook().sendMessage("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
                 return;
             }
             EmbedBuilder embed = handler.getUserStatisticsForDateEmbed(guildId, userId, dateString);
-            event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+            event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
             return;
         }
         
         EmbedBuilder embed = handler.getUserInfoEmbed(guildId, userId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 }

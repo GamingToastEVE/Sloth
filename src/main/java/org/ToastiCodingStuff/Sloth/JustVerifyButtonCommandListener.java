@@ -30,6 +30,8 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
             return;
         }
 
+        event.deferReply().setEphemeral(true).queue();
+
         switch (subcommand) {
             case "add":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
@@ -57,6 +59,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         if (event.getComponentId().equals("just_verify")) {
+            event.deferReply().setEphemeral(true).queue();
             handleJustVerifyButtonClick(event);
         }
     }
@@ -97,12 +100,12 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
             embed.addField("Configuration", desc.toString(), false);
         }
 
-        event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(true).queue();
     }
 
     private void handleJustVerifyButtonClick(ButtonInteractionEvent event) {
         if (!event.getComponentId().equals("just_verify")) {
-            event.reply("❌ Invalid button configuration.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ Invalid button configuration.").setEphemeral(true).queue();
             return;
         }
 
@@ -120,7 +123,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         }
 
         if (event.getMember().getRoles().contains(roleToGive)) {
-            event.reply("❌ You are already verified!").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You are already verified!").setEphemeral(true).queue();
             return;
         }
 
@@ -136,7 +139,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         handler.incrementVerificationsPerformed(event.getGuild().getId());
 
-        event.reply("✅ You have been verified!").setEphemeral(true).queue();
+        event.getHook().sendMessage("✅ You have been verified!").setEphemeral(true).queue();
     }
 
     private void handleSendJustVerifyButtonCommand(SlashCommandInteractionEvent event) {
@@ -144,7 +147,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         // Check if user has manage server permission
         if (!event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
             return;
         }
         String roleToGiveID = handler.getJustVerifyButtonRoleToGiveID(guildId);
@@ -153,7 +156,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         String buttonEmoji = handler.getJustVerifyButtonEmojiID(guildId);
 
         if (roleToGiveID == null) {
-            event.reply("❌ No verify button configured for this server. Please use `/verify-button add` first.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ No verify button configured for this server. Please use `/verify-button add` first.").setEphemeral(true).queue();
             return;
         }
 
@@ -162,7 +165,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         event.getChannel().sendMessage("Click the button below to verify!").addComponents(
                 ActionRow.of(button)
         ).queue();
-        event.reply("✅ Verify button sent!").setEphemeral(true).queue();
+        event.getHook().sendMessage("✅ Verify button sent!").setEphemeral(true).queue();
     }
 
     private void handleJustVerifyButtonCommand(SlashCommandInteractionEvent event) {
@@ -170,7 +173,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         // Check if user has manage server permission
         if (!event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
             return;
         }
 
@@ -181,7 +184,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         handler.setJustVerifyButton(guildId, roleToGiveID, roleToRemoveID, buttonLabel, buttonEmoji);
 
-        event.reply("✅ Verify button configuration added!").setEphemeral(true).queue();
+        event.getHook().sendMessage("✅ Verify button configuration added!").setEphemeral(true).queue();
     }
 
     private void handleJustVerifyButtonRemove(SlashCommandInteractionEvent event) {
@@ -189,12 +192,12 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
 
         // Check if user has manage server permission
         if (!event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Manage Server permission to use this command.").setEphemeral(true).queue();
             return;
         }
 
         handler.removeJustVerifyButton(guildId);
 
-        event.reply("✅ Verify button configuration removed!").setEphemeral(true).queue();
+        event.getHook().sendMessage("✅ Verify button configuration removed!").setEphemeral(true).queue();
     }
 }

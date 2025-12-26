@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -32,6 +33,12 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
         for (Role role : event.getRoles()) {
             processTrigger(event.getGuild(), event.getMember(), RoleEventType.ROLE_REMOVE, role.getId());
         }
+    }
+
+    // Trigger: Wenn ein User einem Server joint.
+    @Override
+    public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        processTrigger(event.getGuild(), event.getMember(), RoleEventType.MEMBER_JOIN, "");
     }
 
     /**
@@ -107,12 +114,9 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
      */
     private boolean checkCondition(String json, String actualId) {
         if (json == null || json.isEmpty() || json.equals("{}")) {
-            return true; // Keine Bedingung = Immer ausführen
+            return true;
         }
 
-        // Simpler String-Check statt teurem JSON-Parser (reicht für einfache IDs)
-        // Prüft, ob die tatsächliche ID im JSON-String vorkommt.
-        // Für komplexere Logik solltest du eine Lib wie Jackson oder Gson nutzen.
         return json.contains(actualId);
     }
 }

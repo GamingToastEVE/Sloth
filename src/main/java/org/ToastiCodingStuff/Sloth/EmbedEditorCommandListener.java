@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
@@ -20,12 +21,15 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
+import net.dv8tion.jda.api.interactions.commands.Command.Choice;
 
 import java.awt.Color;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class EmbedEditorCommandListener extends ListenerAdapter {
 
@@ -46,27 +50,49 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // Reihe 1: Texte
         rows.add(ActionRow.of(
-                Button.primary("embed_edit_title", "Titel").withEmoji(Emoji.fromUnicode("📝")),
+                Button.primary("embed_edit_title", "Title").withEmoji(Emoji.fromUnicode("📝")),
                 Button.primary("embed_edit_desc", "Text").withEmoji(Emoji.fromUnicode("📄")),
                 Button.secondary("embed_edit_footer", "Footer").withEmoji(Emoji.fromUnicode("🔻")),
-                Button.secondary("embed_edit_author", "Autor").withEmoji(Emoji.fromUnicode("👤"))
+                Button.secondary("embed_edit_author", "Author").withEmoji(Emoji.fromUnicode("👤"))
         ));
 
         // Reihe 2: Design
         rows.add(ActionRow.of(
-                Button.secondary("embed_edit_color", "Farbe").withEmoji(Emoji.fromUnicode("🎨")),
-                Button.secondary("embed_edit_image", "Bilder").withEmoji(Emoji.fromUnicode("🖼️")),
-                Button.primary("embed_add_field", "Feld +").withEmoji(Emoji.fromUnicode("➕")),
-                Button.danger("embed_clear_fields", "Felder löschen").withEmoji(Emoji.fromUnicode("🗑️"))
+                Button.secondary("embed_edit_color", "colour").withEmoji(Emoji.fromUnicode("🎨")),
+                Button.secondary("embed_edit_image", "images").withEmoji(Emoji.fromUnicode("🖼️")),
+                Button.primary("embed_add_field", "add field").withEmoji(Emoji.fromUnicode("➕")),
+                Button.danger("embed_clear_fields", "delete field").withEmoji(Emoji.fromUnicode("🗑️"))
         ));
 
         // Reihe 3: Aktionen
         rows.add(ActionRow.of(
-                Button.success("embed_publish_start", "Senden").withEmoji(Emoji.fromUnicode("✅")),
-                Button.primary("embed_save_db", "Speichern").withEmoji(Emoji.fromUnicode("💾"))
+                Button.success("embed_publish_start", "Send").withEmoji(Emoji.fromUnicode("✅")),
+                Button.primary("embed_save_db", "Save").withEmoji(Emoji.fromUnicode("💾"))
         ));
 
         return rows;
+    }
+
+    @Override
+    public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
+        if (!event.getName().equals("embed")) return;
+        String subcommand = event.getSubcommandName();
+        if (subcommand == null) return;
+
+        if (subcommand.equals("delete") || subcommand.equals("load")) {
+            String focusedOption = event.getFocusedOption().getName();
+            if (focusedOption.equals("name")) {
+                String guildId = event.getGuild().getId();
+                String[] names = handler.getCustomEmbedNames(guildId).toArray(new String[0]);
+                String typed = event.getFocusedOption().getValue();
+                List<Choice> filtered = Stream.of(names)
+                        .filter(word -> word.startsWith(typed))
+                        .map(word -> new Choice(word, word))
+                        .collect(Collectors.toList());
+
+                event.replyChoices(filtered).queue();
+            }
+        }
     }
 
     @Override
@@ -76,54 +102,57 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             event.reply("❌ No permissions.").setEphemeral(true).queue();
             return;
         }
-
+        event.deferReply().setEphemeral(true).queue();
         String subcommand = event.getSubcommandName();
         if (subcommand == null) return;
         String guildId = event.getGuild().getId();
 
         switch (subcommand) {
             case "create":
+                handler.insertOrUpdateGlobalStatistic("embed create");
                 EmbedBuilder eb = new EmbedBuilder();
                 eb.setDescription("This is a preview. Use the buttons to edit the embed.");
                 eb.setColor(Color.GRAY);
-                event.replyEmbeds(eb.build()).setComponents(getEditorActionRows()).setEphemeral(true).queue();
+                event.getHook().editOriginalEmbeds(eb.build()).setComponents(getEditorActionRows()).queue();
                 break;
 
             case "list":
+                handler.insertOrUpdateGlobalStatistic("embed list");
                 List<String> names = handler.getCustomEmbedNames(guildId);
                 if (names.isEmpty()) {
-                    event.reply("📂 No saved Embeds found.").setEphemeral(true).queue();
+                    event.getHook().editOriginal("📂 No saved Embeds found.").queue();
                 } else {
-                    event.reply("📂 **Saved Embeds:**\n`" + String.join("`, `", names) + "`").setEphemeral(true).queue();
+                    event.getHook().editOriginal("📂 **Saved Embeds:**\n`" + String.join("`, `", names) + "`").queue();
                 }
                 break;
 
             case "delete":
+                handler.insertOrUpdateGlobalStatistic("embed delete");
                 String delName = event.getOption("name").getAsString();
                 if (handler.deleteCustomEmbed(guildId, delName)) {
-                    event.reply("🗑️ Embed `" + delName + "` got deleted.").setEphemeral(true).queue();
+                    event.getHook().editOriginal("🗑️ Embed `" + delName + "` got deleted.").queue();
                 } else {
-                    event.reply("❌ Embed `" + delName + "` not found.").setEphemeral(true).queue();
+                    event.getHook().editOriginal("❌ Embed `" + delName + "` not found.").queue();
                 }
                 break;
 
             case "load":
+                handler.insertOrUpdateGlobalStatistic("embed load");
                 String loadName = event.getOption("name").getAsString();
                 String json = handler.getCustomEmbedData(guildId, loadName);
                 if (json == null) {
-                    event.reply("❌ Embed `" + loadName + "` not found.").setEphemeral(true).queue();
+                    event.getHook().editOriginal("❌ Embed `" + loadName + "` not found.").queue();
                     return;
                 }
                 try {
                     DataObject data = DataObject.fromJson(json);
                     EmbedBuilder loadedBuilder = jsonToEmbedBuilder(data);
 
-                    event.replyEmbeds(loadedBuilder.build())
+                    event.getHook().editOriginalEmbeds(loadedBuilder.build())
                             .setComponents(getEditorActionRows())
-                            .setEphemeral(true)
                             .queue();
                 } catch (Exception e) {
-                    event.reply("❌ Error loading Embed: " + e.getMessage()).setEphemeral(true).queue();
+                    event.getHook().editOriginal("❌ Error loading Embed: " + e.getMessage()).queue();
                 }
                 break;
         }
@@ -145,7 +174,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                     .setMaxLength(100)
                     .build();
 
-            event.replyModal(Modal.create("modal_embed_save", "Embed Speichern").addComponents((ModalTopLevelComponent) nameInput).build()).queue();
+            event.replyModal(Modal.create("modal_embed_save", "Save embed").addComponents(Label.of("Embed Name:", nameInput)).build()).queue();
             return;
         }
 
@@ -157,10 +186,10 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             List<Button> buttons = new ArrayList<>();
 
             if (hasVerifyConfig) {
-                buttons.add(Button.success("embed_publish_choose_true", "Mit Verify Button").withEmoji(Emoji.fromUnicode("🔘")));
+                buttons.add(Button.success("embed_publish_choose_true", "With Verify Button").withEmoji(Emoji.fromUnicode("🔘")));
             }
-            buttons.add(Button.primary("embed_publish_choose_false", hasVerifyConfig ? "Ohne Verify Button" : "Weiter (Kanal wählen)"));
-            buttons.add(Button.secondary("embed_publish_cancel", "Abbrechen"));
+            buttons.add(Button.primary("embed_publish_choose_false", hasVerifyConfig ? "Without Verify Button" : "Weiter (Kanal wählen)"));
+            buttons.add(Button.secondary("embed_publish_cancel", "Cancel"));
 
             event.editComponents(ActionRow.of(buttons)).queue();
             return;
@@ -172,11 +201,11 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
             // Jetzt Kanal Auswahl anzeigen (Status in ID speichern)
             EntitySelectMenu channelSelect = EntitySelectMenu.create("embed_publish_finish_" + withVerify, EntitySelectMenu.SelectTarget.CHANNEL)
-                    .setPlaceholder("Ziel-Kanal auswählen")
+                    .setPlaceholder("choose a channel to send the embed to")
                     .setChannelTypes(net.dv8tion.jda.api.entities.channel.ChannelType.TEXT, net.dv8tion.jda.api.entities.channel.ChannelType.NEWS)
                     .setMinValues(1).setMaxValues(1).build();
 
-            Button cancelBtn = Button.secondary("embed_publish_cancel", "Abbrechen");
+            Button cancelBtn = Button.secondary("embed_publish_cancel", "cancel");
 
             event.editComponents(ActionRow.of(channelSelect), ActionRow.of(cancelBtn)).queue();
             return;
@@ -238,7 +267,11 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
 
             case "embed_clear_fields":
-                builder.clearFields();
+                if (builder.getFields().isEmpty()) {
+                    event.reply("❌ No fields to remove!").setEphemeral(true).queue();
+                    return;
+                }
+                builder.getFields().remove(builder.getFields().size() - 1);
                 event.editMessageEmbeds(builder.build()).queue();
                 break;
         }
@@ -250,6 +283,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // Speichern Handler
         if (id.equals("modal_embed_save")) {
+            event.deferReply().setEphemeral(true).queue();
             String name = event.getValue("input_save_name").getAsString();
             MessageEmbed embed = event.getMessage().getEmbeds().get(0);
 
@@ -257,7 +291,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             DataObject json = embed.toData();
 
             handler.saveCustomEmbed(event.getGuild().getId(), name, json.toString());
-            event.reply("💾 Embed successfully saved as `" + name + "`!").setEphemeral(true).queue();
+            event.getHook().sendMessage("💾 Embed successfully saved as `" + name + "`!").queue();
             return;
         }
 
@@ -311,6 +345,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
     public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
         String id = event.getComponentId();
         if (id.startsWith("embed_publish_finish_")) {
+            event.deferReply().setEphemeral(true).queue();
             boolean withVerify = Boolean.parseBoolean(id.replace("embed_publish_finish_", ""));
 
             MessageEmbed embedToSend = event.getMessage().getEmbeds().get(0);
@@ -328,7 +363,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                     verifyButton = handler.createJustVerifyButton(r1, r2, label, emoji);
                 } else {
                     verifyButton = null;
-                    event.reply("⚠️ Warning: No verify button found.").setEphemeral(true).queue();
+                    event.getHook().sendMessage("⚠️ Warning: No verify button found.").setEphemeral(true).queue();
                 }
             } else {
                 verifyButton = null;
@@ -342,13 +377,11 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
             action.queue(
                     s -> {
-                        event.reply("✅ Sent in " + targetChannel.getAsMention() + (verifyButton != null ? " (with Verify Button)" : "")).setEphemeral(true).queue();
-                        // Editor zurücksetzen auf Hauptansicht
+                        event.getHook().sendMessage("✅ Sent in " + targetChannel.getAsMention() + (verifyButton != null ? " (with Verify Button)" : "")).queue();
                         event.getMessage().editMessageComponents(getEditorActionRows()).queue();
                     },
                     e -> {
-                        event.reply("❌ Error sending embed: " + e.getMessage()).setEphemeral(true).queue();
-                        // Editor zurücksetzen
+                        event.getHook().sendMessage("❌ Error sending embed: " + e.getMessage()).setEphemeral(true).queue();
                         event.getMessage().editMessageComponents(getEditorActionRows()).queue();
                     }
             );

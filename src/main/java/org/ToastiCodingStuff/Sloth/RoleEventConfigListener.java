@@ -1,7 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.components.ModalTopLevelComponent;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.label.Label;
@@ -262,7 +261,8 @@ public class RoleEventConfigListener extends ListenerAdapter {
 
             case "edit_data":
                 if (data.eventType.equals("WARN_THRESHOLD")) {
-                    event.replyModal(createModal("modal_event_data_" + eventId, "Warn Limit", "Count (e.g. 3)", "3")).queue();
+                    String maxWarns = String.valueOf(handler.getMaxWarns(event.getGuild().getId()));
+                    event.replyModal(createModal("modal_event_data_" + eventId, "Warn Limit", "Count (e.g. " + maxWarns + ")", maxWarns)).queue();
                 } else {
                     event.replyModal(createModal("modal_event_data_" + eventId, "Conditions", "JSON", data.triggerData)).queue();
                 }

@@ -43,6 +43,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             return;
         }
 
+        event.deferReply().setEphemeral(true).queue();
+
         switch (subcommand) {
             case "remove":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
@@ -108,13 +110,13 @@ public class SelectRolesCommandListener extends ListenerAdapter {
     public void onButtonInteraction (net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent event) {
         if (event.getButton().getCustomId().equals("send_select_roles_reaction")) {
             handleSendSelectRolesReaction(event.getGuild(), event.getChannel());
-            event.reply("Sent reaction role selection message!").setEphemeral(true).queue();
+            event.getHook().sendMessage("Sent reaction role selection message!").setEphemeral(true).queue();
         } else  if (event.getButton().getCustomId().equals("send_select_roles_dropdown")) {
             handleSendSelectRolesDropdown(event.getGuild(), event.getChannel());
-            event.reply("Sent dropdown role selection message!").setEphemeral(true).queue();
+            event.getHook().sendMessage("Sent dropdown role selection message!").setEphemeral(true).queue();
         } else  if (event.getButton().getCustomId().equals("send_select_roles_buttons")) {
             handleSendSelectRolesButtons(event.getGuild(), event.getChannel());
-            event.reply("Sent button role selection message!").setEphemeral(true).queue();
+            event.getHook().sendMessage("Sent button role selection message!").setEphemeral(true).queue();
         } else {
             if (event.getButton().getCustomId().startsWith("role_select_button_")) {
                 String selectId = event.getButton().getCustomId().replace("role_select_button_", "");
@@ -127,10 +129,10 @@ public class SelectRolesCommandListener extends ListenerAdapter {
                         if (role != null) {
                             if (Objects.requireNonNull(event.getMember()).getRoles().contains(role)) {
                                 event.getGuild().removeRoleFromMember(event.getMember(), role).queue();
-                                event.reply("Removed role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                                event.getHook().sendMessage("Removed role " + role.getAsMention() + ".").setEphemeral(true).queue();
                             } else {
                                 event.getGuild().addRoleToMember(event.getMember(), role).queue();
-                                event.reply("Added role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                                event.getHook().sendMessage("Added role " + role.getAsMention() + ".").setEphemeral(true).queue();
                             }
                             return;
                         }
@@ -151,11 +153,11 @@ public class SelectRolesCommandListener extends ListenerAdapter {
                 Role role = event.getGuild().getRoleById(roleId);
                 if (role != null && !Objects.requireNonNull(event.getMember()).getRoles().contains(role)) {
                     event.getGuild().addRoleToMember(event.getMember(), role).queue();
-                    event.reply("Added role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                    event.getHook().sendMessage("Added role " + role.getAsMention() + ".").setEphemeral(true).queue();
                 }
                 if (role != null && Objects.requireNonNull(event.getMember()).getRoles().contains(role)) {
                     event.getGuild().removeRoleFromMember(event.getMember(), role).queue();
-                    event.reply("Removed role " + role.getAsMention() + ".").setEphemeral(true).queue();
+                    event.getHook().sendMessage("Removed role " + role.getAsMention() + ".").setEphemeral(true).queue();
                 }
             }
         }
@@ -163,7 +165,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     private void handleRemoveSelectRole(SlashCommandInteractionEvent event, Role role) {
         handler.removeRoleSelectFromGuild(Objects.requireNonNull(event.getGuild()).getId(), role.getId());
-        event.reply("Removed role " + role.getAsMention() + " from the select role list.").setEphemeral(true).queue();
+        event.getHook().sendMessage("Removed role " + role.getAsMention() + " from the select role list.").setEphemeral(true).queue();
     }
 
     private void handleAddSelectRole(SlashCommandInteractionEvent event) {
@@ -177,7 +179,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             emoji = Objects.requireNonNull(event.getOption("emoji").getAsString());
         }
         handler.addRoleSelectToGuild(Objects.requireNonNull(event.getGuild()).getId(), role.getId(), description, emoji);
-        event.reply("Added role " + role.getAsMention() + "with emoji " + emoji + " and description: " + description + " to the select role) list.").setEphemeral(true).queue();
+        event.getHook().sendMessage("Added role " + role.getAsMention() + "with emoji " + emoji + " and description: " + description + " to the select role) list.").setEphemeral(true).queue();
     }
 
     private void handleSendSelectRole(SlashCommandInteractionEvent event) {
@@ -186,7 +188,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle("Select Role Selection Type");
         embedBuilder.setDescription("Please choose the type of role selection you want to send:");
-        event.replyEmbeds(embedBuilder.build()).setEphemeral(true)
+        event.getHook().sendMessageEmbeds(embedBuilder.build()).setEphemeral(true)
                 .setComponents(
                         (MessageTopLevelComponent) Button.primary("send_select_roles_reaction", "Reaction Roles"),
                         //Button.primary("send_select_roles_dropdown", "Dropdown Menu"),
@@ -344,13 +346,13 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
         // Defaults setzen falls weiterhin leer
         if (newTitle == null || newTitle.isBlank()) newTitle = "Select Your Roles";
-        if (newDescription == null || newDescription.isBlank()) newDescription = "Wähle deine Rollen über Reaktionen, Dropdown oder Buttons aus.";
+        if (newDescription == null || newDescription.isBlank()) newDescription = "Choose from the roles below:";
         if (newFooter == null || newFooter.isBlank()) newFooter = "Role Selection";
         if (newColor == null || newColor.isBlank()) newColor = "#3498db";
 
         // Validierung Farbe
         if (!isValidColor(newColor)) {
-            event.reply("Ungültige Farbe. Erlaubt: #RRGGBB oder red/blue/green/yellow/orange/pink/cyan/magenta/white/black/gray.").setEphemeral(true).queue();
+            event.getHook().sendMessage("This colour is not allowed. Allowed: #RRGGBB or red/blue/green/yellow/orange/pink/cyan/magenta/white/black/gray.").setEphemeral(true).queue();
             return;
         }
 
@@ -369,7 +371,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         }
         embed.setTimestamp(java.time.Instant.now());
 
-        event.replyEmbeds(embed.build())
+        event.getHook().sendMessageEmbeds(embed.build())
                 .addContent("Select Role Embed aktualisiert. Verwende /send-select-roles zum Versand.")
                 .setEphemeral(true)
                 .queue();

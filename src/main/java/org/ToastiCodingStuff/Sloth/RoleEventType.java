@@ -3,18 +3,19 @@ package org.ToastiCodingStuff.Sloth;
 public enum RoleEventType {
     // Member Status
     MEMBER_JOIN,
-    /*MEMBER_BOOST,
+    /*
+    MEMBER_BOOST,
     MEMBER_UNBOOST,
-
+    */
     // Moderation & Warns
     WARN_THRESHOLD,
     WARN_EXPIRED,
 
-    // Voice Activity
+    /* Voice Activity
     VOICE_JOIN,
     VOICE_LEAVE,
 
-    // Interaction
+    /* Interaction
     REACTION_ADD,
     MESSAGE_SPAM,
 

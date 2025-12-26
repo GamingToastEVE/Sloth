@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -20,6 +21,7 @@ public class HelpCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("help")) {
+            event.deferReply().queue();
             handler.insertOrUpdateGlobalStatistic("help");
             handleHelpCommand(event);
         }
@@ -49,6 +51,13 @@ public class HelpCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         ActionRow actionRow;
         ActionRow actionRow2;
+
+        Message message = null;
+
+        if (buttonEvent != null) {
+            message = buttonEvent.getMessage();
+            buttonEvent.deferReply().queue();
+        }
 
         // Redirect generic commands button to page 1
         if (page.equals("commands")) {
@@ -157,7 +166,7 @@ public class HelpCommandListener extends ListenerAdapter {
                                         "• Save and load embeds\n" +
                                         "• Manage your saved embeds", false)
                         .setColor(Color.ORANGE)
-                        .setFooter("All systems are ready to use!");
+                        .setFooter("All systems are ready to use once the setup is complete!");
 
                 actionRow = ActionRow.of(
                         Button.secondary("help_home", "🏠 Home"),
@@ -175,8 +184,8 @@ public class HelpCommandListener extends ListenerAdapter {
             case "setup":
                 embed.setTitle("📋 System Setup Guide")
                         .setDescription("Follow these steps to configure Sloth for your server:\n\n")
-                        .addField("**Step 1: Choose Systems to Configure**",
-                                "All systems are available to use:\n" +
+                        .addField("**Step 1: Choose systems to configure with /systems**",
+                                "All systems are available free to use:\n" +
                                         "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
                                         "• Role Systems (Select Roles, Timed Roles, Verify)\n" +
                                         "• Configure only the ones you need with /systems", false)
@@ -323,8 +332,7 @@ public class HelpCommandListener extends ListenerAdapter {
                         Button.secondary("help_home", "🏠 Home")
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_development", "💡 Support")
+                        Button.primary("help_rules_formatting", "🎨 Formatting")
                 );
                 break;
 
@@ -455,9 +463,10 @@ public class HelpCommandListener extends ListenerAdapter {
 
         // Send the response
         if (slashEvent != null) {
-            slashEvent.replyEmbeds(embed.build()).addComponents(actionRow, actionRow2).setEphemeral(false).queue();
+            slashEvent.getHook().sendMessageEmbeds(embed.build()).addComponents(actionRow, actionRow2).setEphemeral(false).queue();
         } else if (buttonEvent != null) {
-            buttonEvent.editMessageEmbeds(embed.build()).setComponents(actionRow, actionRow2).queue();
+            buttonEvent.getHook().deleteOriginal().queue();
+            message.editMessageEmbeds(embed.build()).setComponents(actionRow, actionRow2).queue();
         }
     }
 }

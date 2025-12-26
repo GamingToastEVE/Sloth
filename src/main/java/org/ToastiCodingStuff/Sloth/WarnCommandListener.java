@@ -5,11 +5,14 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent; // Wichtig!
 import net.dv8tion.jda.api.hooks.ListenerAdapter; // Wichtig!
+import org.json.JSONObject;
 
+import javax.xml.crypto.Data;
 import java.awt.Color;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -194,6 +197,34 @@ public class WarnCommandListener extends ListenerAdapter {
         if (targetMember == null) {
             event.reply("User not found in this server.").setEphemeral(true).queue();
             return;
+        }
+
+        List<DatabaseHandler.RoleEventData> data = handler.getRoleEventsByType(guildId, RoleEventType.WARN_THRESHOLD);
+
+        if (!data.isEmpty()) {
+            for (DatabaseHandler.RoleEventData eventData : data) {
+                int threshold;
+                JSONObject triggerDataJson = new JSONObject(eventData.triggerData);
+                try {
+                    threshold = Integer.parseInt(triggerDataJson.getString("threshold"));
+                } catch (NumberFormatException e) {
+                    continue; // Skip invalid entries
+                }
+
+                int activeWarnings = handler.getActiveWarningsCount(guildId, targetMember.getId());
+
+                if (activeWarnings + 1 == threshold) { // +1 because we are about to add a warning
+                    // Apply role
+                    Role role = event.getGuild().getRoleById(eventData.roleId);
+                    if (role != null) {
+                        long durationSeconds = eventData.durationSeconds;
+                        handler.addActiveTimer(event.getGuild().getId(), targetMember.getId(), role.getId(), eventData.id, durationSeconds);
+                        event.getGuild().addRoleToMember(targetMember, role)
+                            .reason("Warn Threshold reached: " + threshold)
+                            .queue();
+                    }
+                }
+            }
         }
 
         String userId = targetMember.getId();

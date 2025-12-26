@@ -10,8 +10,8 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class Sloth {
     public static void main(String[] args) throws Exception {
@@ -92,7 +92,7 @@ public class Sloth {
                                             // 3. Rolle entfernen
                                             guild1.removeRoleFromMember(member, role).reason("Timed Role expired").queue();
                                             // Optional: User benachrichtigen
-                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " ist abgelaufen.").queue());
+                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " auf " + guild1.getName() + " ist abgelaufen.").queue());
                                         },
                                         error -> System.err.println("Member " + timer.userId + " not found/left guild.")
                                 );
@@ -124,7 +124,7 @@ public class Sloth {
     /**
      * Register all system commands globally
      */
-    private static void registerGlobalCommands(JDA api, DatabaseHandler handler) {
+    private static void registerGlobalCommands(JDA api, DatabaseHandler handler) throws InterruptedException {
         System.out.println("Registering all system commands globally...");
         //Guild guild = api.getGuildById("1169699077986988112"); // Replace with your test server ID if needed
 
@@ -152,5 +152,42 @@ public class Sloth {
         //testServer.updateCommands().addCommands(allCommands).queue();
 
         System.out.println("Finished registering " + allCommands.size() + " global commands");
+
+        System.out.println("Starting registering commands in servers...");
+
+        for (Guild guild : api.getGuilds()) {
+            System.out.println("Registering commands in guild: " + guild.getName() + " (ID: " + guild.getId() + ")");
+
+            updateGuildCommandsFromActiveSystems(guild.getId(), handler, api);
+            TimeUnit.MILLISECONDS.sleep(100);
+        }
+
+        System.out.println("Finished registering commands in all servers.");
+    }
+
+    public static void updateGuildCommandsFromActiveSystems(String guildId, DatabaseHandler databaseHandler, JDA api) {
+        if (guildId.isBlank() || databaseHandler == null) {
+            System.err.println("Invalid guild ID or database handler is null.");
+            return;
+        }
+        Guild guild = api.getGuildById(guildId);
+
+        System.out.println("Updating guild commands based on active systems for guild " + guildId);
+
+        AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(guild, databaseHandler);
+
+        java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
+        List<SlashCommandData> activeCommands = new ArrayList<>();
+
+        for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
+            if (entry.getValue()) { // If system is active
+                activeCommands.addAll(commandProvider.getCommandsForSystem(entry.getKey()));
+            }
+        }
+
+        guild.updateCommands().addCommands(activeCommands).queue(
+                success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
+                error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
+        );
     }
 }

@@ -26,15 +26,17 @@ public class SystemsCommandListener extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("systems")) return;
 
+        event.deferReply().queue();
+
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to manage bot systems.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need **Manage Server** permission to manage bot systems.").setEphemeral(true).queue();
             return;
         }
 
         String guildId = event.getGuild().getId();
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
 
-        event.replyEmbeds(buildEmbed(statuses).build())
+        event.getHook().sendMessageEmbeds(buildEmbed(statuses).build())
                 .setComponents(buildButtons(statuses))
                 .setEphemeral(true)
                 .queue();
@@ -44,8 +46,10 @@ public class SystemsCommandListener extends ListenerAdapter {
     public void onButtonInteraction(ButtonInteractionEvent event) {
         if (!event.getComponentId().startsWith("sys_toggle:")) return;
 
+        event.deferReply().queue();
+
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to use this.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need **Manage Server** permission to use this.").setEphemeral(true).queue();
             return;
         }
 
@@ -57,14 +61,13 @@ public class SystemsCommandListener extends ListenerAdapter {
 
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
 
-        // 2. Refresh the guild's commands immediately
-        // Note: In JDA 5, we can use the main class logic or separate command updater
         AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
-        cmdUpdater.updateGuildCommandsFromActiveSystems();
+        cmdUpdater.updateGuildCommandsFromActiveSystems("");
 
-        event.editMessageEmbeds(buildEmbed(statuses).build())
+        event.getMessage().editMessageEmbeds(buildEmbed(statuses).build())
                 .setComponents(buildButtons(statuses))
                 .queue();
+        event.getHook().deleteOriginal().queue();
     }
 
     private EmbedBuilder buildEmbed(Map<String, Boolean> statuses) {

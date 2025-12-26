@@ -2,7 +2,6 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -12,7 +11,6 @@ import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class AddGuildSlashCommands {
     private final Guild guild;
@@ -145,9 +143,9 @@ public class AddGuildSlashCommands {
                         new SubcommandData("create", "Starts Embed-Editor"),
                         new SubcommandData("list", "Shows all saved Embeds"),
                         new SubcommandData("load", "Loads a saved Embed into the editor")
-                                .addOption(OptionType.STRING, "name", "Name of the embed", true),
+                                .addOption(OptionType.STRING, "name", "Name of the embed", true, true),
                         new SubcommandData("delete", "Deletes a saved Embed")
-                                .addOption(OptionType.STRING, "name", "Name of the embed", true)
+                                .addOption(OptionType.STRING, "name", "Name of the embed", true, true)
                 )
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
@@ -334,8 +332,12 @@ public class AddGuildSlashCommands {
      * Updates the slash commands for the specified guild based on active systems.
      * This replaces all guild-specific commands with the current active set.
      */
-    public void updateGuildCommandsFromActiveSystems() {
-        if (guild == null || databaseHandler == null) return;
+    public void updateGuildCommandsFromActiveSystems(String guildId) {
+        if (guildId.isBlank() || databaseHandler == null) {
+            if (guild == null || databaseHandler == null) return;
+            return;
+        }
+        Guild guild = this.guild.getJDA().getGuildById(guildId);
 
         java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
         List<SlashCommandData> activeCommands = new ArrayList<>();

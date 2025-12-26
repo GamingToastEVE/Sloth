@@ -173,7 +173,7 @@ public class DatabaseHandler {
             config.setJdbcUrl(url);
             config.setUsername(user);
             config.setPassword(password);
-            config.setMaximumPoolSize(10);
+            config.setMaximumPoolSize(25);
             config.setMinimumIdle(2);
             config.setIdleTimeout(300000); // 5 minutes
             config.setConnectionTimeout(30000); // 30 seconds
@@ -2177,7 +2177,6 @@ public class DatabaseHandler {
         try (Connection connection = getConnection()) {
             String currentDate = getCurrentDate();
 
-            // Nur erlaubte Spaltennamen zulassen (SQL-Injection vermeiden)
             java.util.Set<String> allowedActions = java.util.Set.of(
                     "messages_sent", "commands_used", "timeouts_performed", "untimeouts_performed",
                     "verifications_performed", "untimeouts_received", "timeouts_received",
@@ -2189,11 +2188,25 @@ public class DatabaseHandler {
                 throw new IllegalArgumentException("Ungültiger Spaltenname für Statistik: " + actionType);
             }
 
+            int currentNumber = 0;
+            String selectQuery = "SELECT " + actionType + " FROM user_statistics WHERE guild_id = ? AND user_id = ? AND date = ?";
+            PreparedStatement selectStmt = connection.prepareStatement(selectQuery);
+            selectStmt.setString(1, guildId);
+            selectStmt.setString(2, userId);
+            selectStmt.setString(3, currentDate);
+            ResultSet rs = selectStmt.executeQuery();
+            if (rs.next()) {
+                currentNumber = rs.getInt(actionType);
+            }
+
             // UPDATE versuchen
             String updateQuery = null;
             if (userExistsInUserStatistics(guildId, userId)) {
-            }updateQuery = "UPDATE user_statistics SET " + actionType + " = " + actionType +
-                    " + ? WHERE guild_id = ? AND user_id = ? AND date = ?";
+                updateQuery = "UPDATE user_statistics SET " + actionType + " = " + currentNumber +
+                        " + ? WHERE guild_id = ? AND user_id = ? AND date = ?";
+            } else {
+                updateQuery = "INSERT INTO user_statistics (" + actionType + ", guild_id, user_id, date) VALUES (?, ?, ?, ?)";
+            }
             PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
             updateStmt.setInt(1, 1);
             updateStmt.setString(2, guildId);
@@ -2201,19 +2214,6 @@ public class DatabaseHandler {
             updateStmt.setString(4, currentDate);
 
             int rowsUpdated = updateStmt.executeUpdate();
-
-            // Wenn kein Datensatz existiert, neuen einfügen
-            if (rowsUpdated == 0) {
-                // ID wird durch AUTO_INCREMENT in der Datenbank generiert
-                String insertQuery = "INSERT INTO user_statistics (guild_id, user_id, date, " +
-                        actionType + ") VALUES (?, ?, ?, ?)";
-                PreparedStatement insertStmt = connection.prepareStatement(insertQuery);
-                insertStmt.setString(1, guildId);
-                insertStmt.setString(2, userId);
-                insertStmt.setString(3, currentDate);
-                insertStmt.setInt(4, 1);
-                insertStmt.executeUpdate();
-            }
         } catch (SQLException e) {
             System.err.println("Error updating user statistics: " + e.getMessage());
             e.printStackTrace();
@@ -4174,8 +4174,9 @@ public class DatabaseHandler {
      * Toggle a system's status for a guild in the guilds table.
      */
     public boolean toggleSystem(String guildId, String systemName) {
-        List<String> currentModules = new ArrayList<>();
-        boolean wasActive = true; // Default state
+        HashMap<String, Boolean> statuses = new HashMap<>();
+        List<String> currentModules;
+        boolean wasActive = false;
 
         try (Connection connection = getConnection()) {
             // 1. Get current modules
@@ -4188,7 +4189,7 @@ public class DatabaseHandler {
                 String modulesStr = rs.getString("active_modules");
                 if (modulesStr == null) {
                     // First time setup: Initialize with ALL systems
-                    currentModules = new ArrayList<>(List.of(""));
+                    currentModules = new ArrayList<>();
                 } else if (modulesStr.isEmpty()) {
                     currentModules = new ArrayList<>();
                 } else {
@@ -4196,7 +4197,17 @@ public class DatabaseHandler {
                 }
             } else {
                 // Guild not found, assume defaults
-                currentModules = new ArrayList<>(Arrays.asList(ALL_SYSTEMS));
+                currentModules = new ArrayList<>();
+            }
+
+            for (String module : ALL_SYSTEMS) {
+                if (currentModules.contains(module) && module.equals(systemName)) {
+                    statuses.put(module, false);
+                } else if (currentModules.contains(module) || (module.equals(systemName) && !currentModules.contains(systemName))) {
+                    statuses.put(module, true);
+                } else {
+                    statuses.put(module, false);
+                }
             }
 
             wasActive = currentModules.contains(systemName);
@@ -4212,7 +4223,18 @@ public class DatabaseHandler {
             }
 
             // 3. Save back to database
-            String newModulesStr = String.join(",", currentModules);
+            System.out.println("Updating active modules for guild " + guildId + ": " + currentModules);
+            String newModulesStr = "";
+            System.out.println(statuses);
+            for (String mod : statuses.keySet()) {
+                if (statuses.get(mod) == true) {
+                    newModulesStr = newModulesStr + mod + ",";
+                }
+            }
+            if (newModulesStr.endsWith(",")) {
+                newModulesStr = newModulesStr.substring(0, newModulesStr.length() - 1);
+            }
+            System.out.println(newModulesStr);
 
             String updateQuery = "UPDATE guilds SET active_modules = ? WHERE id = ?";
             PreparedStatement updateStmt = connection.prepareStatement(updateQuery);

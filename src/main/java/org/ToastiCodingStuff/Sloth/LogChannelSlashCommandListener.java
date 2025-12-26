@@ -24,6 +24,8 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
             return;
         }
 
+        event.deferReply().setEphemeral(true).queue();
+
         switch (subcommand) {
             case "set":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
@@ -31,9 +33,9 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
                 Channel channel = event.getOption("channel").getAsChannel();
                 String channelID = handler.setLogChannel(event.getGuild().getId(), channel.getId());
                 if (!channelID.equals("Error")) {
-                    event.reply("Set log channel to: " + channel.getAsMention()).queue();
+                    event.getHook().sendMessage("Set log channel to: " + channel.getAsMention()).queue();
                 } else {
-                    event.reply("There was an Error. Please try again or contact the developer!");
+                    event.getHook().sendMessage("There was an Error. Please try again or contact the developer!");
                 }
                 break;
             case "get":
@@ -41,10 +43,10 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("log-channel-get");
                 if (handler.hasLogChannel(event.getGuild().getId())) {
                     Channel logChannel = event.getGuild().getTextChannelById(handler.getLogChannelID(event.getGuild().getId()));
-                    event.reply("Log Channel set to: " + logChannel.getAsMention()).queue();
+                    event.getHook().sendMessage("Log Channel set to: " + logChannel.getAsMention()).queue();
                     return;
                 }
-                event.reply("Couldn't find a Log Channel.").queue();
+                event.getHook().sendMessage("Couldn't find a Log Channel.").queue();
                 break;
         }
     }

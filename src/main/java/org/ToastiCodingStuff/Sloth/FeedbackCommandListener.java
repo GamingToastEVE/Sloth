@@ -2,6 +2,7 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -34,7 +35,8 @@ public class FeedbackCommandListener extends ListenerAdapter {
             eb2.addField("User ID", event.getUser().getId(), false);
             eb2.setColor(Color.BLUE);
             eb2.setTimestamp(Instant.now());
-            Objects.requireNonNull(guild.getOwner()).getUser().openPrivateChannel().complete().sendMessageEmbeds(eb2.build()).queue();
+            PrivateChannel channel = Objects.requireNonNull(guild.getOwner()).getUser().openPrivateChannel().complete();
+            channel.sendMessageEmbeds(eb2.build()).queue();
         }
     }
 }
