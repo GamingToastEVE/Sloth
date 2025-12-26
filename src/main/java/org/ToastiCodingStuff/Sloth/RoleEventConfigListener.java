@@ -20,6 +20,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.callbacks.IMessageEditCallback;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.modals.Modal;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -29,6 +31,9 @@ import java.util.concurrent.TimeUnit;
 public class RoleEventConfigListener extends ListenerAdapter {
 
     private final DatabaseHandler handler;
+    
+    // Discord limits messages to 5 action rows maximum
+    private static final int MAX_ACTION_ROWS_BEFORE_REQUIRED_ROLES = 4;
 
     public RoleEventConfigListener(DatabaseHandler handler) {
         this.handler = handler;
@@ -105,7 +110,40 @@ public class RoleEventConfigListener extends ListenerAdapter {
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data == null) return;
 
-            String json = "{\"trigger_role_id\": \"" + selectedRole.getId() + "\"}";
+            // Support multiple trigger roles - merge with existing conditions
+            List<Role> selectedRoles = event.getMentions().getRoles();
+            JSONArray roleIds = new JSONArray();
+            for (Role r : selectedRoles) {
+                roleIds.put(r.getId());
+            }
+            
+            // Preserve existing conditions and add/update trigger_role_ids
+            JSONObject jsonObj = parseExistingConditions(data.triggerData);
+            jsonObj.put("trigger_role_ids", roleIds);
+            String json = jsonObj.toString();
+
+            handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
+                    data.actionType, data.durationSeconds, "REFRESH", json, data.active);
+
+            sendEventDashboard(event, handler.getRoleEvent(eventId));
+        }
+        else if (id.startsWith("event_required_role_select_")) {
+            int eventId = Integer.parseInt(id.replace("event_required_role_select_", ""));
+            DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
+            if (data == null) return;
+
+            // Support multiple required roles - merge with existing conditions
+            List<Role> selectedRoles = event.getMentions().getRoles();
+            JSONArray roleIds = new JSONArray();
+            for (Role r : selectedRoles) {
+                roleIds.put(r.getId());
+            }
+            
+            // Preserve existing conditions and add/update required_role_ids
+            JSONObject jsonObj = parseExistingConditions(data.triggerData);
+            jsonObj.put("required_role_ids", roleIds);
+            String json = jsonObj.toString();
+
             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
                     data.actionType, data.durationSeconds, "REFRESH", json, data.active);
 
@@ -162,6 +200,15 @@ public class RoleEventConfigListener extends ListenerAdapter {
             event.reply("🗑️ Event deleted.").setEphemeral(true).queue();
             event.getMessage().delete().queue();
         }
+        else if (id.startsWith("event_clear_conditions_")) {
+            int eventId = Integer.parseInt(id.replace("event_clear_conditions_", ""));
+            DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
+            if (data != null) {
+                handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
+                        data.actionType, data.durationSeconds, "REFRESH", null, data.active);
+                sendEventDashboard(event, handler.getRoleEvent(eventId));
+            }
+        }
     }
 
     // --- MODALS ---
@@ -197,8 +244,10 @@ public class RoleEventConfigListener extends ListenerAdapter {
                     if (data.eventType.equals("WARN_THRESHOLD")) {
                         try {
                             int count = Integer.parseInt(input);
-                            String json = "{\"threshold\": " + count + "}";
-                            handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", json, data.active);
+                            // Preserve existing conditions and add/update threshold
+                            JSONObject jsonObj = parseExistingConditions(data.triggerData);
+                            jsonObj.put("threshold", count);
+                            handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
                         } catch (NumberFormatException e) { success = false; }
                     } else {
                         handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", input, data.active);
@@ -291,19 +340,56 @@ public class RoleEventConfigListener extends ListenerAdapter {
         String durationText = (data.durationSeconds > 0) ? formatDuration(data.durationSeconds) : "Permanent / Instant";
         embed.addField("3. Duration", durationText, true);
 
-        // Conditions Text
-        String conditionText = "None";
+        // Conditions Text - now showing multiple condition types
+        StringBuilder conditionBuilder = new StringBuilder();
         if (data.triggerData != null && !data.triggerData.equals("{}") && !data.triggerData.isEmpty()) {
-            if (data.triggerData.contains("trigger_role_id")) {
-                String id = data.triggerData.replaceAll("[^0-9]", "");
-                Role tr = event.getGuild().getRoleById(id);
-                conditionText = "At Role: " + (tr != null ? tr.getAsMention() : id);
-            } else if (data.triggerData.contains("threshold")) {
-                conditionText = "From Warns: " + data.triggerData.replaceAll("[^0-9]", "");
-            } else {
-                conditionText = "`" + data.triggerData + "`";
+            try {
+                JSONObject jsonObj = new JSONObject(data.triggerData);
+                
+                // Show trigger roles
+                if (jsonObj.has("trigger_role_ids")) {
+                    JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
+                    conditionBuilder.append("**Trigger Roles:** ");
+                    for (int i = 0; i < roleIds.length(); i++) {
+                        String roleId = roleIds.getString(i);
+                        Role tr = event.getGuild().getRoleById(roleId);
+                        if (i > 0) conditionBuilder.append(", ");
+                        conditionBuilder.append(tr != null ? tr.getAsMention() : roleId);
+                    }
+                    conditionBuilder.append("\n");
+                } else if (jsonObj.has("trigger_role_id")) {
+                    // Legacy single role format
+                    String roleIdStr = jsonObj.getString("trigger_role_id");
+                    Role tr = event.getGuild().getRoleById(roleIdStr);
+                    conditionBuilder.append("**Trigger Role:** ").append(tr != null ? tr.getAsMention() : roleIdStr).append("\n");
+                }
+                
+                // Show required roles
+                if (jsonObj.has("required_role_ids")) {
+                    JSONArray roleIds = jsonObj.getJSONArray("required_role_ids");
+                    conditionBuilder.append("**Required Roles:** ");
+                    for (int i = 0; i < roleIds.length(); i++) {
+                        String roleId = roleIds.getString(i);
+                        Role tr = event.getGuild().getRoleById(roleId);
+                        if (i > 0) conditionBuilder.append(", ");
+                        conditionBuilder.append(tr != null ? tr.getAsMention() : roleId);
+                    }
+                    conditionBuilder.append("\n");
+                }
+                
+                // Show threshold
+                if (jsonObj.has("threshold")) {
+                    int threshold = jsonObj.getInt("threshold");
+                    conditionBuilder.append("**Warn Threshold:** ").append(threshold).append("\n");
+                }
+                
+            } catch (Exception e) {
+                conditionBuilder.append("`").append(data.triggerData).append("`");
             }
-        } else if (data.eventType.equals("ROLE_ADD")) {
+        }
+        
+        String conditionText = conditionBuilder.length() > 0 ? conditionBuilder.toString().trim() : "None";
+        if (conditionText.equals("None") && (data.eventType.equals("ROLE_ADD") || data.eventType.equals("ROLE_REMOVE"))) {
             conditionText = "⚠️ None (Fires on ANY role!)";
         }
         embed.addField("4. Conditions", conditionText, false);
@@ -323,19 +409,36 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 .build();
         rows.add(ActionRow.of(menu));
 
-        // Dynamic Menu for ROLE Trigger
+        // Dynamic Menu for ROLE Trigger - Allow multiple role selection
         if (data.eventType.equals("ROLE_ADD") || data.eventType.equals("ROLE_REMOVE")) {
             EntitySelectMenu triggerRoleMenu = EntitySelectMenu.create("event_trigger_role_select_" + data.id, EntitySelectMenu.SelectTarget.ROLE)
-                    .setPlaceholder("Optional: Select Trigger Role...")
-                    .setMinValues(1).setMaxValues(1).build();
+                    .setPlaceholder("Select Trigger Role(s)...")
+                    .setMinValues(1).setMaxValues(25).build();
             rows.add(ActionRow.of(triggerRoleMenu));
+        }
+        
+        // Required roles selector - available for all event types
+        // Only add if we have room (Discord limits to 5 action rows)
+        if (rows.size() < MAX_ACTION_ROWS_BEFORE_REQUIRED_ROLES) {
+            EntitySelectMenu requiredRoleMenu = EntitySelectMenu.create("event_required_role_select_" + data.id, EntitySelectMenu.SelectTarget.ROLE)
+                    .setPlaceholder("Required Role(s) - user must have these...")
+                    .setMinValues(1).setMaxValues(25).build();
+            rows.add(ActionRow.of(requiredRoleMenu));
         }
 
         Button toggleBtn = data.active
                 ? Button.secondary("event_toggle_" + data.id, "Disable")
                 : Button.success("event_toggle_" + data.id, "Enable");
         Button deleteBtn = Button.danger("event_delete_" + data.id, "Delete");
-        rows.add(ActionRow.of(toggleBtn, deleteBtn));
+        
+        // Add "Clear Conditions" button if conditions are set
+        boolean hasConditions = data.triggerData != null && !data.triggerData.isEmpty() && !data.triggerData.equals("{}");
+        if (hasConditions) {
+            Button clearConditionsBtn = Button.secondary("event_clear_conditions_" + data.id, "Clear Conditions");
+            rows.add(ActionRow.of(toggleBtn, clearConditionsBtn, deleteBtn));
+        } else {
+            rows.add(ActionRow.of(toggleBtn, deleteBtn));
+        }
 
         if (event instanceof IMessageEditCallback) {
             ((IMessageEditCallback) event).editMessageEmbeds(embed.build()).setComponents(rows).queue();
@@ -407,5 +510,20 @@ public class RoleEventConfigListener extends ListenerAdapter {
         if (seconds < 3600) return (seconds/60) + "m";
         if (seconds < 86400) return (seconds/3600) + "h";
         return (seconds/86400) + "d";
+    }
+    
+    /**
+     * Parse existing conditions from triggerData JSON, preserving existing values.
+     * Returns an empty JSONObject if triggerData is null or invalid.
+     */
+    private JSONObject parseExistingConditions(String triggerData) {
+        if (triggerData == null || triggerData.isEmpty() || triggerData.equals("{}")) {
+            return new JSONObject();
+        }
+        try {
+            return new JSONObject(triggerData);
+        } catch (Exception e) {
+            return new JSONObject();
+        }
     }
 }
