@@ -20,6 +20,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.callbacks.IMessageEditCallback;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.modals.Modal;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -105,7 +107,16 @@ public class RoleEventConfigListener extends ListenerAdapter {
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data == null) return;
 
-            String json = "{\"trigger_role_id\": \"" + selectedRole.getId() + "\"}";
+            // Support multiple trigger roles
+            List<Role> allRoles = event.getMentions().getRoles();
+            JSONArray roleIds = new JSONArray();
+            for (Role r : allRoles) {
+                roleIds.put(r.getId());
+            }
+            JSONObject jsonObj = new JSONObject();
+            jsonObj.put("trigger_role_ids", roleIds);
+            String json = jsonObj.toString();
+
             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
                     data.actionType, data.durationSeconds, "REFRESH", json, data.active);
 
@@ -161,6 +172,15 @@ public class RoleEventConfigListener extends ListenerAdapter {
             handler.deleteRoleEvent(guildId, eventId);
             event.reply("🗑️ Event deleted.").setEphemeral(true).queue();
             event.getMessage().delete().queue();
+        }
+        else if (id.startsWith("event_clear_conditions_")) {
+            int eventId = Integer.parseInt(id.replace("event_clear_conditions_", ""));
+            DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
+            if (data != null) {
+                handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId,
+                        data.actionType, data.durationSeconds, "REFRESH", null, data.active);
+                sendEventDashboard(event, handler.getRoleEvent(eventId));
+            }
         }
     }
 
@@ -294,16 +314,33 @@ public class RoleEventConfigListener extends ListenerAdapter {
         // Conditions Text
         String conditionText = "None";
         if (data.triggerData != null && !data.triggerData.equals("{}") && !data.triggerData.isEmpty()) {
-            if (data.triggerData.contains("trigger_role_id")) {
-                String id = data.triggerData.replaceAll("[^0-9]", "");
-                Role tr = event.getGuild().getRoleById(id);
-                conditionText = "At Role: " + (tr != null ? tr.getAsMention() : id);
+            if (data.triggerData.contains("trigger_role_ids")) {
+                // Multiple trigger roles (new format)
+                try {
+                    JSONObject jsonObj = new JSONObject(data.triggerData);
+                    JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
+                    StringBuilder sb = new StringBuilder("At Roles: ");
+                    for (int i = 0; i < roleIds.length(); i++) {
+                        String roleId = roleIds.getString(i);
+                        Role tr = event.getGuild().getRoleById(roleId);
+                        if (i > 0) sb.append(", ");
+                        sb.append(tr != null ? tr.getAsMention() : roleId);
+                    }
+                    conditionText = sb.toString();
+                } catch (Exception e) {
+                    conditionText = "`" + data.triggerData + "`";
+                }
+            } else if (data.triggerData.contains("trigger_role_id")) {
+                // Single trigger role (legacy format - backward compatibility)
+                String roleIdStr = data.triggerData.replaceAll("[^0-9]", "");
+                Role tr = event.getGuild().getRoleById(roleIdStr);
+                conditionText = "At Role: " + (tr != null ? tr.getAsMention() : roleIdStr);
             } else if (data.triggerData.contains("threshold")) {
                 conditionText = "From Warns: " + data.triggerData.replaceAll("[^0-9]", "");
             } else {
                 conditionText = "`" + data.triggerData + "`";
             }
-        } else if (data.eventType.equals("ROLE_ADD")) {
+        } else if (data.eventType.equals("ROLE_ADD") || data.eventType.equals("ROLE_REMOVE")) {
             conditionText = "⚠️ None (Fires on ANY role!)";
         }
         embed.addField("4. Conditions", conditionText, false);
@@ -323,11 +360,11 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 .build();
         rows.add(ActionRow.of(menu));
 
-        // Dynamic Menu for ROLE Trigger
+        // Dynamic Menu for ROLE Trigger - Allow multiple role selection
         if (data.eventType.equals("ROLE_ADD") || data.eventType.equals("ROLE_REMOVE")) {
             EntitySelectMenu triggerRoleMenu = EntitySelectMenu.create("event_trigger_role_select_" + data.id, EntitySelectMenu.SelectTarget.ROLE)
-                    .setPlaceholder("Optional: Select Trigger Role...")
-                    .setMinValues(1).setMaxValues(1).build();
+                    .setPlaceholder("Select Trigger Role(s)...")
+                    .setMinValues(1).setMaxValues(25).build();
             rows.add(ActionRow.of(triggerRoleMenu));
         }
 
@@ -335,7 +372,15 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 ? Button.secondary("event_toggle_" + data.id, "Disable")
                 : Button.success("event_toggle_" + data.id, "Enable");
         Button deleteBtn = Button.danger("event_delete_" + data.id, "Delete");
-        rows.add(ActionRow.of(toggleBtn, deleteBtn));
+        
+        // Add "Clear Conditions" button if conditions are set
+        boolean hasConditions = data.triggerData != null && !data.triggerData.isEmpty() && !data.triggerData.equals("{}");
+        if (hasConditions) {
+            Button clearConditionsBtn = Button.secondary("event_clear_conditions_" + data.id, "Clear Conditions");
+            rows.add(ActionRow.of(toggleBtn, clearConditionsBtn, deleteBtn));
+        } else {
+            rows.add(ActionRow.of(toggleBtn, deleteBtn));
+        }
 
         if (event instanceof IMessageEditCallback) {
             ((IMessageEditCallback) event).editMessageEmbeds(embed.build()).setComponents(rows).queue();

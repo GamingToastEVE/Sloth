@@ -7,6 +7,8 @@ import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.List;
 
@@ -109,7 +111,9 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
 
     /**
      * Hilfsmethode: Parst das JSON und vergleicht IDs.
-     * Erwartet JSON Format: {"trigger_role_id": "12345"}
+     * Supports multiple conditions:
+     * - New format: {"trigger_role_ids": ["12345", "67890"]} - matches if actualId is in the array
+     * - Legacy format: {"trigger_role_id": "12345"} - matches if actualId equals the value
      * Wenn triggerData leer/null ist, feuert das Event IMMER (Global Trigger).
      */
     private boolean checkCondition(String json, String actualId) {
@@ -117,6 +121,30 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
             return true;
         }
 
-        return json.contains(actualId);
+        try {
+            JSONObject jsonObj = new JSONObject(json);
+            
+            // Check for new format with multiple trigger roles
+            if (jsonObj.has("trigger_role_ids")) {
+                JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
+                for (int i = 0; i < roleIds.length(); i++) {
+                    if (roleIds.getString(i).equals(actualId)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            // Check for legacy single trigger role format
+            if (jsonObj.has("trigger_role_id")) {
+                return jsonObj.getString("trigger_role_id").equals(actualId);
+            }
+            
+            // Fallback: simple string contains check for other condition types
+            return json.contains(actualId);
+        } catch (Exception e) {
+            // If JSON parsing fails, fallback to simple contains check
+            return json.contains(actualId);
+        }
     }
 }
