@@ -64,7 +64,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
         for (DatabaseHandler.RoleEventData eventConfig : events) {
 
             // 2. Prüfen, ob die Bedingung (trigger_data) passt
-            if (!checkCondition(eventConfig.triggerData, triggerEntityId)) {
+            if (!checkCondition(eventConfig.triggerData, triggerEntityId, member, guild)) {
                 continue;
             }
 
@@ -115,9 +115,12 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
      * Supports multiple conditions:
      * - New format: {"trigger_role_ids": ["12345", "67890"]} - matches if actualId is in the array
      * - Legacy format: {"trigger_role_id": "12345"} - matches if actualId equals the value
+     * - Required roles: {"required_role_ids": ["12345", "67890"]} - member must have ALL these roles
+     * - Threshold: {"threshold": 3} - for WARN_THRESHOLD events
+     * All conditions in the JSON must be satisfied (AND logic).
      * Wenn triggerData leer/null ist, feuert das Event IMMER (Global Trigger).
      */
-    private boolean checkCondition(String json, String actualId) {
+    private boolean checkCondition(String json, String actualId, Member member, Guild guild) {
         if (json == null || json.isEmpty() || json.equals("{}")) {
             return true;
         }
@@ -125,28 +128,58 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
         try {
             JSONObject jsonObj = new JSONObject(json);
             
-            // Check for new format with multiple trigger roles
+            // Check for trigger_role_ids (multiple trigger roles - OR logic within this condition)
             if (jsonObj.has("trigger_role_ids")) {
                 JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
+                boolean found = false;
                 for (int i = 0; i < roleIds.length(); i++) {
                     if (roleIds.getString(i).equals(actualId)) {
-                        return true;
+                        found = true;
+                        break;
                     }
                 }
-                return false;
+                if (!found) {
+                    return false;
+                }
             }
             
             // Check for legacy single trigger role format
             if (jsonObj.has("trigger_role_id")) {
-                return jsonObj.getString("trigger_role_id").equals(actualId);
+                if (!jsonObj.getString("trigger_role_id").equals(actualId)) {
+                    return false;
+                }
             }
             
-            // Fallback: simple string contains check for other condition types
-            return json.contains(actualId);
+            // Check for required_role_ids - member must have ALL these roles (AND logic)
+            if (jsonObj.has("required_role_ids") && member != null) {
+                JSONArray requiredRoleIds = jsonObj.getJSONArray("required_role_ids");
+                for (int i = 0; i < requiredRoleIds.length(); i++) {
+                    String requiredRoleId = requiredRoleIds.getString(i);
+                    Role requiredRole = guild.getRoleById(requiredRoleId);
+                    if (requiredRole == null || !member.getRoles().contains(requiredRole)) {
+                        return false;
+                    }
+                }
+            }
+            
+            // If no specific trigger conditions were found, allow the event
+            // (This handles cases where only required_role_ids is set without trigger_role_ids)
+            if (!jsonObj.has("trigger_role_ids") && !jsonObj.has("trigger_role_id") && !jsonObj.has("threshold")) {
+                return true;
+            }
+            
+            return true;
         } catch (JSONException e) {
             // If JSON parsing fails, fallback to simple contains check
             System.err.println("Failed to parse trigger_data JSON: " + e.getMessage());
             return json.contains(actualId);
         }
+    }
+    
+    /**
+     * Overloaded method for backward compatibility
+     */
+    private boolean checkCondition(String json, String actualId) {
+        return checkCondition(json, actualId, null, null);
     }
 }
