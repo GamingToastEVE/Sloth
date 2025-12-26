@@ -1,5 +1,6 @@
 package org.ToastiCodingStuff.Sloth;
 
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
@@ -11,14 +12,23 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TimedRoleTriggerListener extends ListenerAdapter {
 
     private final DatabaseHandler handler;
+    private final JDA api;
 
-    public TimedRoleTriggerListener(DatabaseHandler handler) {
+    public TimedRoleTriggerListener(DatabaseHandler handler, JDA api) {
         this.handler = handler;
+        this.api = api;
+        startScheduler();
     }
 
     // Trigger: Wenn ein User eine Rolle bekommt ("getrole")
@@ -42,6 +52,37 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
         processTrigger(event.getGuild(), event.getMember(), RoleEventType.MEMBER_JOIN, "");
+    }
+
+    private void startScheduler() {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                checkMessageCounts();
+            } catch (Exception e) {
+                // Fehler fangen, damit der Scheduler nicht abstürzt
+                e.printStackTrace();
+            }
+        }, 0, 5, TimeUnit.MINUTES); // Startet sofort, wiederholt alle 5 Min
+    }
+
+    private void checkMessageCounts() {
+        api.getGuilds().forEach(guild -> {
+            List<DatabaseHandler.RoleEventData> events = handler.getRoleEventsByType(guild.getId(), RoleEventType.MESSAGE_THRESHOLD);
+            if (events.isEmpty()) {
+                return; // Keine Events dieses Typs auf dem Server
+            }
+            for (DatabaseHandler.RoleEventData configData : events) {
+                JSONObject config = new JSONObject(configData);
+                if (config.has("message_threshold")) {
+                    guild.getMembers().forEach(member -> {
+                        processTrigger(guild, member, RoleEventType.MESSAGE_THRESHOLD, "");
+                    });
+
+                }
+            }
+        });
     }
 
     /**
@@ -133,12 +174,13 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
             if (jsonObj.has("trigger_role_ids")) {
                 JSONArray roleIds = jsonObj.getJSONArray("trigger_role_ids");
                 // Empty array means no trigger roles specified - skip this check
-                if (roleIds.length() > 0) {
+                if (!roleIds.isEmpty()) {
                     boolean found = false;
                     for (int i = 0; i < roleIds.length(); i++) {
-                        if (roleIds.getString(i).equals(actualId)) {
+                        if (!roleIds.getString(i).equals(actualId)) {
+                            return false;
+                        } else {
                             found = true;
-                            break;
                         }
                     }
                     if (!found) {
@@ -164,6 +206,20 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                         return false;
                     }
                 }
+            }
+
+            if (jsonObj.has("messages_sent_threshold") && member != null) {
+                int threshold = jsonObj.getInt("messages_sent_threshold");
+                String date = handler.getCurrentDate();
+                LocalDateTime dateTime = LocalDateTime.parse(date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                if (jsonObj.has("messages_sent_threshold_seconds")) {
+                    long seconds  = jsonObj.getLong("messages_sent_threshold_seconds");
+                    dateTime = dateTime.minusSeconds(seconds);
+                }
+                int messagesSent = handler.getMessagesSentByDate(guild.getId(), member.getId(), dateTime.toString());
+
+                return messagesSent <= threshold;
+
             }
             
             // All conditions passed

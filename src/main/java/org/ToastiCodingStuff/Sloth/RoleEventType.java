@@ -9,7 +9,7 @@ public enum RoleEventType {
     */
     // Moderation & Warns
     WARN_THRESHOLD,
-    WARN_EXPIRED,
+    //WARN_EXPIRED,
 
     /* Voice Activity
     VOICE_JOIN,
@@ -19,8 +19,8 @@ public enum RoleEventType {
     REACTION_ADD,
     MESSAGE_SPAM,
 
-    // Custom
-    MESSAGE_THRESHOLD, */
+    */// Custom
+    MESSAGE_THRESHOLD,
     ROLE_REMOVE,
     ROLE_ADD;
 

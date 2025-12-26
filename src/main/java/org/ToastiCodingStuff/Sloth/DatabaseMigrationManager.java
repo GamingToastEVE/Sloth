@@ -155,7 +155,8 @@ public class DatabaseMigrationManager {
                 .addColumn("created_at", "TEXT")
                 .addColumn("updated_at", "TEXT")
                 .addColumn("active", "INTEGER DEFAULT 1")
-                .addColumn("active_modules", "TEXT");
+                .addColumn("active_modules", "TEXT")
+                .addColumn("message_count_tracking", "INTEGER DEFAULT 0");
     }
 
     private TableSchema createJustVerifyButtonSchema() {

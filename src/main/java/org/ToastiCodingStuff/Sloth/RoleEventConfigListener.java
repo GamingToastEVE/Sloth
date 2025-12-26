@@ -22,6 +22,7 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.modals.Modal;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -249,6 +250,20 @@ public class RoleEventConfigListener extends ListenerAdapter {
                             jsonObj.put("threshold", count);
                             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
                         } catch (NumberFormatException e) { success = false; }
+                    } else if (data.eventType.equals("MESSAGE_THRESHOLD")) {
+                        try {
+                            int count = Integer.parseInt(input);
+                            String trackMessages = event.getValue("message_count_tracking").getAsString();
+                            boolean trackMessagesBool = trackMessages.matches("(?i)^(yes|y|true|t)$");
+
+                            handler.toggleMessageCountTracking(event.getGuild().getId(), trackMessagesBool);
+
+                            // Preserve existing conditions and add/update message_threshold
+                            JSONObject jsonObj = parseExistingConditions(data.triggerData);
+                            jsonObj.put("threshold", count);
+                            handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
+                        } catch (NumberFormatException e) { success = false; }
+
                     } else {
                         handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", input, data.active);
                     }
@@ -283,7 +298,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 for (RoleEventType type : RoleEventType.values()) {
                     typeMenu.addOption(type.toString(), type.toString(), getTriggerDescription(type));
                 }
-
+                event.getMessage().delete().queue();
                 event.reply("When should this event fire?")
                         .setComponents(ActionRow.of(typeMenu.build()))
                         .setEphemeral(true).queue();
@@ -293,7 +308,8 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 EntitySelectMenu roleMenu = EntitySelectMenu.create("event_role_select_" + eventId, EntitySelectMenu.SelectTarget.ROLE)
                         .setPlaceholder("Search and select target role...")
                         .setMinValues(1).setMaxValues(1).build();
-                event.reply("Which role should be given/removed?")
+                event.getMessage().delete().queue();
+                event.reply("When should this event fire?")
                         .setComponents(ActionRow.of(roleMenu))
                         .setEphemeral(true).queue();
                 break;
@@ -312,6 +328,22 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 if (data.eventType.equals("WARN_THRESHOLD")) {
                     String maxWarns = String.valueOf(handler.getMaxWarns(event.getGuild().getId()));
                     event.replyModal(createModal("modal_event_data_" + eventId, "Warn Limit", "Count (e.g. " + maxWarns + ")", maxWarns)).queue();
+                } else if (data.eventType.equals("MESSAGE_THRESHOLD")) {
+                    String defaultMsgThreshold = "100";
+                    Modal modal = Modal.create("modal_event_data_" + eventId, "Message Threshold")
+                                    .addComponents(Label.of("input_field",
+                                            TextInput.create("input_field", TextInputStyle.SHORT)
+                                                    .setPlaceholder("e.g. " + defaultMsgThreshold)
+                                                    .setValue(data.triggerData != null && !data.triggerData.isEmpty() ? data.triggerData : defaultMsgThreshold)
+                                                    .setRequired(true)
+                                                    .build()),
+                                            Label.of("message_count_tracking", TextInput.create("input_field", TextInputStyle.SHORT)
+                                                    .setPlaceholder("Activate Message count tracking? " + "true/false/y/n")
+                                                    .setValue("true")
+                                                    .setRequired(true)
+                                                    .build())).build();
+                    event.replyModal(modal).queue();
+
                 } else {
                     event.replyModal(createModal("modal_event_data_" + eventId, "Conditions", "JSON", data.triggerData)).queue();
                 }
@@ -452,9 +484,8 @@ public class RoleEventConfigListener extends ListenerAdapter {
             case MEMBER_JOIN: return "User joins server";
             case ROLE_ADD: return "User gets a role";
             case ROLE_REMOVE: return "User loses a role";
-            //case WARN_THRESHOLD: return "Warn limit reached";
-            //case MEMBER_BOOST: return "User boosts server";
-            // case VOICE_LEAVE: return "Leaves voice channel";
+            case WARN_THRESHOLD: return "Warn limit reached";
+            case MESSAGE_THRESHOLD: return "Message limit reached";
             default: return type.name();
         }
     }

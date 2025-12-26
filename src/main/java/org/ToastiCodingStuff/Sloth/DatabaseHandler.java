@@ -2022,7 +2022,7 @@ public class DatabaseHandler {
     /**
      * Get current date in YYYY-MM-DD format for statistics
      */
-    private String getCurrentDate() {
+    public String getCurrentDate() {
         return java.time.LocalDate.now().toString();
     }
 
@@ -4286,5 +4286,87 @@ public class DatabaseHandler {
         }
 
         return statuses;
+    }
+
+    public int getMessagesSentByDate (String guildId, String userId, String date) {
+        String query = "SELECT messages_sent FROM user_statistics WHERE guild_id = ? AND user_id = ? AND date >= ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, date);
+            ResultSet rs = stmt.executeQuery();
+            int count = 0;
+            while (rs.next()) {
+                count += rs.getInt("messages_sent");
+            }
+            return count;
+        } catch (SQLException e) {
+            System.err.println("Error fetching messages sent: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public HashMap<String, Integer> getMessagesSentByDate (String guildId, String date) {
+        String query = "SELECT user_id, messages_sent FROM user_statistics WHERE guild_id = ? AND date >= ?";
+        HashMap<String, Integer> messagesMap = new HashMap<>();
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, date);
+            ResultSet rs = stmt.executeQuery();
+            int count = 0;
+            String userId = null;
+            while (rs.next()) {
+                if (userId == null) {
+                    userId = rs.getString("user_id");
+                }
+                if (userId.equals(rs.getString("user_id"))) {
+                    int messagesSent = rs.getInt("messages_sent");
+                    count += messagesSent;
+                } else {
+                    messagesMap.put(userId, count);
+                }
+                userId = rs.getString("user_id");
+            }
+            return messagesMap;
+        } catch (SQLException e) {
+            System.err.println("Error fetching messages sent: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public void toggleMessageCountTracking (String guildId, boolean enable) {
+        String query = "UPDATE guilds SET message_count_tracking = ? WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, enable ? 1 : 0);
+            stmt.setString(2, guildId);
+            stmt.executeUpdate();
+            System.out.println("Message count tracking for guild " + guildId + " set to " + enable);
+        } catch (SQLException e) {
+            System.err.println("Error toggling message count tracking: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public boolean doesGuildTrackMessages (String guildId) {
+        String query = "SELECT message_count_tracking FROM guilds WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("message_count_tracking") == 1;
+            } else {
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error checking message count tracking: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return false;
     }
 }

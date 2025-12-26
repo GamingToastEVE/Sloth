@@ -26,7 +26,7 @@ public class Sloth {
         Guild guild = api.getGuildById("1169699077986988112");
 
         // Set bot status to "Playing /help"
-        api.getPresence().setActivity(Activity.playing("/help"));
+        api.getPresence().setActivity(Activity.playing("Starting up..."));
 
         api.addEventListener(new LogChannelSlashCommandListener(handler));
         api.addEventListener(new WarnCommandListener(handler));
@@ -40,7 +40,7 @@ public class Sloth {
         api.addEventListener(new SelectRolesCommandListener(handler));
         api.addEventListener(new TimedRolesCommandListener(handler));
         api.addEventListener(new RoleEventConfigListener(handler));
-        api.addEventListener(new TimedRoleTriggerListener(handler));
+        api.addEventListener(new TimedRoleTriggerListener(handler, api));
         api.addEventListener(new EmbedEditorCommandListener(handler));
         api.addEventListener(new SystemsCommandListener(handler));
 
@@ -63,15 +63,15 @@ public class Sloth {
         activityRotator.scheduleAtFixedRate(() -> {
             Random rand = new Random();
             String[] activities = {
-                    "/help | in " + api.getGuilds().size() + " servers",
+                    "/help | in " + api.getGuilds().size() + " servers!"/*,
                     "New Features out now!",
                     "Check out /feedback",
                     "For support, join our Discord!",
-                    "Activate systems with /systems"
+                    "Activate systems with /systems"*/
             };
             String activity = activities[rand.nextInt(activities.length)];
             api.getPresence().setActivity(Activity.customStatus(activity));
-        }, 0, 60, java.util.concurrent.TimeUnit.MINUTES);
+        }, 0, 60000000, java.util.concurrent.TimeUnit.DAYS);
 
         // Starte den Background-Check für abgelaufene Rollen (jede Minute)
         java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
@@ -118,7 +118,7 @@ public class Sloth {
                 System.err.println("Error in TimedRole loop: " + e.getMessage());
                 e.printStackTrace();
             }
-        }, 0, 60, java.util.concurrent.TimeUnit.SECONDS);
+        }, 0, 60*5, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /**
