@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.List;
@@ -142,8 +143,9 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
             
             // Fallback: simple string contains check for other condition types
             return json.contains(actualId);
-        } catch (Exception e) {
+        } catch (JSONException e) {
             // If JSON parsing fails, fallback to simple contains check
+            System.err.println("Failed to parse trigger_data JSON: " + e.getMessage());
             return json.contains(actualId);
         }
     }

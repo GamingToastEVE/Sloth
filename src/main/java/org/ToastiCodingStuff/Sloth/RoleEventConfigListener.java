@@ -108,9 +108,9 @@ public class RoleEventConfigListener extends ListenerAdapter {
             if (data == null) return;
 
             // Support multiple trigger roles
-            List<Role> allRoles = event.getMentions().getRoles();
+            List<Role> selectedRoles = event.getMentions().getRoles();
             JSONArray roleIds = new JSONArray();
-            for (Role r : allRoles) {
+            for (Role r : selectedRoles) {
                 roleIds.put(r.getId());
             }
             JSONObject jsonObj = new JSONObject();
@@ -332,11 +332,22 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 }
             } else if (data.triggerData.contains("trigger_role_id")) {
                 // Single trigger role (legacy format - backward compatibility)
-                String roleIdStr = data.triggerData.replaceAll("[^0-9]", "");
-                Role tr = event.getGuild().getRoleById(roleIdStr);
-                conditionText = "At Role: " + (tr != null ? tr.getAsMention() : roleIdStr);
+                try {
+                    JSONObject jsonObj = new JSONObject(data.triggerData);
+                    String roleIdStr = jsonObj.getString("trigger_role_id");
+                    Role tr = event.getGuild().getRoleById(roleIdStr);
+                    conditionText = "At Role: " + (tr != null ? tr.getAsMention() : roleIdStr);
+                } catch (Exception e) {
+                    conditionText = "`" + data.triggerData + "`";
+                }
             } else if (data.triggerData.contains("threshold")) {
-                conditionText = "From Warns: " + data.triggerData.replaceAll("[^0-9]", "");
+                try {
+                    JSONObject jsonObj = new JSONObject(data.triggerData);
+                    int threshold = jsonObj.getInt("threshold");
+                    conditionText = "From Warns: " + threshold;
+                } catch (Exception e) {
+                    conditionText = "`" + data.triggerData + "`";
+                }
             } else {
                 conditionText = "`" + data.triggerData + "`";
             }
