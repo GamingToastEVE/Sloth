@@ -4003,8 +4003,9 @@ public class DatabaseHandler {
         public final long durationSeconds;
         public final String triggerData;
         public final boolean active;
+        public final boolean instant;
 
-        public RoleEventData(int id, String name, String eventType, String roleId, String actionType, long durationSeconds, String triggerData, boolean active, String stackType) {
+        public RoleEventData(int id, String name, String eventType, String roleId, String actionType, long durationSeconds, String triggerData, boolean active, String stackType, boolean instant) {
             this.id = id;
             this.name = name;
             this.eventType = eventType;
@@ -4014,6 +4015,7 @@ public class DatabaseHandler {
             this.triggerData = triggerData;
             this.active = active;
             this.stackType = stackType;
+            this.instant = instant;
         }
     }
 
@@ -4033,7 +4035,8 @@ public class DatabaseHandler {
                         rs.getLong("duration_seconds"),
                         rs.getString("trigger_data"),
                         rs.getInt("active") == 1,
-                        rs.getString("stack_type")
+                        rs.getString("stack_type"),
+                        rs.getInt("instant_apply") == 1
                 );
             }
         } catch (SQLException e) {
@@ -4066,7 +4069,8 @@ public class DatabaseHandler {
                         rs.getLong("duration_seconds"),
                         rs.getString("trigger_data"),
                         rs.getInt("active") == 1,
-                        rs.getString("stack_type")
+                        rs.getString("stack_type"),
+                        rs.getInt("instant_apply") == 1
                 ));
             }
         } catch (SQLException e) {
@@ -4368,5 +4372,29 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public void deleteUserData(String userId) {
+        String[] tables = {
+                "users",
+                "user_statistics",
+                "active_timers",
+                "role_events",
+                "custom_embeds"
+        };
+
+        try (Connection connection = getConnection()) {
+            for (String table : tables) {
+                String query = "DELETE FROM " + table + " WHERE user_id = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                    stmt.setString(1, userId);
+                    int rowsAffected = stmt.executeUpdate();
+                    System.out.println("Deleted " + rowsAffected + " rows from " + table + " for user " + userId);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error deleting user data for user " + userId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }

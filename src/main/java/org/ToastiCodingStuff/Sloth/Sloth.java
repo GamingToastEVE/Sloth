@@ -71,7 +71,7 @@ public class Sloth {
             };
             String activity = activities[rand.nextInt(activities.length)];
             api.getPresence().setActivity(Activity.customStatus(activity));
-        }, 0, 60000000, java.util.concurrent.TimeUnit.DAYS);
+        }, 0, 60, java.util.concurrent.TimeUnit.MINUTES);
 
         // Starte den Background-Check für abgelaufene Rollen (jede Minute)
         java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
@@ -90,7 +90,11 @@ public class Sloth {
                                 guild1.retrieveMemberById(timer.userId).queue(
                                         member -> {
                                             // 3. Rolle entfernen
-                                            guild1.removeRoleFromMember(member, role).reason("Timed Role expired").queue();
+                                            if (!member.getRoles().contains(role)) {
+                                                guild1.addRoleToMember(member, role).reason("Timed Role expired, Role gets added again: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
+                                            } else {
+                                                guild1.removeRoleFromMember(member, role).reason("Timed Role expired: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
+                                            }
                                             // Optional: User benachrichtigen
                                             // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " auf " + guild1.getName() + " ist abgelaufen.").queue());
                                         },
@@ -100,7 +104,11 @@ public class Sloth {
                                 guild1.retrieveMemberById(timer.userId).queue(
                                         member -> {
                                             // 3. Rolle hinzufügen
-                                            guild1.addRoleToMember(member, role).reason("Timed Role expired").queue();
+                                            if (member.getRoles().contains(role)) {
+                                                guild1.removeRoleFromMember(member, role).reason("Timed Role removed after timer expired: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
+                                            } else {
+                                                guild1.addRoleToMember(member, role).reason("Timed Role gained after timer expired: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
+                                            }
                                             // Optional: User benachrichtigen
                                             // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " wurde dir wieder hinzugefügt.").queue());
                                         },

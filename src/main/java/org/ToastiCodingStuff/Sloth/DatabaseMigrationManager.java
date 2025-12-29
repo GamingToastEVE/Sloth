@@ -393,6 +393,7 @@ public class DatabaseMigrationManager {
                 .addColumn("stack_type", "VARCHAR(16) DEFAULT 'REFRESH'")
                 .addColumn("trigger_data", "TEXT") // JSON String
                 .addColumn("active", "TINYINT(1) DEFAULT 1")
+                .addColumn("instant_apply", "TINYINT(1) DEFAULT 0")
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 

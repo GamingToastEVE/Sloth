@@ -247,12 +247,16 @@ public class RoleEventConfigListener extends ListenerAdapter {
                             int count = Integer.parseInt(input);
                             // Preserve existing conditions and add/update threshold
                             JSONObject jsonObj = parseExistingConditions(data.triggerData);
-                            jsonObj.put("threshold", count);
+                            jsonObj.put("warn_threshold", count);
                             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
                         } catch (NumberFormatException e) { success = false; }
                     } else if (data.eventType.equals("MESSAGE_THRESHOLD")) {
                         try {
                             int count = Integer.parseInt(input);
+                            String timeWindowStr = "1d"; // Default time window
+                            if (event.getValue("time_window") != null) {
+                                timeWindowStr = event.getValue("time_window").getAsString();
+                            }
                             String trackMessages = event.getValue("message_count_tracking").getAsString();
                             boolean trackMessagesBool = trackMessages.matches("(?i)^(yes|y|true|t)$");
 
@@ -260,7 +264,8 @@ public class RoleEventConfigListener extends ListenerAdapter {
 
                             // Preserve existing conditions and add/update message_threshold
                             JSONObject jsonObj = parseExistingConditions(data.triggerData);
-                            jsonObj.put("threshold", count);
+                            jsonObj.put("message_threshold", count);
+                            jsonObj.put("time_window", parseDuration(timeWindowStr));
                             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
                         } catch (NumberFormatException e) { success = false; }
 
@@ -331,16 +336,18 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 } else if (data.eventType.equals("MESSAGE_THRESHOLD")) {
                     String defaultMsgThreshold = "100";
                     Modal modal = Modal.create("modal_event_data_" + eventId, "Message Threshold")
-                                    .addComponents(Label.of("input_field",
+                                    .addComponents(Label.of("Number of Messages",
                                             TextInput.create("input_field", TextInputStyle.SHORT)
                                                     .setPlaceholder("e.g. " + defaultMsgThreshold)
-                                                    .setValue(data.triggerData != null && !data.triggerData.isEmpty() ? data.triggerData : defaultMsgThreshold)
                                                     .setRequired(true)
                                                     .build()),
-                                            Label.of("message_count_tracking", TextInput.create("input_field", TextInputStyle.SHORT)
+                                            Label.of("Activate Message tracking?", TextInput.create("message_count_tracking", TextInputStyle.SHORT)
                                                     .setPlaceholder("Activate Message count tracking? " + "true/false/y/n")
-                                                    .setValue("true")
                                                     .setRequired(true)
+                                                    .build()),
+                                            Label.of("Time Window", TextInput.create("time_window", TextInputStyle.SHORT)
+                                                    .setPlaceholder("Considering the last (e.g. 1d, 30m, 0), Default 1d")
+                                                    .setRequired(false)
                                                     .build())).build();
                     event.replyModal(modal).queue();
 
@@ -410,11 +417,14 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 }
                 
                 // Show threshold
-                if (jsonObj.has("threshold")) {
-                    int threshold = jsonObj.getInt("threshold");
+                if (jsonObj.has("warn_threshold")) {
+                    int threshold = jsonObj.getInt("warn_threshold");
                     conditionBuilder.append("**Warn Threshold:** ").append(threshold).append("\n");
+                } else if (jsonObj.has("message_threshold")) {
+                    int threshold = jsonObj.getInt("message_threshold");
+                    conditionBuilder.append("**Message Threshold:** ").append(threshold).append("\n");
                 }
-                
+
             } catch (Exception e) {
                 conditionBuilder.append("`").append(data.triggerData).append("`");
             }
@@ -425,6 +435,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
             conditionText = "⚠️ None (Fires on ANY role!)";
         }
         embed.addField("4. Conditions", conditionText, false);
+        embed.addField("5. Apply role instantly", data.instant + "", false);
         embed.setFooter("Event-ID: " + data.id);
 
         // COMPONENTS
@@ -458,6 +469,8 @@ public class RoleEventConfigListener extends ListenerAdapter {
             rows.add(ActionRow.of(requiredRoleMenu));
         }
 
+        Button applyInstantlyBtn = Button.primary("event_apply_instantly_" + data.id, "Apply Role instantly.");
+
         Button toggleBtn = data.active
                 ? Button.secondary("event_toggle_" + data.id, "Disable")
                 : Button.success("event_toggle_" + data.id, "Enable");
@@ -467,9 +480,9 @@ public class RoleEventConfigListener extends ListenerAdapter {
         boolean hasConditions = data.triggerData != null && !data.triggerData.isEmpty() && !data.triggerData.equals("{}");
         if (hasConditions) {
             Button clearConditionsBtn = Button.secondary("event_clear_conditions_" + data.id, "Clear Conditions");
-            rows.add(ActionRow.of(toggleBtn, clearConditionsBtn, deleteBtn));
+            rows.add(ActionRow.of(applyInstantlyBtn, toggleBtn, clearConditionsBtn, deleteBtn));
         } else {
-            rows.add(ActionRow.of(toggleBtn, deleteBtn));
+            rows.add(ActionRow.of(applyInstantlyBtn, toggleBtn, deleteBtn));
         }
 
         if (event instanceof IMessageEditCallback) {
@@ -497,7 +510,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
 
         if (allEvents.isEmpty()) {
-            event.reply("No events found. (/event create)").setEphemeral(true).queue();
+            event.reply("No events found. (/role-event create)").setEphemeral(true).queue();
             return;
         }
 

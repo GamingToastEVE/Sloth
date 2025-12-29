@@ -77,6 +77,12 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                 JSONObject config = new JSONObject(configData);
                 if (config.has("message_threshold")) {
                     guild.getMembers().forEach(member -> {
+                        List<DatabaseHandler.ActiveTimerData> activeTimers = handler.getActiveTimersForUser(guild.getId(), member.getId());
+                        boolean hasActiveTimer = activeTimers.stream().anyMatch(timer ->
+                                timer.sourceEventId == configData.id);
+                        if (hasActiveTimer) {
+                            return; // Timer bereits aktiv, überspringen
+                        }
                         processTrigger(guild, member, RoleEventType.MESSAGE_THRESHOLD, "");
                     });
 
@@ -131,6 +137,15 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                     }
                 });
             } else {
+                if (eventConfig.instant) {
+                    if ("REMOVE".equalsIgnoreCase(eventConfig.actionType)) {
+                        guild.removeRoleFromMember(member, targetRole)
+                                .reason("Auto-Trigger (Instant): " + eventConfig.name).queue();
+                    } else {
+                        guild.addRoleToMember(member, targetRole)
+                                .reason("Auto-Trigger (Instant): " + eventConfig.name).queue();
+                    }
+                }
                 List<DatabaseHandler.ActiveTimerData> activeTimers = handler.getActiveTimersForUser(guildId, member.getId());
                 if (eventConfig.stackType.equalsIgnoreCase("EXTEND")) {
                     for (DatabaseHandler.ActiveTimerData timer : activeTimers) {
@@ -212,7 +227,7 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                 int threshold = jsonObj.getInt("messages_sent_threshold");
                 String date = handler.getCurrentDate();
                 LocalDateTime dateTime = LocalDateTime.parse(date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                if (jsonObj.has("messages_sent_threshold_seconds")) {
+                if (jsonObj.has("time_window")) {
                     long seconds  = jsonObj.getLong("messages_sent_threshold_seconds");
                     dateTime = dateTime.minusSeconds(seconds);
                 }
