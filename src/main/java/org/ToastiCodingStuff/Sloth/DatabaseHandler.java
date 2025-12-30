@@ -4045,6 +4045,23 @@ public class DatabaseHandler {
         return null;
     }
 
+    public void updateRoleEventInstantApply(String guildId, int eventId, boolean b) {
+        String query = "UPDATE role_events SET instant_apply = ? WHERE id = ? AND guild_id = ?";
+
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+
+            stmt.setInt(1, b ? 1 : 0);
+            stmt.setInt(2, eventId);
+            stmt.setString(3, guildId);
+
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            System.err.println("Error updating instant apply for role event: " + e.getMessage());
+        }
+    }
+
     /**
      * Holt alle aktiven Events eines bestimmten Typs für eine Guild.
      */

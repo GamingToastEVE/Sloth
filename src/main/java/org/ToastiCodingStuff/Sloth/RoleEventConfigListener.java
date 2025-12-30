@@ -210,6 +210,14 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 sendEventDashboard(event, handler.getRoleEvent(eventId));
             }
         }
+        else if (id.startsWith("event_apply_instantly_")) {
+            int eventId = Integer.parseInt(id.replace("event_apply_instantly_", ""));
+            DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
+            if (data != null) {
+                handler.updateRoleEventInstantApply(guildId, eventId, !data.instant);
+                sendEventDashboard(event, handler.getRoleEvent(eventId));
+            }
+        }
     }
 
     // --- MODALS ---
@@ -469,7 +477,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
             rows.add(ActionRow.of(requiredRoleMenu));
         }
 
-        Button applyInstantlyBtn = Button.primary("event_apply_instantly_" + data.id, "Apply Role instantly.");
+        Button applyInstantlyBtn = data.instant ? Button.success("event_apply_instantly_" + data.id, "Disable Instant Apply") : Button.secondary("event_apply_instantly_" + data.id, "Enable Instant Apply");
 
         Button toggleBtn = data.active
                 ? Button.secondary("event_toggle_" + data.id, "Disable")
