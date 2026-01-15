@@ -296,7 +296,7 @@ public class TicketCommandListener extends ListenerAdapter {
                         // Send audit log entry for ticket creation
                         handler.sendAuditLogEntry(event.getGuild(), "TICKET_CREATED", 
                                 "Ticket #" + ticketId + " - " + subject, 
-                                event.getUser().getEffectiveName(), "Priority: " + priority);
+                                event.getMember(), null, "Priority: " + priority);
                         
                         // Send welcome message in ticket channel
                         EmbedBuilder welcomeEmbed = new EmbedBuilder()
@@ -354,7 +354,7 @@ public class TicketCommandListener extends ListenerAdapter {
             // Send audit log entry for ticket closure
             handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
                     "Ticket #" + ticketId, 
-                    event.getUser().getEffectiveName(), reason);
+                    event.getMember(), null, reason);
             
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")
@@ -403,7 +403,7 @@ public class TicketCommandListener extends ListenerAdapter {
             // Send audit log entry for ticket closure via button
             handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 
                     "Ticket #" + ticketId, 
-                    event.getUser().getEffectiveName(), "Closed via button");
+                    event.getMember(), null, "Closed via button");
             
             EmbedBuilder embed = new EmbedBuilder()
                     .setTitle("🔒 Ticket Closed")

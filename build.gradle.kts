@@ -8,7 +8,7 @@ application.mainClass = "org.ToastiCodingStuff.Sloth.Sloth"
 group = "org.ToastiCodingStuff"
 version = "1.0"
 
-val jdaVersion = "6.1.3" //
+val jdaVersion = "6.2.0" //
 
 repositories {
     mavenCentral()

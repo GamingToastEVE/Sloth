@@ -1,11 +1,13 @@
 package org.ToastiCodingStuff.Sloth;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -43,6 +45,7 @@ public class Sloth {
         api.addEventListener(new TimedRoleTriggerListener(handler, api));
         api.addEventListener(new EmbedEditorCommandListener(handler));
         api.addEventListener(new SystemsCommandListener(handler));
+        api.addEventListener(new ReminderCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -127,6 +130,47 @@ public class Sloth {
                 e.printStackTrace();
             }
         }, 0, 60*5, java.util.concurrent.TimeUnit.SECONDS);
+
+        java.util.concurrent.ScheduledExecutorService reminderScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        reminderScheduler.scheduleAtFixedRate(() -> {
+            try {
+                List<DatabaseHandler.ReminderData> dueReminders = handler.getDueReminders();
+
+                for (DatabaseHandler.ReminderData rem : dueReminders) {
+                    EmbedBuilder embed = new EmbedBuilder();
+                    embed.setTitle("⏰ Erinnerung");
+                    embed.setColor(0x3498db);
+                    embed.setFooter("This is a reminder you set earlier.");
+
+                    if (rem.dm) {
+                        // Per DM senden
+                        api.retrieveUserById(rem.userId).queue(user -> {
+                            user.openPrivateChannel().queue(channel -> {
+                                channel.sendMessageEmbeds(embed.build()).queue(null, error -> {
+                                    System.err.println("Konnte DM für Reminder nicht senden (User blocked?): " + rem.userId);
+                                });
+                            });
+                        }, error -> System.err.println("User für Reminder nicht gefunden: " + rem.userId));
+                    } else {
+                        // Im Server Channel senden
+                        if (rem.guildId != null && rem.channelId != null) {
+                            Guild g = api.getGuildById(rem.guildId);
+                            if (g != null) {
+                                TextChannel ch = g.getTextChannelById(rem.channelId);
+                                if (ch != null && ch.canTalk()) {
+                                    ch.sendMessageEmbeds(embed.build()).queue();
+                                }
+                            }
+                        }
+                    }
+                    // 2. Reminder aus DB löschen
+                    handler.deleteReminder(rem.id);
+                }
+            } catch (Exception e) {
+                System.err.println("Error in Reminder loop: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, 0, 60, TimeUnit.SECONDS);
     }
 
     /**

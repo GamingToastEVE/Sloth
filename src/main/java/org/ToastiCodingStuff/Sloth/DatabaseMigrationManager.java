@@ -139,6 +139,7 @@ public class DatabaseMigrationManager {
         schemas.put("custom_embeds", createCustomEmbedsSchema());
         schemas.put("role_events", createRoleEventsSchema());
         schemas.put("active_timers", createActiveTimersSchema());
+        schemas.put("reminders", createRemindersSchema());
 
         return schemas;
     }
@@ -192,7 +193,8 @@ public class DatabaseMigrationManager {
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("moderator_id", "INTEGER NOT NULL")
             .addColumn("reason", "TEXT NOT NULL")
-            .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
+            .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('NOTE', 'LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
+            .addColumn("evidence", "TEXT")
             .addColumn("active", "INTEGER DEFAULT 1")
             .addColumn("expires_at", "TEXT")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
@@ -420,6 +422,19 @@ public class DatabaseMigrationManager {
                 .addColumn("guild_id", "VARCHAR(32) NOT NULL")
                 .addColumn("name", "VARCHAR(100) NOT NULL")
                 .addColumn("data", "TEXT NOT NULL") // Speichert das komplette Embed als JSON
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    private TableSchema createRemindersSchema() {
+        return new TableSchema("reminders")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("guild_id", "VARCHAR(32)")
+                .addColumn("channel_id", "VARCHAR(32)")
+                .addColumn("title", "TEXT")
+                .addColumn("message", "TEXT NOT NULL")
+                .addColumn("dm", "TINYINT(1) DEFAULT 0")
+                .addColumn("remind_at", "DATETIME NOT NULL")
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 

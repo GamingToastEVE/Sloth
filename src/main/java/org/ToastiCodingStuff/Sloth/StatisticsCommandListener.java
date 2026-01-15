@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -23,7 +24,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
-        if (event.getAuthor().isBot()) { return; }
+        if (event.getAuthor().isBot() || event.getChannel() instanceof PrivateChannel) { return; }
         boolean needsMessages = handler.doesGuildTrackMessages(event.getGuild().getId());
         if (needsMessages) {
             handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());

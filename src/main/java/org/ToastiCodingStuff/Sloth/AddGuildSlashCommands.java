@@ -150,6 +150,18 @@ public class AddGuildSlashCommands {
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
+    private SlashCommandData getReminderCommand() {
+        return Commands.slash("reminder", "Manage your reminders")
+                .addSubcommands(
+                        new SubcommandData("set", "Create a new reminder")
+                                .addOption(OptionType.STRING, "time", "Time until i remind you (10m, 1h, 2d)", true)
+                                .addOption(OptionType.STRING, "title", "Title of the reminder", true)
+                                .addOption(OptionType.STRING, "message", "What should I remind you of?", false)
+                                .addOption(OptionType.BOOLEAN, "dm", "DM? Standard: YES", false),
+                        new SubcommandData("list", "Shows all active reminders")
+                );
+    }
+
     /**
      * Get warn command with subcommands
      */
@@ -161,17 +173,20 @@ public class AddGuildSlashCommands {
                         new SubcommandData("user", "Issue a warning to a user")
                                 .addOption(OptionType.USER, "user", "User to warn", true)
                                 .addOption(OptionType.STRING, "reason", "Reason for the warning", true)
+                                .addOption(OptionType.ATTACHMENT, "evidence", "Evidence attachment (optional)", false)
                                 .addOption(OptionType.STRING, "severity", "Severity level (LOW, MEDIUM, HIGH, SEVERE)", false),
-                        // NEUER SUBCOMMAND HIER:
                         new SubcommandData("list", "List and manage active warnings of a user")
                                 .addOption(OptionType.USER, "user", "The user to check", true),
 
                         new SubcommandData("settings-set", "Configure warning system settings")
-                                // ... deine existierenden Optionen ...
                                 .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
                                 .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
                                 .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
-                        new SubcommandData("settings-get", "View current warning system settings")
+                        new SubcommandData("settings-get", "View current warning system settings")/*,
+                        new SubcommandData("note", "Track a user without issuing a warning")
+                                .addOption(OptionType.USER, "user", "User to note", true)
+                                .addOption(OptionType.STRING, "note", "Note content", true)
+                                .addOption(OptionType.ATTACHMENT, "evidence", "Evidence attachment (optional)", false)*/
                 )
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
@@ -324,6 +339,7 @@ public class AddGuildSlashCommands {
             case "temprole": cmds.addAll(getTimedRoleCommands()); break;
             case "role-event": cmds.addAll(getRoleEventCommands()); break;
             case "embed": cmds.add(getEmbedEditorCommand()); break;
+            case "reminders": cmds.add(getReminderCommand()); break;
         }
         return cmds;
     }
@@ -333,17 +349,26 @@ public class AddGuildSlashCommands {
      * This replaces all guild-specific commands with the current active set.
      */
     public void updateGuildCommandsFromActiveSystems(String guildId) {
+        Guild guild;
         if (guildId.isBlank() || databaseHandler == null) {
+            guild = this.guild;
             if (guild == null || databaseHandler == null) return;
             return;
+        } else {
+            guild = this.guild.getJDA().getGuildById(guildId);
+            if (guild == null) {
+                System.err.println("Cannot update guild commands - guild not found: " + guildId);
+                return;
+            }
         }
-        Guild guild = this.guild.getJDA().getGuildById(guildId);
+
 
         java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
         List<SlashCommandData> activeCommands = new ArrayList<>();
 
         for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
             if (entry.getValue()) { // If system is active
+                System.out.println("Adding commands for active system: " + entry.getKey());
                 activeCommands.addAll(getCommandsForSystem(entry.getKey()));
             }
         }
@@ -353,14 +378,6 @@ public class AddGuildSlashCommands {
                 error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
         );
     }
-
-// Und in getAllCommands() hinzufügen:
-// allCommands.addAll(getRoleEventCommands()
-
-// NICHT VERGESSEN:
-// In der Methode getAllCommands() diese Zeile hinzufügen:
-// allCommands.addAll(getTimedRoleCommands());
-
 
     /**
      * Get statistics command with subcommands

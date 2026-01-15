@@ -7,9 +7,11 @@ import java.util.stream.Collectors;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
 
@@ -159,12 +161,12 @@ public class DatabaseHandler {
     public DatabaseHandler() {
         HikariDataSource ds = null;
         try {
-            // Configure HikariCP connection pool
-            String host = System.getenv().getOrDefault("DB_HOST", "localhost");
-            String port = System.getenv().getOrDefault("DB_PORT", "3306");
-            String database = System.getenv().getOrDefault("DB_NAME", "sloth");
-            String user = System.getenv().getOrDefault("DB_USER", "root");
-            String password = System.getenv().getOrDefault("DB_PASSWORD", "admin");
+            Dotenv dotenv = Dotenv.load();
+            String host = dotenv.get("DB_HOST", "localhost");
+            String port = dotenv.get("DB_PORT", "3306");
+            String database = dotenv.get("DB_NAME", "sloth");
+            String user = dotenv.get("DB_USER", "root");
+            String password = dotenv.get("DB_PASSWORD", "admin");
             
             String url = String.format("jdbc:mariadb://%s:%s/%s", host, port, database);
             System.out.println("Configuring HikariCP connection pool for MariaDB: " + url);
@@ -1139,12 +1141,18 @@ public class DatabaseHandler {
         public final String reason;
         public final String moderatorId;
         public final String date;
+        public final String severity;
+        public final String evidence;
+        public final String expiresAt;
 
-        public WarningData(int id, String reason, String moderatorId, String date) {
+        public WarningData(int id, String reason, String moderatorId, String date, String severity, String evidence, String expiresAt) {
             this.id = id;
             this.reason = reason;
             this.moderatorId = moderatorId;
             this.date = date;
+            this.severity = severity;
+            this.evidence = evidence;
+            this.expiresAt = expiresAt;
         }
     }
 
@@ -1152,7 +1160,7 @@ public class DatabaseHandler {
     public List<WarningData> getUserActiveWarnings(String guildId, String userId) {
         List<WarningData> warnings = new ArrayList<>();
         // Wir holen nur aktive Warns
-        String query = "SELECT id, reason, moderator_id, created_at FROM warnings WHERE guild_id = ? AND user_id = ? AND (active = 1 OR active IS NULL) ORDER BY created_at ASC LIMIT 25";
+        String query = "SELECT id, reason, moderator_id, created_at, severity, evidence, expires_at FROM warnings WHERE guild_id = ? AND user_id = ? AND (active = 1 OR active IS NULL) ORDER BY created_at ASC LIMIT 25";
 
         try (Connection connection = getConnection();
              PreparedStatement stmt = connection.prepareStatement(query)) {
@@ -1166,8 +1174,10 @@ public class DatabaseHandler {
                             rs.getInt("id"),
                             rs.getString("reason"),
                             rs.getString("moderator_id"),
-                            rs.getString("created_at")
-                    ));
+                            rs.getString("created_at"),
+                            rs.getString("severity"),
+                            rs.getString("evidence"),
+                            rs.getString("expires_at")));
                 }
             }
         } catch (SQLException e) {
@@ -1328,10 +1338,10 @@ public class DatabaseHandler {
         }
     }
 
-    public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt) {
+    public int insertWarning(String guildId, String userId, String moderatorId, String reason, String severity, String expiresAt, String evidence) {
         try (Connection connection = getConnection()) {
-            String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, active, expires_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String insertWarning = "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, severity, active, expires_at, created_at, evidence) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)";
             PreparedStatement stmt = connection.prepareStatement(insertWarning, Statement.RETURN_GENERATED_KEYS);
             stmt.setString(1, guildId);
             stmt.setString(2, userId);
@@ -1340,6 +1350,7 @@ public class DatabaseHandler {
             stmt.setString(5, severity);
             stmt.setInt(6, 1);
             stmt.setString(7, expiresAt);
+            stmt.setString(8, evidence);
             
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected > 0) {
@@ -2954,7 +2965,7 @@ public class DatabaseHandler {
      * @param moderatorName The name of the moderator who performed the action
      * @param reason The reason for the action
      */
-    public void sendAuditLogEntry(Guild guild, String actionType, String targetName, String moderatorName, String reason) {
+    public void sendAuditLogEntry(Guild guild, String actionType, String targetName, Member targetMember, Member moderatorName, String reason) {
         String guildId = guild.getId();
         
         if (hasLogChannel(guildId)) {
@@ -2987,12 +2998,28 @@ public class DatabaseHandler {
                     
                     EmbedBuilder embed = new EmbedBuilder()
                             .setTitle(emoji + " " + actionType)
-                            .setDescription(emoji + " " + targetName)
-                            .addField("Moderator", moderatorName, true)
+                            .setDescription(emoji + " " + (!Objects.equals(targetName, "") ? targetName : targetMember.getEffectiveName()))
+                            .addField("Moderator", moderatorName.getAsMention(), true)
                             .addField("Reason", reason, true)
                             .setColor(embedColor)
                             .setTimestamp(java.time.Instant.now());
-                    
+
+                    if (actionType.equals("WARN")) {
+                        List<DatabaseHandler.WarningData> warningDataList = getUserActiveWarnings(guildId, targetMember.getId());
+                        DatabaseHandler.WarningData warningData = warningDataList.get(warningDataList.size() - 1);
+                        if (warningData != null) {
+                            if (warningData.evidence != null && !warningData.evidence.isEmpty()) {
+                                embed.addField("Evidence", "", false);
+                                embed.setImage(warningData.evidence);
+                            } else {
+                                embed.addField("Evidence", "No evidence provided for this warning.", false);
+                            }
+                        } else {
+                            embed.addField("Evidence", "No evidence found for this warning.", false);
+                        }
+                        embed.setFooter("Use /warnings list {user} to view all user warnings.");
+                    }
+
                     logChannel.sendMessageEmbeds(embed.build()).queue();
                 }
             }
@@ -4162,7 +4189,7 @@ public class DatabaseHandler {
     private static final String[] ALL_SYSTEMS = {
             "log-channel", "warn", "ticket", "mod", "stats",
             "verify-button", "select-roles", "temprole", "role-event",
-            "embed"
+            "embed", "reminders"
     };
 
     /**
@@ -4413,5 +4440,142 @@ public class DatabaseHandler {
             System.err.println("Error deleting user data for user " + userId + ": " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public static class ReminderData {
+        public final int id;
+        public final String userId;
+        public final String guildId;
+        public final String channelId;
+        public final String title;
+        public final String message;
+        public final boolean dm;
+        public final Timestamp remindAt;
+
+        public ReminderData(int id, String userId, String guildId, String channelId, String title, String message, boolean dm, Timestamp remindAt) {
+            this.id = id;
+            this.userId = userId;
+            this.guildId = guildId;
+            this.channelId = channelId;
+            this.title = title;
+            this.message = message;
+            this.dm = dm;
+            this.remindAt = remindAt;
+        }
+    }
+
+    public void addReminder(String userId, String guildId, String channelId, String title, String message, boolean dm, Timestamp remindAt) {
+        String query = "INSERT INTO reminders (user_id, guild_id, channel_id, title, message, dm, remind_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, userId);
+            stmt.setString(2, guildId);
+            stmt.setString(3, channelId);
+            stmt.setString(4, title);
+            stmt.setString(5, message);
+            stmt.setInt(6, dm ? 1 : 0);
+            stmt.setTimestamp(7, remindAt);
+            stmt.executeUpdate();
+            System.out.println("Reminder added for user " + userId);
+        } catch (SQLException e) {
+            System.err.println("Error adding reminder: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public List<ReminderData> getUserReminders(String userId) {
+        List<ReminderData> list = new ArrayList<>();
+        String query = "SELECT * FROM reminders WHERE user_id = ? ORDER BY remind_at ASC";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                list.add(new ReminderData(
+                        rs.getInt("id"),
+                        rs.getString("user_id"),
+                        rs.getString("guild_id"),
+                        rs.getString("channel_id"),
+                        rs.getString("title"),
+                        rs.getString("message"),
+                        rs.getInt("dm") == 1,
+                        rs.getTimestamp("remind_at")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public List<ReminderData> getDueReminders() {
+        List<ReminderData> list = new ArrayList<>();
+        String query = "SELECT * FROM reminders WHERE remind_at <= CURRENT_TIMESTAMP";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                list.add(new ReminderData(
+                        rs.getInt("id"),
+                        rs.getString("user_id"),
+                        rs.getString("guild_id"),
+                        rs.getString("channel_id"),
+                        rs.getString("title"),
+                        rs.getString("message"),
+                        rs.getInt("dm") == 1,
+                        rs.getTimestamp("remind_at")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public boolean deleteReminder(int id) {
+        String query = "DELETE FROM reminders WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean deleteReminder(int id, String userId) {
+        String query = "DELETE FROM reminders WHERE id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, id);
+            stmt.setString(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public ReminderData getReminder(int id) {
+        String query = "SELECT * FROM reminders WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new ReminderData(
+                        rs.getInt("id"),
+                        rs.getString("user_id"),
+                        rs.getString("guild_id"),
+                        rs.getString("channel_id"),
+                        rs.getString("title"),
+                        rs.getString("message"),
+                        rs.getInt("dm") == 1,
+                        rs.getTimestamp("remind_at")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

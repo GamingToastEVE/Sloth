@@ -22,7 +22,6 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.modals.Modal;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.w3c.dom.Text;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -156,7 +155,6 @@ public class RoleEventConfigListener extends ListenerAdapter {
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
         String id = event.getComponentId();
-        String guildId = event.getGuild().getId();
 
         if (id.equals("event_select_edit")) {
             int eventId = Integer.parseInt(event.getValues().get(0));
@@ -169,6 +167,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
             handleDashboardAction(event, eventId, action);
         }
         else if (id.startsWith("event_trigger_type_select_")) {
+            String guildId = event.getGuild().getId();
             int eventId = Integer.parseInt(id.replace("event_trigger_type_select_", ""));
             String newType = event.getValues().get(0);
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
@@ -185,9 +184,9 @@ public class RoleEventConfigListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String id = event.getComponentId();
-        String guildId = event.getGuild().getId();
 
         if (id.startsWith("event_toggle_")) {
+            String guildId = event.getGuild().getId();
             int eventId = Integer.parseInt(id.replace("event_toggle_", ""));
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data != null) {
@@ -196,12 +195,14 @@ public class RoleEventConfigListener extends ListenerAdapter {
             }
         }
         else if (id.startsWith("event_delete_")) {
+            String guildId = event.getGuild().getId();
             int eventId = Integer.parseInt(id.replace("event_delete_", ""));
             handler.deleteRoleEvent(guildId, eventId);
             event.reply("🗑️ Event deleted.").setEphemeral(true).queue();
             event.getMessage().delete().queue();
         }
         else if (id.startsWith("event_clear_conditions_")) {
+            String guildId = event.getGuild().getId();
             int eventId = Integer.parseInt(id.replace("event_clear_conditions_", ""));
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data != null) {
@@ -211,6 +212,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
             }
         }
         else if (id.startsWith("event_apply_instantly_")) {
+            String guildId = event.getGuild().getId();
             int eventId = Integer.parseInt(id.replace("event_apply_instantly_", ""));
             DatabaseHandler.RoleEventData data = handler.getRoleEvent(eventId);
             if (data != null) {

@@ -3,16 +3,17 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent; // Wichtig!
-import net.dv8tion.jda.api.hooks.ListenerAdapter; // Wichtig!
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import org.json.JSONObject;
 
-import javax.xml.crypto.Data;
 import java.awt.Color;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -75,7 +76,7 @@ public class WarnCommandListener extends ListenerAdapter {
 
     // --- NEUE HELPER METHODE: Embed & Menü bauen ---
     // Ausgelagert, damit wir sie auch nach dem Löschen eines Warns aufrufen können (Refresh)
-    private void sendWarnListEmbed(net.dv8tion.jda.api.interactions.callbacks.IReplyCallback event, String guildId, User targetUser) {
+    private void sendWarnListEmbed(IReplyCallback event, String guildId, User targetUser) {
         List<DatabaseHandler.WarningData> warnings = handler.getUserActiveWarnings(guildId, targetUser.getId());
 
         EmbedBuilder embed = new EmbedBuilder();
@@ -88,7 +89,7 @@ public class WarnCommandListener extends ListenerAdapter {
             embed.setColor(Color.GREEN);
             // Wenn keine Warns da sind, senden wir nur das Embed ohne Menü
             if (event instanceof SlashCommandInteractionEvent) {
-                event.replyEmbeds(embed.build()).setEphemeral(true).queue();
+                event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(true).queue();
             } else if (event instanceof StringSelectInteractionEvent) {
                 // Wenn wir aus dem Dropdown kommen (letzter Warn gelöscht), updaten wir die Nachricht
                 ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build()).setComponents().queue();
@@ -98,7 +99,7 @@ public class WarnCommandListener extends ListenerAdapter {
 
         // Dropdown Menü erstellen
         StringSelectMenu.Builder menuBuilder = StringSelectMenu.create("warn_delete_menu:" + targetUser.getId())
-                .setPlaceholder("🗑️ Select a warning to delete it")
+                .setPlaceholder("🗑️ Select a warning to view details.")
                 .setMinValues(1)
                 .setMaxValues(1);
 
@@ -115,8 +116,6 @@ public class WarnCommandListener extends ListenerAdapter {
                     .append("Reason: `").append(warn.reason).append("`\n")
                     .append("Mod: <@").append(warn.moderatorId).append(">\n\n");
 
-            // Option für Dropdown
-            // Label darf max 100 Zeichen haben
             String label = "ID " + warn.id + ": " + warn.reason;
             if (label.length() > 100) label = label.substring(0, 97) + "...";
 
@@ -125,19 +124,68 @@ public class WarnCommandListener extends ListenerAdapter {
         }
 
         embed.setDescription(desc.toString());
-        embed.setFooter("Select a warning below to remove it.");
+        embed.setFooter("Select a warning below to remove it or view details.");
 
         // Antwort senden
         if (event instanceof SlashCommandInteractionEvent) {
-            event.replyEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menuBuilder.build()))
-                    .setEphemeral(true)
-                    .queue();
+            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
         } else if (event instanceof StringSelectInteractionEvent) {
-            // Nachricht editieren (Refresh nach Löschung)
-            ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menuBuilder.build()))
-                    .queue();
+            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
+        } else {
+            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
+        }
+    }
+
+    @Override
+    public void onButtonInteraction(net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent event) {
+        String componentId = event.getComponentId();
+
+        // Warn Lösch Bestätigung
+        if (componentId.startsWith("warn_delete_confirm:")) {
+            if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
+                event.reply("❌ No permission.").setEphemeral(true).queue();
+                return;
+            }
+
+            String warnIdStr = componentId.split(":")[1];
+            try {
+                int warnId = Integer.parseInt(warnIdStr);
+                boolean success = handler.deactivateWarning(warnId, event.getGuild().getId());
+                if (success) {
+                    event.reply("✅ Warning deleted successfully.").setEphemeral(true).queue();
+
+                    // Nach dem Löschen die Warnliste neu senden (Refresh)
+                    String guildId = event.getGuild().getId();
+                    String targetUserId = componentId.split(":")[2];
+                    if (targetUserId != null) {
+                        User targetUser = event.getJDA().getUserById(targetUserId);
+                        if (targetUser != null) {
+                            event.getMessage().delete().queue();
+                            sendWarnListEmbed(event, guildId, targetUser);
+                        }
+                    }
+                } else {
+                    event.getMessage().delete().queue();
+                    event.reply("❌ Failed to delete warning. It may not exist.").setEphemeral(true).queue();
+                }
+            } catch (NumberFormatException e) {
+                event.getMessage().delete().queue();
+                event.reply("❌ Invalid warning ID.").setEphemeral(true).queue();
+            }
+        }
+
+        // Zurück zur Warnliste
+        else if (componentId.startsWith("warn_delete_back:")) {
+            String targetUserId = componentId.split(":")[1];
+            System.out.println("DEBUG: Back button pressed for user ID " + targetUserId);
+            User targetUser = event.getJDA().retrieveUserById(targetUserId).complete();
+            System.out.println("DEBUG: Retrieved user: " + targetUser);
+            if (targetUser != null) {
+                String guildId = event.getGuild().getId();
+                sendWarnListEmbed(event, guildId, targetUser);
+            } else {
+                event.reply("❌ User not found.").setEphemeral(true).queue();
+            }
         }
     }
 
@@ -163,26 +211,46 @@ public class WarnCommandListener extends ListenerAdapter {
 
         try {
             int warnId = Integer.parseInt(selectedWarnIdStr);
-            boolean success = handler.deactivateWarning(warnId, guildId);
+            List<DatabaseHandler.WarningData> warnings = handler.getUserActiveWarnings(guildId, targetUserId);
 
-            if (success) {
-                // Wir holen den User (für den Namen im Refresh)
-                event.getJDA().retrieveUserById(targetUserId).queue(
-                        targetUser -> {
-                            // Embed aktualisieren (Warns neu laden)
-                            sendWarnListEmbed(event, guildId, targetUser);
-
-                            // Kleines Follow-up Feedback
-                            event.getHook().sendMessage("✅ Warning ID " + warnId + " removed.")
-                                    .setEphemeral(true).queue();
-
-                            // Stats updaten (optional, wenn du 'deleted warnings' tracken willst)
-                        },
-                        error -> event.reply("User not found via API, but warning removed.").setEphemeral(true).queue()
-                );
-            } else {
-                event.reply("❌ Failed to remove warning. It might be already deleted.").setEphemeral(true).queue();
+            int i = 0;
+            for (DatabaseHandler.WarningData warns : warnings) {
+                i++;
+                if (warns.id == warnId) {
+                    EmbedBuilder embed = new EmbedBuilder();
+                    User targetUser = event.getJDA().getUserById(targetUserId);
+                    if (targetUser == null) {
+                        embed.setTitle("🗑️ Warning #" + i + " for " + targetUserId);
+                    } else {
+                        embed.setTitle("🗑️ Warning #" + i + " for " + targetUser.getName());
+                        embed.setThumbnail(targetUser.getAvatarUrl());
+                    }
+                    embed.setColor(Color.RED);
+                    embed.addField("Warning ID", String.valueOf(warns.id), false);
+                    embed.addField("Date Issued", warns.date, false);
+                    embed.addField("Reason", warns.reason, false);
+                    embed.addField("Severity", warns.severity, false);
+                    embed.addField("Issued by", "<@" + warns.moderatorId + ">", false);
+                    if (warns.expiresAt != null) {
+                        embed.addField("Expires At", warns.expiresAt, false);
+                    } else {
+                        embed.addField("Expires At", "Never", false);
+                    }
+                    if (warns.evidence != null) {
+                        embed.setImage(warns.evidence);
+                    }
+                    embed.setFooter("Use the buttons below to delete this warning or go back to the previous view.");
+                    Button deleteButton = Button.danger("warn_delete_confirm:" + warnId + ":" + targetUserId, "Delete Warning");
+                    Button backButton = Button.secondary("warn_delete_back:" + targetUserId, "Back to Warnings");
+                    event.getMessage().delete().queue();
+                    event.replyEmbeds(embed.build())
+                            .setComponents(ActionRow.of(backButton, deleteButton))
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
             }
+            event.reply("❌ Warning not found.").setEphemeral(true).queue();
 
         } catch (NumberFormatException e) {
             event.reply("❌ Invalid warning ID.").setEphemeral(true).queue();
@@ -193,38 +261,11 @@ public class WarnCommandListener extends ListenerAdapter {
         Member targetMember = event.getOption("user").getAsMember();
         String reason = event.getOption("reason").getAsString();
         String severity = event.getOption("severity") != null ? event.getOption("severity").getAsString() : "MEDIUM";
+        String evidence = event.getOption("evidence") != null ? event.getOption("evidence").getAsAttachment().getUrl() : null;
 
         if (targetMember == null) {
             event.reply("User not found in this server.").setEphemeral(true).queue();
             return;
-        }
-
-        List<DatabaseHandler.RoleEventData> data = handler.getRoleEventsByType(guildId, RoleEventType.WARN_THRESHOLD);
-
-        if (!data.isEmpty()) {
-            for (DatabaseHandler.RoleEventData eventData : data) {
-                int threshold;
-                JSONObject triggerDataJson = new JSONObject(eventData.triggerData);
-                try {
-                    threshold = Integer.parseInt(triggerDataJson.getString("threshold"));
-                } catch (NumberFormatException e) {
-                    continue; // Skip invalid entries
-                }
-
-                int activeWarnings = handler.getActiveWarningsCount(guildId, targetMember.getId());
-
-                if (activeWarnings + 1 == threshold) { // +1 because we are about to add a warning
-                    // Apply role
-                    Role role = event.getGuild().getRoleById(eventData.roleId);
-                    if (role != null) {
-                        long durationSeconds = eventData.durationSeconds;
-                        handler.addActiveTimer(event.getGuild().getId(), targetMember.getId(), role.getId(), eventData.id, durationSeconds);
-                        event.getGuild().addRoleToMember(targetMember, role)
-                            .reason("Warn Threshold reached: " + threshold)
-                            .queue();
-                    }
-                }
-            }
         }
 
         String userId = targetMember.getId();
@@ -250,8 +291,36 @@ public class WarnCommandListener extends ListenerAdapter {
             }
         }
 
+        List<DatabaseHandler.RoleEventData> data = handler.getRoleEventsByType(guildId, RoleEventType.WARN_THRESHOLD);
+
+        if (!data.isEmpty()) {
+            for (DatabaseHandler.RoleEventData eventData : data) {
+                int threshold;
+                JSONObject triggerDataJson = new JSONObject(eventData.triggerData);
+                try {
+                    threshold = Integer.parseInt(triggerDataJson.getString("threshold"));
+                } catch (NumberFormatException e) {
+                    continue; // Skip invalid entries
+                }
+
+                int activeWarnings = handler.getActiveWarningsCount(guildId, targetMember.getId());
+
+                if (activeWarnings + 1 == threshold) { // +1 because we are about to add a warning
+                    // Apply role
+                    Role role = event.getGuild().getRoleById(eventData.roleId);
+                    if (role != null) {
+                        long durationSeconds = eventData.durationSeconds;
+                        handler.addActiveTimer(event.getGuild().getId(), targetMember.getId(), role.getId(), eventData.id, durationSeconds);
+                        event.getGuild().addRoleToMember(targetMember, role)
+                                .reason("Warn Threshold reached: " + threshold)
+                                .queue();
+                    }
+                }
+            }
+        }
+
         // Use new insertWarning method instead of legacy approach
-        int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt);
+        int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt, evidence);
 
         if (warningId > 0) {
             // Check if user has reached max warnings and apply timeout if needed
@@ -312,8 +381,8 @@ public class WarnCommandListener extends ListenerAdapter {
             handler.incrementUserWarningsIssued(guildId, moderatorId);
 
             // Send audit log entry to log channel
-            handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(),
-                    event.getMember().getEffectiveName(), reason);
+            handler.sendAuditLogEntry(event.getGuild(), "WARN", "", targetMember,
+                    event.getMember(), reason);
         } else {
             event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
         }

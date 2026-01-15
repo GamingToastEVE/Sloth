@@ -101,7 +101,7 @@ public class SystemsCommandListener extends ListenerAdapter {
         String[] order = {
                 "log-channel", "warn", "ticket", "mod", "stats",
                 "verify-button", "select-roles", "temprole", "role-event",
-                "embed"
+                "embed", "reminders"
         };
 
         for (String sys : order) {
@@ -142,6 +142,7 @@ public class SystemsCommandListener extends ListenerAdapter {
             case "temprole": return "Temp Roles";
             case "role-event": return "Role Events";
             case "embed": return "Embed Creation";
+            case "reminders": return "Reminders";
             default: return key;
         }
     }
