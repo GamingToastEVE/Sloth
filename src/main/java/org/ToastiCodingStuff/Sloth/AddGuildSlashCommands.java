@@ -16,11 +16,6 @@ public class AddGuildSlashCommands {
     private final Guild guild;
     private final DatabaseHandler databaseHandler;
 
-    public AddGuildSlashCommands(Guild guild) {
-        this.guild = guild;
-        this.databaseHandler = null; // For backwards compatibility
-    }
-
     public AddGuildSlashCommands(Guild guild, DatabaseHandler databaseHandler) {
         this.guild = guild;
         this.databaseHandler = databaseHandler;
@@ -45,26 +40,6 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getRoleEventCommands());
         allCommands.add(getEmbedEditorCommand());
         return allCommands;
-    }
-
-    /**
-     * Update guild commands for all systems
-     * This method adds commands from all systems to the guild
-     * @deprecated Commands are now registered globally. This method is kept for compatibility.
-     */
-    @Deprecated
-    public void updateAllGuildCommands() {
-        if (guild == null) {
-            System.out.println("Warning: Cannot update guild commands - guild is null. Commands should be registered globally.");
-            return;
-        }
-
-        List<SlashCommandData> allCommands = getAllCommands();
-
-        // Upsert guild commands to avoid replacing existing commands
-        for (SlashCommandData command : allCommands) {
-            guild.upsertCommand(command).queue();
-        }
     }
 
     /**
@@ -352,8 +327,10 @@ public class AddGuildSlashCommands {
         Guild guild;
         if (guildId.isBlank() || databaseHandler == null) {
             guild = this.guild;
-            if (guild == null || databaseHandler == null) return;
-            return;
+            if (guild == null || databaseHandler == null) {
+                System.out.println("No guild or databasehandler found.");
+                return;
+            }
         } else {
             guild = this.guild.getJDA().getGuildById(guildId);
             if (guild == null) {
@@ -394,26 +371,5 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.USER, "user", "User to view information for", true)
                                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false)
                 ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
-    }
-
-    // The old methods are kept for backwards compatibility but now use the new approach
-    public void addLogChannelCommands () {
-        updateAllGuildCommands();
-    }
-
-    public void addWarnCommands() {
-        updateAllGuildCommands();
-    }
-
-    public void addModerationCommands() {
-        updateAllGuildCommands();
-    }
-
-    public void addTicketCommands() {
-        updateAllGuildCommands();
-    }
-
-    public void addStatisticsCommands() {
-        updateAllGuildCommands();
     }
 }

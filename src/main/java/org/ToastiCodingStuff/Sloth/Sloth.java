@@ -138,7 +138,7 @@ public class Sloth {
 
                 for (DatabaseHandler.ReminderData rem : dueReminders) {
                     EmbedBuilder embed = new EmbedBuilder();
-                    embed.setTitle("⏰ Erinnerung");
+                    embed.setTitle("⏰ Reminder");
                     embed.setColor(0x3498db);
                     embed.setFooter("This is a reminder you set earlier.");
 

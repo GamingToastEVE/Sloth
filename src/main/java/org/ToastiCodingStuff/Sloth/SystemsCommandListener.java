@@ -61,6 +61,8 @@ public class SystemsCommandListener extends ListenerAdapter {
 
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
 
+        System.out.println("New State: " + newState);
+
         AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
         cmdUpdater.updateGuildCommandsFromActiveSystems("");
 
@@ -75,7 +77,7 @@ public class SystemsCommandListener extends ListenerAdapter {
         embed.setTitle("⚙️ System Configuration");
         embed.setDescription("Click the buttons below to enable or disable specific bot systems for this server.\n" +
                 "\n**Note:** Disabling a system will remove its slash commands from the server. \nData will remain intact.\n\n" +
-                "**It might take a few seconds for changes to take effect.**");
+                "**It might take a while for changes to take effect. Refreshing discord can help.**");
         embed.setColor(Color.decode("#2b2d31"));
         embed.setFooter("Sloth Bot Systems Management");
 
