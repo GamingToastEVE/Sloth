@@ -44,6 +44,7 @@ public class AddGuildSlashCommands {
         allCommands.add(getSelectRolesCommand());
         allCommands.addAll(getTimedRoleCommands());
         allCommands.addAll(getRoleEventCommands());
+        allCommands.add(getSettingsCommand());
         return allCommands;
     }
 
@@ -307,5 +308,17 @@ public class AddGuildSlashCommands {
         updateAllGuildCommands();
     }
 
+    /**
+     * Get settings command with subcommands
+     */
+    private SlashCommandData getSettingsCommand() {
+        return Commands.slash("settings", "Configure bot settings for this server")
+                .addSubcommands(
+                        new SubcommandData("language", "Set the bot language for this server")
+                                .addOptions(new OptionData(OptionType.STRING, "language", "Language to use", true)
+                                        .addChoice("English", "en")
+                                        .addChoice("Deutsch (German)", "de"))
+                );
+    }
 
 }

@@ -21,6 +21,10 @@ public class ModerationCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    private String getLang(String guildId) {
+        return handler.getGuildLanguage(guildId);
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("mod")) {
@@ -74,36 +78,38 @@ public class ModerationCommandListener extends ListenerAdapter {
     }
 
     private void handleKickCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has kick permissions
         if (!event.getMember().hasPermission(Permission.KICK_MEMBERS)) {
-            event.reply("❌ You do not have permission to kick members.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.kick.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         if (event.getOption("user") == null) {
-            event.reply("❌ Please specify a user to kick.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.kick.specify_user")).setEphemeral(true).queue();
             return;
         }
 
         Member targetMember = event.getOption("user").getAsMember();
         if (targetMember == null) {
-            event.reply("❌ User not found in this server.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "general.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Check if the target can be kicked
         if (!event.getGuild().getSelfMember().canInteract(targetMember)) {
-            event.reply("❌ I cannot kick this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.kick.hierarchy_bot")).setEphemeral(true).queue();
             return;
         }
 
         if (!event.getMember().canInteract(targetMember)) {
-            event.reply("❌ You cannot kick this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.kick.hierarchy_user")).setEphemeral(true).queue();
             return;
         }
 
         String reason = event.getOption("reason") != null ? 
-                event.getOption("reason").getAsString() : "No reason provided";
+                event.getOption("reason").getAsString() : LocaleManager.getMessage(lang, "general.no_reason");
 
         String userId = targetMember.getId();
         String moderatorId = event.getMember().getId();
@@ -123,7 +129,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         targetMember.kick().reason(reason).queue(
             success -> {
                 // Kick successful
-                event.reply("✅ Kicked " + targetName + " for: " + reason).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.kick.success", targetName, reason)).queue();
                 
                 // Log moderation action
                 handler.insertModerationAction(guildId, userId, moderatorId, "KICK", reason, null, null);
@@ -139,42 +145,44 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "KICK", targetName, moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to kick " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.kick.failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
 
     private void handleBanCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has ban permissions
         if (!event.getMember().hasPermission(Permission.BAN_MEMBERS)) {
-            event.reply("❌ You do not have permission to ban members.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.ban.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         if (event.getOption("user") == null) {
-            event.reply("❌ Please specify a user to ban.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.ban.specify_user")).setEphemeral(true).queue();
             return;
         }
 
         Member targetMember = event.getOption("user").getAsMember();
         if (targetMember == null) {
-            event.reply("❌ User not found in this server.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "general.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Check if the target can be banned
         if (!event.getGuild().getSelfMember().canInteract(targetMember)) {
-            event.reply("❌ I cannot ban this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.ban.hierarchy_bot")).setEphemeral(true).queue();
             return;
         }
 
         if (!event.getMember().canInteract(targetMember)) {
-            event.reply("❌ You cannot ban this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.ban.hierarchy_user")).setEphemeral(true).queue();
             return;
         }
 
         String reason = event.getOption("reason") != null ? 
-                event.getOption("reason").getAsString() : "No reason provided";
+                event.getOption("reason").getAsString() : LocaleManager.getMessage(lang, "general.no_reason");
 
         String userId = targetMember.getId();
         String moderatorId = event.getMember().getId();
@@ -194,7 +202,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         targetMember.ban(0, TimeUnit.SECONDS).reason(reason).queue(
             success -> {
                 // Ban successful
-                event.reply("✅ Banned " + targetName + " for: " + reason).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.ban.success", targetName, reason)).queue();
                 
                 // Log moderation action
                 handler.insertModerationAction(guildId, userId, moderatorId, "BAN", reason, null, null);
@@ -210,21 +218,23 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "BAN", targetName, moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to ban " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.ban.failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
 
     private void handleUnbanCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has ban permissions
         if (!event.getMember().hasPermission(Permission.BAN_MEMBERS)) {
-            event.reply("❌ You do not have permission to unban members.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.unban.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         String userId = event.getOption("userid").getAsString();
         String reason = event.getOption("reason") != null ? 
-                event.getOption("reason").getAsString() : "No reason provided";
+                event.getOption("reason").getAsString() : LocaleManager.getMessage(lang, "general.no_reason");
 
         String moderatorId = event.getMember().getId();
         String moderatorName = event.getMember().getEffectiveName();
@@ -232,7 +242,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         // Unban the user
         event.getGuild().unban(net.dv8tion.jda.api.entities.UserSnowflake.fromId(userId)).reason(reason).queue(
             success -> {
-                event.reply("✅ Unbanned user with ID " + userId + " for: " + reason).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.unban.success", userId, reason)).queue();
                 
                 // Insert or update moderator data
                 handler.insertOrUpdateUser(moderatorId, moderatorName,
@@ -247,42 +257,44 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "UNBAN", "User ID: " + userId, moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to unban user. Please verify the user ID is correct.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.unban.failed")).setEphemeral(true).queue();
             }
         );
     }
 
     private void handleTimeoutCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You do not have permission to timeout members.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.timeout.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         Member targetMember = event.getOption("user").getAsMember();
         int minutes = event.getOption("minutes").getAsInt();
         String reason = event.getOption("reason") != null ? 
-                event.getOption("reason").getAsString() : "No reason provided";
+                event.getOption("reason").getAsString() : LocaleManager.getMessage(lang, "general.no_reason");
 
         if (targetMember == null) {
-            event.reply("❌ User not found in this server.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "general.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Validate timeout duration (max 28 days = 40320 minutes)
         if (minutes < 1 || minutes > 40320) {
-            event.reply("❌ Timeout duration must be between 1 and 40320 minutes (28 days).").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.timeout.invalid_duration")).setEphemeral(true).queue();
             return;
         }
 
         // Check if the target can be timed out
         if (!event.getGuild().getSelfMember().canInteract(targetMember)) {
-            event.reply("❌ I cannot timeout this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.timeout.hierarchy_bot")).setEphemeral(true).queue();
             return;
         }
 
         if (!event.getMember().canInteract(targetMember)) {
-            event.reply("❌ You cannot timeout this user due to role hierarchy.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.timeout.hierarchy_user")).setEphemeral(true).queue();
             return;
         }
 
@@ -295,7 +307,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         Duration duration = Duration.ofMinutes(minutes);
         targetMember.timeoutFor(duration).reason(reason).queue(
             success -> {
-                event.reply("✅ Timed out " + targetName + " for " + minutes + " minutes. Reason: " + reason).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.timeout.success", targetName, minutes, reason)).queue();
                 
                 // Insert or update user data
                 handler.insertOrUpdateUser(userId, targetName, 
@@ -316,30 +328,32 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "TIMEOUT (" + minutes + "m)", targetName, moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to timeout " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.timeout.failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
 
     private void handleUntimeoutCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You do not have permission to remove timeouts from members.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.untimeout.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         Member targetMember = event.getOption("user").getAsMember();
         String reason = event.getOption("reason") != null ? 
-                event.getOption("reason").getAsString() : "No reason provided";
+                event.getOption("reason").getAsString() : LocaleManager.getMessage(lang, "general.no_reason");
 
         if (targetMember == null) {
-            event.reply("❌ User not found in this server.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "general.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Check if user is actually timed out
         if (!targetMember.isTimedOut()) {
-            event.reply("❌ " + targetMember.getEffectiveName() + " is not currently timed out.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.untimeout.not_timed_out", targetMember.getEffectiveName())).setEphemeral(true).queue();
             return;
         }
 
@@ -351,7 +365,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         // Remove timeout
         targetMember.removeTimeout().reason(reason).queue(
             success -> {
-                event.reply("✅ Removed timeout from " + targetName + ". Reason: " + reason).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.untimeout.success", targetName, reason)).queue();
                 
                 // Insert or update user data
                 handler.insertOrUpdateUser(userId, targetName, 
@@ -370,15 +384,17 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "UNTIMEOUT", targetName, moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to remove timeout from " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.untimeout.failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
 
     private void handlePurgeCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has manage messages permission
         if (!event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
-            event.reply("❌ You do not have permission to manage messages.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.purge.no_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -386,7 +402,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         Member targetUser = event.getOption("user") != null ? event.getOption("user").getAsMember() : null;
 
         if (amount < 1 || amount > 100) {
-            event.reply("❌ Amount must be between 1 and 100 messages.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.purge.invalid_amount")).setEphemeral(true).queue();
             return;
         }
 
@@ -413,7 +429,7 @@ public class ModerationCommandListener extends ListenerAdapter {
             }
 
             if (messagesToDelete.isEmpty()) {
-                event.getHook().sendMessage("❌ No messages found to delete.").queue();
+                event.getHook().sendMessage(LocaleManager.getMessage(lang, "mod.purge.no_messages")).queue();
                 return;
             }
 
@@ -422,8 +438,8 @@ public class ModerationCommandListener extends ListenerAdapter {
                 messagesToDelete.get(0).delete().queue(
                     success -> {
                         String response = targetUser != null ?
-                            "✅ Deleted " + messagesToDelete.size() + " message(s) from " + targetUser.getEffectiveName() :
-                            "✅ Deleted " + messagesToDelete.size() + " message(s)";
+                            LocaleManager.getMessage(lang, "mod.purge.success_user", messagesToDelete.size(), targetUser.getEffectiveName()) :
+                            LocaleManager.getMessage(lang, "mod.purge.success", messagesToDelete.size());
                         event.getHook().sendMessage(response).queue();
                         
                         // Log the action
@@ -433,15 +449,15 @@ public class ModerationCommandListener extends ListenerAdapter {
                         sendToLogChannel(event, guildId, "PURGE", channel.getName(), moderatorName, reason);
                     },
                     error -> {
-                        event.getHook().sendMessage("❌ Failed to delete messages.").queue();
+                        event.getHook().sendMessage(LocaleManager.getMessage(lang, "mod.purge.failed")).queue();
                     }
                 );
             } else {
                 channel.deleteMessages(messagesToDelete).queue(
                     success -> {
                         String response = targetUser != null ?
-                            "✅ Deleted " + messagesToDelete.size() + " message(s) from " + targetUser.getEffectiveName() :
-                            "✅ Deleted " + messagesToDelete.size() + " message(s)";
+                            LocaleManager.getMessage(lang, "mod.purge.success_user", messagesToDelete.size(), targetUser.getEffectiveName()) :
+                            LocaleManager.getMessage(lang, "mod.purge.success", messagesToDelete.size());
                         event.getHook().sendMessage(response).queue();
                         
                         // Log the action
@@ -451,26 +467,28 @@ public class ModerationCommandListener extends ListenerAdapter {
                         sendToLogChannel(event, guildId, "PURGE", channel.getName(), moderatorName, reason);
                     },
                     error -> {
-                        event.getHook().sendMessage("❌ Failed to delete messages. Messages older than 2 weeks cannot be bulk deleted.").queue();
+                        event.getHook().sendMessage(LocaleManager.getMessage(lang, "mod.purge.too_old")).queue();
                     }
                 );
             }
         }, error -> {
-            event.getHook().sendMessage("❌ Failed to retrieve messages.").queue();
+            event.getHook().sendMessage(LocaleManager.getMessage(lang, "mod.purge.retrieve_failed")).queue();
         });
     }
 
     private void handleSlowmodeCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has manage channel permission
         if (!event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {
-            event.reply("❌ You do not have permission to manage channels.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.slowmode.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         int seconds = event.getOption("seconds").getAsInt();
 
         if (seconds < 0 || seconds > 21600) { // Max 6 hours
-            event.reply("❌ Slowmode delay must be between 0 and 21600 seconds (6 hours).").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "mod.slowmode.invalid_duration")).setEphemeral(true).queue();
             return;
         }
 
@@ -480,8 +498,8 @@ public class ModerationCommandListener extends ListenerAdapter {
         channel.getManager().setSlowmode(seconds).queue(
             success -> {
                 String response = seconds == 0 ?
-                    "✅ Slowmode disabled in " + channel.getAsMention() :
-                    "✅ Slowmode set to " + seconds + " seconds in " + channel.getAsMention();
+                    LocaleManager.getMessage(lang, "mod.slowmode.disabled", channel.getAsMention()) :
+                    LocaleManager.getMessage(lang, "mod.slowmode.enabled", seconds, channel.getAsMention());
                 event.reply(response).queue();
                 
                 // Log the action
@@ -489,13 +507,14 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "SLOWMODE", channel.getName(), moderatorName, reason);
             },
             error -> {
-                event.reply("❌ Failed to set slowmode. Please try again.").setEphemeral(true).queue();
+                event.reply(LocaleManager.getMessage(lang, "mod.slowmode.failed")).setEphemeral(true).queue();
             }
         );
     }
 
     private void sendToLogChannel(SlashCommandInteractionEvent event, String guildId, 
                                  String actionType, String targetName, String moderatorName, String reason) {
+        String lang = getLang(guildId);
         if (handler.hasLogChannel(guildId)) {
             String logChannelId = handler.getLogChannelID(guildId);
             if (!logChannelId.equals("Couldnt find a Log Channel") && !logChannelId.equals("Error")) {
@@ -524,8 +543,8 @@ public class ModerationCommandListener extends ListenerAdapter {
                     EmbedBuilder embed = new EmbedBuilder()
                             .setTitle(emoji + " " + actionType)
                             .setDescription(emoji + " " + targetName)
-                            .addField("Moderator", moderatorName, true)
-                            .addField("Reason", reason, true)
+                            .addField(LocaleManager.getMessage(lang, "log.moderator"), moderatorName, true)
+                            .addField(LocaleManager.getMessage(lang, "log.reason"), reason, true)
                             .setColor(embedColor)
                             .setTimestamp(java.time.Instant.now());
                     

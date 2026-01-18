@@ -41,6 +41,7 @@ public class Sloth {
         api.addEventListener(new TimedRolesCommandListener(handler));
         api.addEventListener(new RoleEventConfigListener(handler));
         api.addEventListener(new TimedRoleTriggerListener(handler));
+        api.addEventListener(new SettingsCommandListener(handler));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));

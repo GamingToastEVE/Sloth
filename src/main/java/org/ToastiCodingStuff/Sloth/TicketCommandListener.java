@@ -29,6 +29,10 @@ public class TicketCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    private String getLang(String guildId) {
+        return handler.getGuildLanguage(guildId);
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("ticket")) {
@@ -41,35 +45,36 @@ public class TicketCommandListener extends ListenerAdapter {
         }
 
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        String lang = getLang(guildId);
 
         switch (subcommand) {
             case "setup":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-setup");
                 handleTicketSetup(event, guildId);
                 break;
             case "panel":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-panel");
                 handleTicketPanel(event, guildId);
                 break;
             case "config":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-config");
                 handleSetTicketConfig(event, guildId);
                 break;
             case "close":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-close");
                 handleCloseTicket(event, guildId);
                 break;
             case "assign":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-assign");
                 handleAssignTicket(event, guildId);
                 break;
             case "priority":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(LocaleManager.getMessage(lang, "ticket.no_permission")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-priority");
                 handleSetTicketPriority(event, guildId);
                 break;
@@ -103,9 +108,11 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     private void handleTicketSetup(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has admin permissions
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Administrator permissions to set up the ticket system.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.setup.no_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -124,8 +131,8 @@ public class TicketCommandListener extends ListenerAdapter {
         
         if (success) {
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("✅ Ticket System Configured")
-                    .setDescription("The ticket system has been successfully configured!")
+                    .setTitle(LocaleManager.getMessage(lang, "ticket.setup.success.title"))
+                    .setDescription(LocaleManager.getMessage(lang, "ticket.setup.success.description"))
                     .addField("Ticket Category", category.getAsMention(), true)
                     .addField("Ticket Panel Channel", channel.getAsMention(), true)
                     .addField("Support Role", supportRole != null ? supportRole.getAsMention() : "None", true)
@@ -134,14 +141,16 @@ public class TicketCommandListener extends ListenerAdapter {
             
             event.replyEmbeds(embed.build()).queue();
         } else {
-            event.reply("❌ Failed to configure ticket system. Please try again.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.setup.failed")).setEphemeral(true).queue();
         }
     }
 
     private void handleSetTicketConfig(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has manage server permissions
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Manage Server permissions to configure ticket settings.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.setup.no_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -152,8 +161,8 @@ public class TicketCommandListener extends ListenerAdapter {
         
         if (success) {
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("✅ Ticket Configuration Updated")
-                    .setDescription("The ticket panel title and description have been successfully updated!")
+                    .setTitle(LocaleManager.getMessage(lang, "ticket.config.success.title"))
+                    .setDescription(LocaleManager.getMessage(lang, "ticket.config.success.description"))
                     .addField("New Title", title, false)
                     .addField("New Description", description, false)
                     .setColor(Color.GREEN)
@@ -161,19 +170,21 @@ public class TicketCommandListener extends ListenerAdapter {
             
             event.replyEmbeds(embed.build()).setEphemeral(true).queue();
         } else {
-            event.reply("❌ Failed to update ticket configuration. Please try again.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.setup.failed")).setEphemeral(true).queue();
         }
     }
 
     private void handleTicketPanel(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
+        
         // Check if user has manage channels permission
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            event.reply("❌ You need Manage Channels permission to create a ticket panel.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.panel.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         if (!handler.isTicketSystem(guildId)) {
-            event.reply("❌ Ticket system is not configured for this server. Use `/ticket-setup` first.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "ticket.panel.not_configured")).setEphemeral(true).queue();
             return;
         }
 
@@ -186,14 +197,14 @@ public class TicketCommandListener extends ListenerAdapter {
                 .setTitle(title)
                 .setDescription(description)
                 .setColor(Color.BLUE)
-                .setFooter("Ticket System • Click the button to get started");
+                .setFooter(LocaleManager.getMessage(lang, "ticket.panel.footer"));
 
-        Button createTicketButton = Button.primary("create_ticket", "🎫 Create Ticket");
+        Button createTicketButton = Button.primary("create_ticket", LocaleManager.getMessage(lang, "ticket.panel.button"));
 
         event.getChannel().sendMessageEmbeds(embed.build())
                 .setActionRow(createTicketButton)
                 .queue(message -> {
-                    event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue();
+                    event.reply(LocaleManager.getMessage(lang, "ticket.panel.success")).setEphemeral(true).queue();
                     // Sort channels to ensure ticket panel channel stays on top
                     sortTicketChannelsByPriority(event.getGuild(), guildId);
                 });
