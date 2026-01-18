@@ -19,6 +19,10 @@ public class WarnCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    private String getLang(String guildId) {
+        return handler.getGuildLanguage(guildId);
+    }
+
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("warn")) {
             return;
@@ -51,12 +55,13 @@ public class WarnCommandListener extends ListenerAdapter {
     }
 
     private void handleWarnCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
         Member targetMember = event.getOption("user").getAsMember();
         String reason = event.getOption("reason").getAsString();
         String severity = event.getOption("severity") != null ? event.getOption("severity").getAsString() : "MEDIUM";
 
         if (targetMember == null) {
-            event.reply("User not found in this server.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "warn.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
@@ -123,16 +128,19 @@ public class WarnCommandListener extends ListenerAdapter {
                                     // Handle timeout failure silently - warning was still issued
                                 }
                             );
-                        timeoutMessage = "\n⏱️ **User has been timed out for " + timeoutMinutes + " minutes** (reached " + activeWarnings + "/" + maxWarns + " warnings)";
+                        timeoutMessage = LocaleManager.getMessage(lang, "warn.timeout_applied", timeoutMinutes, activeWarnings, maxWarns);
                     } else {
-                        timeoutMessage = "\n⚠️ **Warning:** User has reached maximum warnings (" + activeWarnings + "/" + maxWarns + ") but I cannot timeout them due to permissions";
+                        timeoutMessage = LocaleManager.getMessage(lang, "warn.timeout_no_permission", activeWarnings, maxWarns);
                     }
                 }
             }
             
-            event.reply("Warning issued to " + targetMember.getAsMention() + " for: " + reason +
-                    "\nWarning ID: " + warningId +
-                    (expiresAt != null ? "\nExpires: " + expiresAt : "") + timeoutMessage).queue();
+            String replyMessage = LocaleManager.getMessage(lang, "warn.success", targetMember.getAsMention(), reason, warningId);
+            if (expiresAt != null) {
+                replyMessage += LocaleManager.getMessage(lang, "warn.expires", expiresAt);
+            }
+            replyMessage += timeoutMessage;
+            event.reply(replyMessage).queue();
 
             // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
@@ -148,11 +156,12 @@ public class WarnCommandListener extends ListenerAdapter {
             handler.sendAuditLogEntry(event.getGuild(), "WARN", targetMember.getEffectiveName(), 
                     event.getMember().getEffectiveName(), reason);
         } else {
-            event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "warn.failed")).setEphemeral(true).queue();
         }
     }
 
     private void handleSetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
         int maxWarns = event.getOption("max_warns").getAsInt();
         int timeoutMinutes = event.getOption("timeout_minutes").getAsInt();
         int warnTimeHours = event.getOption("warn_time_hours") != null ?
@@ -160,22 +169,20 @@ public class WarnCommandListener extends ListenerAdapter {
 
         // Validate timeout duration (max 28 days = 40320 minutes)
         if (timeoutMinutes < 1 || timeoutMinutes > 40320) {
-            event.reply("❌ Timeout duration must be between 1 and 40320 minutes (28 days).").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "warn.settings.invalid_timeout")).setEphemeral(true).queue();
             return;
         }
 
         // Use existing setWarnSettings method but pass null for roleID since we don't use mute roles anymore
         handler.setWarnSettings(guildId, maxWarns, timeoutMinutes, null, warnTimeHours);
 
-        event.reply("Warn settings updated successfully!\n" +
-                "Max Warns: " + maxWarns + "\n" +
-                "Timeout Duration: " + timeoutMinutes + " minutes\n" +
-                "Warning Expiry: " + warnTimeHours + " hours").queue();
+        event.reply(LocaleManager.getMessage(lang, "warn.settings.updated", maxWarns, timeoutMinutes, warnTimeHours)).queue();
     }
 
     private void handleGetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
+        String lang = getLang(guildId);
         if (!handler.hasWarnSystemSettings(guildId)) {
-            event.reply("No warn system settings configured for this server. Use `/warn settings-set` to configure.").setEphemeral(true).queue();
+            event.reply(LocaleManager.getMessage(lang, "warn.settings.not_configured")).setEphemeral(true).queue();
             return;
         }
 
@@ -184,10 +191,6 @@ public class WarnCommandListener extends ListenerAdapter {
         int timeoutMinutes = handler.getTimeMuted(guildId);
         int warnTimeHours = handler.getWarnTimeHours(guildId);
 
-        event.reply("**Current Warn Settings:**\n" +
-                "Max Warns: " + maxWarns + "\n" +
-                "Timeout Duration: " + timeoutMinutes + " minutes\n" +
-                "Warning Expiry: " + warnTimeHours + " hours\n\n" +
-                "ℹ️ When users reach max warnings, they will be automatically timed out using Discord's built-in timeout feature.").queue();
+        event.reply(LocaleManager.getMessage(lang, "warn.settings.current", maxWarns, timeoutMinutes, warnTimeHours)).queue();
     }
 }

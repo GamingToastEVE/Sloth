@@ -36,8 +36,7 @@ public class LocaleManager {
             ResourceBundle bundle = ResourceBundle.getBundle(BUNDLE_NAME, locale);
             bundles.put(languageCode, bundle);
         } catch (MissingResourceException e) {
-            System.err.println("Could not load resource bundle for language: " + languageCode);
-            e.printStackTrace();
+            System.err.println("Could not load resource bundle for language: " + languageCode + " - " + e.getMessage());
         }
     }
     
