@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 
 import java.awt.*;
+import java.util.Objects;
 
 public class HelpCommandListener extends ListenerAdapter {
 
@@ -15,6 +16,10 @@ public class HelpCommandListener extends ListenerAdapter {
 
     public HelpCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    private String getLang(String guildId) {
+        return handler.getGuildLanguage(guildId);
     }
 
     @Override
@@ -36,134 +41,103 @@ public class HelpCommandListener extends ListenerAdapter {
 
     private void handleHelpCommand(SlashCommandInteractionEvent event) {
         // Show the main help page
-        showHelpPage(event, null, "home");
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        String lang = getLang(guildId);
+        showHelpPage(event, null, "home", lang);
     }
 
     private void handleHelpNavigation(ButtonInteractionEvent event, String customId) {
         // Extract page from custom ID (format: help_<page>)
         String page = customId.substring(5);
-        showHelpPage(null, event, page);
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        String lang = getLang(guildId);
+        showHelpPage(null, event, page, lang);
     }
 
-    private void showHelpPage(SlashCommandInteractionEvent slashEvent, ButtonInteractionEvent buttonEvent, String page) {
+    private void showHelpPage(SlashCommandInteractionEvent slashEvent, ButtonInteractionEvent buttonEvent, String page, String lang) {
         EmbedBuilder embed = new EmbedBuilder();
         ActionRow actionRow;
         ActionRow actionRow2;
 
         switch (page) {
             case "home":
-                embed.setTitle("🤖 Sloth Bot - Help & Wiki")
-                        .setDescription("Welcome to Sloth! I'm a comprehensive Discord moderation and management bot.\n\n" +
-                                "**Available Help Sections:**\n" +
-                                "🏠 **Overview** - Learn about Sloth's features\n" +
-                                "⚙️ **Systems** - Available modular systems\n" +
-                                "📋 **Setup** - How to configure systems\n" +
-                                "📖 **Commands** - Complete command reference\n" +
-                                "🎨 **Formatting** - Rules embed formatting guide\n" +
-                                "📜 **Legal** - Terms of Service and Privacy Policy\n" +
-                                "💡 **Support Development** - How to support the bot\n\n" +
-                                "Note: this bot is completely reworked and settings from the old version will not carry over.")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.welcome"))
                         .setColor(Color.BLUE)
-                        .setFooter("Use the buttons below to navigate");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup")),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             case "overview":
-                embed.setTitle("🏠 Sloth Bot - Overview")
-                        .setDescription("Sloth is designed to help server administrators manage their communities effectively.\n\n" +
-                                "**Key Features:**\n" +
-                                "• **Comprehensive Logging** - Track all server activities\n" +
-                                "• **Advanced Moderation** - Powerful tools for maintaining order\n" +
-                                "• **Ticket System** - Professional support channel management\n" +
-                                "• **Statistics Tracking** - Monitor server engagement\n\n" +
-                                "**Getting Started:**\n" +
-                                "1. All systems are available to use immediately\n" +
-                                "2. Configure each system using setup commands\n" +
-                                "3. Start managing your server more effectively!")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.overview.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.overview.description"))
                         .setColor(Color.GREEN)
-                        .setFooter("Navigate using buttons below");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup")),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             case "systems":
-                embed.setTitle("⚙️ Available Systems")
-                        .setDescription("Sloth offers several modular systems that can be independently activated:\n\n")
-                        .addField("🛡️ **Moderation System**", 
-                                "• Kick, ban, timeout users\n" +
-                                "• Message purging and slowmode\n" +
-                                "• Comprehensive moderation logging", false)
-                        .addField("⚠️ **Warning System**", 
-                                "• Issue warnings with severity levels\n" +
-                                "• Automatic actions on thresholds\n" +
-                                "• Warning history tracking", false)
-                        .addField("🎫 **Ticket System**", 
-                                "• Professional support channels\n" +
-                                "• Staff assignment and priorities", false)
-                        .addField("📝 **Log Channel System**", 
-                                "• Dedicated logging channels\n" +
-                                "• Track server events\n" +
-                                "• Comprehensive audit trail", false)
-                        .addField("📊 **Statistics System**", 
-                                "• Server activity tracking\n" +
-                                "• Daily and weekly reports\n" +
-                                "• Engagement metrics", false)
-                        .addField("📋 **Rules/Verification System**", 
-                                "• Custom rules embeds with verification buttons\n" +
-                                "• Role assignment upon verification\n" +
-                                "• Verification statistics tracking", false)
-                        .addField("🔘 **Verify Button System**", 
-                                "• Create custom verification buttons\n" +
-                                "• Assign/remove roles when users verify\n" +
-                                "• Support for multiple configurations (max 3)", false)
-                        .addField("🎭 **Select Roles System**", 
-                                "• Allow users to self-assign roles\n" +
-                                "• Role selection menus with descriptions and emojis\n" +
-                                "• Support for reactions, dropdowns, and buttons", false)
-                        .addField("⏱️ **Timed Roles System**", 
-                                "• Assign temporary roles that automatically expire\n" +
-                                "• Automated role management based on events\n" +
-                                "• Track active temporary roles per user", false)
+                embed.setTitle(LocaleManager.getMessage(lang, "help.systems.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.systems.description"))
+                        .addField(LocaleManager.getMessage(lang, "help.systems.moderation.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.moderation.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.warning.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.warning.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.ticket.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.ticket.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.log.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.log.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.stats.title"),
+                                LocaleManager.getMessage(lang, "help.systems.stats.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.rules.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.rules.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.verify.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.verify.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.selectroles.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.selectroles.description"), false)
+                        .addField(LocaleManager.getMessage(lang, "help.systems.timedroles.title"), 
+                                LocaleManager.getMessage(lang, "help.systems.timedroles.description"), false)
                         .setColor(Color.ORANGE)
-                        .setFooter("All systems are ready to use!");
+                        .setFooter(LocaleManager.getMessage(lang, "help.systems.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup")),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             case "setup":
-                embed.setTitle("📋 System Setup Guide")
-                        .setDescription("Follow these steps to configure Sloth for your server:\n\n")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.setup.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.setup.description"))
                         .addField("**Step 1: Choose Systems to Configure**", 
                                 "All systems are available to use:\n" +
                                 "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
@@ -184,24 +158,24 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "Need help formatting your rules descriptions? Use Discord markdown!\n" +
                                 "📝 Click the 🎨 Formatting button below for a complete guide.", false)
                         .setColor(Color.CYAN)
-                        .setFooter("Need help? Create a support ticket!");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_commands", "📖 Commands")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             case "commands":
-                embed.setTitle("📖 Command Reference")
-                        .setDescription("Complete list of available commands by system:\n\n")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.commands.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.commands.description"))
                         .addField("**Log Channel System**",
                                 "`/log-channel set` - Configure logging channel\n" +
                                 "`/log-channel get` - View current log channel", false)
@@ -251,51 +225,46 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "`/role-event list` - List and manage all role events", false)
                         .addField("**General Commands**",
                                 "`/help` - Show this help system\n" +
-                                "`/feedback` - Send feedback to the developer", false)
+                                "`/feedback` - Send feedback to the developer\n" +
+                                "`/settings language` - Set bot language", false)
                         .setColor(Color.MAGENTA)
-                        .setFooter("All commands require appropriate permissions");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             case "support_developement":
-                embed.setTitle("💡 Support Development")
-                        .setDescription("Sloth is free to use, but development and hosting incur costs.\n\n" +
-                                "**Ways to Support:**\n" +
-                                "• **Donate:** https://ko-fi.com/gamingtoast27542\n" +
-                                "• **Feedback:** Join our [Support Server](https://discord.gg/dQT53fD8M5) to share ideas and report issues.\n" +
-                                "• **Spread the Word:** Recommend Sloth to other server admins.\n" +
-                                "\nEvery bit of support helps keep Sloth running and improving!" +
-                                "\n\nThank you for considering supporting Sloth!");
+                embed.setTitle(LocaleManager.getMessage(lang, "help.support.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.support.description"));
                 embed.setColor(Color.PINK)
-                        .setFooter("Navigate using buttons below");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_legal", "📜 Legal"),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands")),
+                        Button.primary("help_rules_formatting", LocaleManager.getMessage(lang, "button.formatting")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal")),
                         Button.link("https://ko-fi.com/gamingtoast27542", "☕ Donate")
                 );
                 break;
 
             case "legal":
-                embed.setTitle("📜 Legal Information")
-                        .setDescription("Important legal documents and policies for using Sloth Bot:\n\n")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.legal.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.legal.description"))
                         .addField("**📋 Terms of Service**", 
                                 "By using Sloth Bot, you agree to our Terms of Service.\n" +
                                 "**Key Points:**\n" +
@@ -317,25 +286,25 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Discord: **gamingtoasti**\n" +
                                 "• Support Server: https://discord.gg/dQT53fD8M5", false)
                         .setColor(Color.GRAY)
-                        .setFooter("Last updated: 06.09.25 • Navigate using buttons below");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_legal", "📜 Legal"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
                         Button.link("https://github.com/GamingToastEVE/Sloth", "📄 View on GitHub")
                 );
                 break;
 
             case "rules_formatting":
-                embed.setTitle("📝 Rules Embed Formatting Guide")
-                        .setDescription("Learn how to format your rules embed descriptions using Discord markdown:\n\n")
+                embed.setTitle(LocaleManager.getMessage(lang, "help.formatting.title"))
+                        .setDescription(LocaleManager.getMessage(lang, "help.formatting.description"))
                         .addField("**Basic Text Formatting**", 
                                 "• `**bold text**` → **bold text**\n" +
                                 "• `*italic text*` → *italic text*\n" +
@@ -371,24 +340,24 @@ public class HelpCommandListener extends ListenerAdapter {
                                 "• Test formatting before publishing\n" +
                                 "• Bot will warn if you use formatting in titles", false)
                         .setColor(Color.YELLOW)
-                        .setFooter("Navigate using buttons below");
+                        .setFooter(LocaleManager.getMessage(lang, "help.footer"));
 
                 actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
+                        Button.secondary("help_home", LocaleManager.getMessage(lang, "button.home")),
+                        Button.primary("help_overview", LocaleManager.getMessage(lang, "button.overview")),
+                        Button.primary("help_systems", LocaleManager.getMessage(lang, "button.systems")),
+                        Button.primary("help_setup", LocaleManager.getMessage(lang, "button.setup"))
                 );
                 actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
+                        Button.primary("help_commands", LocaleManager.getMessage(lang, "button.commands")),
+                        Button.primary("help_support_developement", LocaleManager.getMessage(lang, "button.support")),
+                        Button.primary("help_legal", LocaleManager.getMessage(lang, "button.legal"))
                 );
                 break;
 
             default:
                 // Fallback to home page
-                showHelpPage(slashEvent, buttonEvent, "home");
+                showHelpPage(slashEvent, buttonEvent, "home", lang);
                 return;
         }
 
