@@ -4,10 +4,13 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.events.Event;
+import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -29,6 +32,50 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
         this.handler = handler;
         this.api = api;
         startScheduler();
+    }
+
+    @Override
+    public void onGenericEvent(@NotNull GenericEvent event) {
+        if (!(event instanceof LevelUpEvent)) {
+            return;
+        }
+        System.out.println("LevelUpEvent detected, processing triggers...");
+        LevelUpEvent levelUpEvent = (LevelUpEvent) event;
+        Guild guild = levelUpEvent.getGuild();
+        Member member = levelUpEvent.getMember();
+        int newLevel = levelUpEvent.getNewLevel();
+        int oldLevel = levelUpEvent.getOldLevel();
+
+        List<DatabaseHandler.RoleEventData> eventsLevelReached = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_REACHED);
+        List<DatabaseHandler.RoleEventData> eventsLevelUp = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_UP);
+
+        for (DatabaseHandler.RoleEventData eventConfig : eventsLevelReached) {
+            try {
+                JSONObject config = new JSONObject(eventConfig.triggerData);
+                if (config.has("level_threshold")) {
+                    int targetLevel = config.getInt("level_threshold");
+                    if (newLevel == targetLevel) {
+                        processTrigger(guild, member, RoleEventType.LEVEL_REACHED, String.valueOf(targetLevel));
+                    }
+                }
+            } catch (JSONException e) {
+                System.err.println("Failed to parse trigger_data JSON for LEVEL_REACHED: " + e.getMessage());
+            }
+        }
+
+        for (DatabaseHandler.RoleEventData eventConfig : eventsLevelUp) {
+            try {
+                JSONObject config = new JSONObject(eventConfig.triggerData);
+                if (config.has("level_threshold")) {
+                    int minLevel = config.getInt("level_threshold");
+                    if (newLevel >= minLevel) {
+                        processTrigger(guild, member, RoleEventType.LEVEL_UP, String.valueOf(minLevel));
+                    }
+                }
+            } catch (JSONException e) {
+                System.err.println("Failed to parse trigger_data JSON for LEVEL_UP: " + e.getMessage());
+            }
+        }
     }
 
     // Trigger: Wenn ein User eine Rolle bekommt ("getrole")

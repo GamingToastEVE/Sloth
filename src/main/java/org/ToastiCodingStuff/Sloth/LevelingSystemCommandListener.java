@@ -9,14 +9,19 @@ import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
@@ -24,16 +29,35 @@ import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class LevelingSystemCommandListener extends ListenerAdapter {
     private final DatabaseHandler handler;
     private final Random random = new Random();
 
+    // Voice XP tracking - maps guildId:userId to join timestamp
+    private final Map<String, Long> voiceJoinTimes = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastVoiceXpTime = new ConcurrentHashMap<>();
+
+    // JDA reference for scheduler (set on first voice event)
+    private net.dv8tion.jda.api.JDA jdaInstance = null;
+
+    // Scheduled executor for voice XP awards
+    private final ScheduledExecutorService voiceXpScheduler = Executors.newScheduledThreadPool(1);
+
     public LevelingSystemCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+
+        // Start voice XP award task - runs every 60 seconds
+        voiceXpScheduler.scheduleAtFixedRate(this::awardVoiceXp, 60, 60, TimeUnit.SECONDS);
     }
 
     // ==================== MESSAGE EVENT FOR XP ====================
@@ -45,8 +69,13 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             return;
         }
 
+        // Store JDA reference
+        if (jdaInstance == null) {
+            jdaInstance = event.getJDA();
+        }
+
         String guildId = event.getGuild().getId();
-        String userId = event.getAuthor().getId();
+        String oderId = event.getAuthor().getId();
         String channelId = event.getChannel().getId();
 
         // Check if leveling system is active
@@ -55,7 +84,600 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
 
         // Handle leveling XP
-        handleLevelingXp(event, guildId, userId, channelId);
+        handleLevelingXp(event, guildId, oderId, channelId);
+    }
+
+    // ==================== VOICE EVENT FOR XP ====================
+
+    @Override
+    public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
+        if (event.getMember().getUser().isBot()) return;
+
+        // Store JDA reference and sync existing voice users on first event
+        if (jdaInstance == null) {
+            jdaInstance = event.getJDA();
+            syncExistingVoiceUsers();
+        }
+
+        String guildId = event.getGuild().getId();
+        String oderId = event.getMember().getId();
+        String key = guildId + ":" + oderId;
+
+        // Check if leveling system is active
+        if (!handler.isSystemActive(guildId, "leveling")) {
+            return;
+        }
+
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+        if (!settings.enabled || !settings.voiceXpEnabled) {
+            return;
+        }
+
+        AudioChannel joined = event.getChannelJoined();
+        AudioChannel left = event.getChannelLeft();
+
+        if (joined != null && left == null) {
+            // User joined a voice channel
+            voiceJoinTimes.put(key, System.currentTimeMillis());
+            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " joined voice, now tracking");
+        } else if (left != null && joined == null) {
+            // User left voice channel
+            voiceJoinTimes.remove(key);
+            lastVoiceXpTime.remove(key);
+            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " left voice, stopped tracking");
+        } else if (joined != null) {
+            // User switched channels - keep tracking
+            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " switched channels, still tracking");
+        }
+    }
+
+    /**
+     * Sync existing users who are already in voice channels when the bot starts
+     */
+    private void syncExistingVoiceUsers() {
+        if (jdaInstance == null) return;
+
+        System.out.println("[VoiceXP] Syncing existing voice users...");
+        int count = 0;
+
+        for (Guild guild : jdaInstance.getGuilds()) {
+            // Check if leveling is active for this guild
+            if (!handler.isSystemActive(guild.getId(), "leveling")) {
+                continue;
+            }
+
+            DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guild.getId());
+            if (!settings.enabled || !settings.voiceXpEnabled) {
+                continue;
+            }
+
+            // Iterate through all voice channels
+            for (net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel voiceChannel : guild.getVoiceChannels()) {
+                for (Member member : voiceChannel.getMembers()) {
+                    if (member.getUser().isBot()) continue;
+
+                    String key = guild.getId() + ":" + member.getId();
+                    if (!voiceJoinTimes.containsKey(key)) {
+                        voiceJoinTimes.put(key, System.currentTimeMillis());
+                        count++;
+                    }
+                }
+            }
+
+            // Also check stage channels
+            for (net.dv8tion.jda.api.entities.channel.concrete.StageChannel stageChannel : guild.getStageChannels()) {
+                for (Member member : stageChannel.getMembers()) {
+                    if (member.getUser().isBot()) continue;
+
+                    String key = guild.getId() + ":" + member.getId();
+                    if (!voiceJoinTimes.containsKey(key)) {
+                        voiceJoinTimes.put(key, System.currentTimeMillis());
+                        count++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("[VoiceXP] Synced " + count + " users already in voice channels");
+    }
+
+    /**
+     * Award voice XP to all users currently in voice channels
+     * This runs periodically via scheduler
+     */
+    private void awardVoiceXp() {
+        if (jdaInstance == null) {
+            System.out.println("[VoiceXP] JDA instance is null, skipping...");
+            return;
+        }
+
+        try {
+            Map<String, Long> snapshot = new HashMap<>(voiceJoinTimes);
+            System.out.println("[VoiceXP] Processing " + snapshot.size() + " users in voice channels");
+
+            for (Map.Entry<String, Long> entry : snapshot.entrySet()) {
+                String[] parts = entry.getKey().split(":");
+                if (parts.length != 2) continue;
+
+                String guildId = parts[0];
+                String oderId = parts[1];
+                String key = entry.getKey();
+
+                // Get settings
+                DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+                if (!settings.enabled || !settings.voiceXpEnabled) {
+                    System.out.println("[VoiceXP] Voice XP disabled for guild " + guildId);
+                    continue;
+                }
+
+                // Check cooldown
+                Long lastAward = lastVoiceXpTime.get(key);
+                long now = System.currentTimeMillis();
+
+                if (lastAward != null) {
+                    long elapsed = (now - lastAward) / 1000;
+                    if (elapsed < settings.voiceXpCooldown) {
+                        System.out.println("[VoiceXP] User " + oderId + " on cooldown (" + elapsed + "s / " + settings.voiceXpCooldown + "s)");
+                        continue;
+                    }
+                }
+
+                // Get the guild and member
+                Guild guild = jdaInstance.getGuildById(guildId);
+                if (guild == null) {
+                    System.out.println("[VoiceXP] Guild " + guildId + " not found, removing from tracking");
+                    voiceJoinTimes.remove(key);
+                    continue;
+                }
+
+                Member member = guild.getMemberById(oderId);
+                if (member == null) {
+                    System.out.println("[VoiceXP] Member " + oderId + " not found, removing from tracking");
+                    voiceJoinTimes.remove(key);
+                    continue;
+                }
+
+                // Check if member is still in a voice channel
+                if (member.getVoiceState() == null || member.getVoiceState().getChannel() == null) {
+                    System.out.println("[VoiceXP] Member " + member.getEffectiveName() + " no longer in voice, removing from tracking");
+                    voiceJoinTimes.remove(key);
+                    lastVoiceXpTime.remove(key);
+                    continue;
+                }
+
+                AudioChannel voiceChannel = member.getVoiceState().getChannel();
+
+                // Check minimum members requirement
+                long humanMembers = voiceChannel.getMembers().stream()
+                        .filter(m -> !m.getUser().isBot())
+                        .count();
+                if (humanMembers < settings.voiceXpMinMembers) {
+                    System.out.println("[VoiceXP] Not enough members in channel (" + humanMembers + " / " + settings.voiceXpMinMembers + " required)");
+                    continue;
+                }
+
+                // Check anti-AFK (user must not be muted and not deafened)
+                if (settings.voiceXpAntiAfk) {
+                    if (member.getVoiceState().isSelfMuted() ||
+                        member.getVoiceState().isSelfDeafened() ||
+                        member.getVoiceState().isGuildMuted() ||
+                        member.getVoiceState().isGuildDeafened()) {
+                        System.out.println("[VoiceXP] Member " + member.getEffectiveName() + " is AFK (muted/deafened)");
+                        continue;
+                    }
+                }
+
+                // Check if user has an ignored role
+                if (hasIgnoredRole(settings, member)) {
+                    System.out.println("[VoiceXP] Member " + member.getEffectiveName() + " has ignored role");
+                    continue;
+                }
+
+                // Check max level
+                if (settings.maxLevel > 0) {
+                    DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, oderId);
+                    if (userData.level >= settings.maxLevel) {
+                        System.out.println("[VoiceXP] Member " + member.getEffectiveName() + " at max level");
+                        continue;
+                    }
+                }
+
+                // Calculate XP amount (random between min and max)
+                int xpAmount = settings.voiceXpMin;
+                if (settings.voiceXpMax > settings.voiceXpMin) {
+                    xpAmount = random.nextInt(settings.voiceXpMax - settings.voiceXpMin + 1) + settings.voiceXpMin;
+                }
+
+                // Apply multiplier
+                xpAmount = (int) Math.round(xpAmount * settings.xpMultiplier);
+
+                // Calculate minutes to add (based on cooldown interval)
+                int minutesToAdd = settings.voiceXpCooldown / 60;
+                if (minutesToAdd < 1) minutesToAdd = 1;
+
+                // Award Voice XP using the correct method that tracks voice_minutes
+                int newLevel = handler.addVoiceXpToUser(guildId, oderId, xpAmount, minutesToAdd);
+
+                // Update last award time
+                lastVoiceXpTime.put(key, now);
+
+                System.out.println("[VoiceXP] Awarded " + xpAmount + " XP to " + member.getEffectiveName() +
+                                   " (+" + minutesToAdd + " minutes). New level: " + (newLevel > 0 ? newLevel : "no change"));
+
+                // Handle level up
+                if (newLevel > 0) {
+                    handleVoiceLevelUp(guild, settings, member, newLevel);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[VoiceXP] Error in voice XP scheduler: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Handle level up from voice XP
+     */
+    private void handleVoiceLevelUp(net.dv8tion.jda.api.entities.Guild guild,
+                                     DatabaseHandler.LevelSettingsData settings,
+                                     Member member, int newLevel) {
+        // Apply role rewards
+        applyRoleRewardsForMember(guild, settings, member, newLevel);
+
+        // Build level-up message
+        String levelUpMessage = buildLevelUpMessageForMember(settings, member, newLevel);
+
+        // Send notification
+        sendVoiceLevelUpNotification(guild, settings, member, levelUpMessage, newLevel);
+
+        // Fire level up event
+        LevelUpEvent levelUpEvent = new LevelUpEvent(jdaInstance, guild, member, newLevel, newLevel - 1);
+        jdaInstance.getEventManager().handle(levelUpEvent);
+    }
+
+    /**
+     * Send level-up notification for voice level ups
+     */
+    private void sendVoiceLevelUpNotification(net.dv8tion.jda.api.entities.Guild guild,
+                                               DatabaseHandler.LevelSettingsData settings,
+                                               Member member, String message, int newLevel) {
+        // Send DM if enabled
+        if (settings.levelupDm) {
+            member.getUser().openPrivateChannel().queue(
+                    dm -> dm.sendMessage(message).queue(success -> {}, error -> {}),
+                    error -> {}
+            );
+        }
+
+        String channelSetting = settings.levelupChannelId;
+        if (channelSetting == null || channelSetting.equals("0") || channelSetting.isEmpty() || channelSetting.equals("current")) {
+            return; // Can't send to "current" for voice level ups
+        }
+
+        TextChannel targetChannel = guild.getTextChannelById(channelSetting);
+        if (targetChannel != null) {
+            DatabaseHandler.UserLevelData userData = handler.getUserLevel(guild.getId(), member.getId());
+            long xpForNext = userData.getXpForNextLevel();
+            double progress = userData.getProgressPercent();
+            String progressBar = buildProgressBar(progress);
+
+            Container levelUpContainer = Container.of(
+                    TextDisplay.of("# 🎉 Level Up! (Voice)"),
+                    Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(message),
+                    Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(String.format(
+                            "**Level %d** → **Level %d**\n%s\n`%d / %d XP` (%.1f%%)",
+                            newLevel - 1, newLevel, progressBar, userData.xp, xpForNext, progress
+                    ))
+            ).withAccentColor(0x9B59B6); // Purple for voice
+
+            MessageCreateBuilder messageBuilder = new MessageCreateBuilder().setComponents(levelUpContainer);
+            targetChannel.sendMessage(messageBuilder.useComponentsV2().build()).queue(
+                    success -> {},
+                    error -> System.err.println("Failed to send voice level-up message: " + error.getMessage())
+            );
+        }
+    }
+
+    // ==================== REACTION EVENT FOR XP ====================
+
+    @Override
+    public void onMessageReactionAdd(MessageReactionAddEvent event) {
+        // Ignore bots and DMs
+        if (event.getUser() == null || event.getUser().isBot()) return;
+        if (!event.isFromGuild()) return;
+
+        String guildId = event.getGuild().getId();
+        String reactorId = event.getUserId(); // Person who added the reaction
+        String channelId = event.getChannel().getId();
+
+        // Check if leveling system is active
+        if (!handler.isSystemActive(guildId, "leveling")) {
+            return;
+        }
+
+        // Get settings
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+        if (!settings.enabled || !settings.reactionXpEnabled) {
+            return;
+        }
+
+        // Check if channel is ignored
+        if (isChannelIgnored(settings, channelId)) {
+            return;
+        }
+
+        // Check if reactor has an ignored role
+        Member reactorMember = event.getMember();
+        if (reactorMember != null && hasIgnoredRole(settings, reactorMember)) {
+            return;
+        }
+
+        // Get the message to find the author
+        event.retrieveMessage().queue(message -> {
+            handleReactionXp(event, settings, guildId, reactorId, message);
+        }, error -> {
+            // Message might be deleted, ignore
+        });
+    }
+
+    /**
+     * Handle XP gain from reactions
+     */
+    private void handleReactionXp(MessageReactionAddEvent event, DatabaseHandler.LevelSettingsData settings,
+                                   String guildId, String reactorId, Message message) {
+        String messageAuthorId = message.getAuthor().getId();
+
+        // Don't give XP for self-reactions
+        if (reactorId.equals(messageAuthorId)) {
+            return;
+        }
+
+        // Don't give XP for bot message reactions
+        if (message.getAuthor().isBot()) {
+            return;
+        }
+
+        // Calculate XP amount
+        int xpAmount = settings.reactionXpMin;
+        if (settings.reactionXpMax > settings.reactionXpMin) {
+            xpAmount = random.nextInt(settings.reactionXpMax - settings.reactionXpMin + 1) + settings.reactionXpMin;
+        }
+
+        // Apply multiplier
+        xpAmount = (int) Math.round(xpAmount * settings.xpMultiplier);
+
+        // Award XP based on awards setting
+        switch (settings.reactionXpAwards) {
+            case "sender" -> {
+                // Only reactor gets XP
+                awardReactionXpToUser(event, settings, guildId, reactorId, xpAmount, "reaction_sender");
+            }
+            case "receiver" -> {
+                // Only message author gets XP
+                awardReactionXpToUser(event, settings, guildId, messageAuthorId, xpAmount, "reaction_receiver");
+            }
+            default -> { // "both"
+                // Both get XP
+                awardReactionXpToUser(event, settings, guildId, reactorId, xpAmount, "reaction_sender");
+                awardReactionXpToUser(event, settings, guildId, messageAuthorId, xpAmount, "reaction_receiver");
+            }
+        }
+    }
+
+    /**
+     * Award reaction XP to a user with cooldown check
+     */
+    private void awardReactionXpToUser(MessageReactionAddEvent event, DatabaseHandler.LevelSettingsData settings,
+                                        String guildId, String userId, int xpAmount, String cooldownType) {
+        // Check cooldown (use reaction-specific cooldown)
+        if (handler.isUserOnReactionXpCooldown(guildId, userId, cooldownType, settings.reactionXpCooldown)) {
+            return;
+        }
+
+        // Check if user has an ignored role
+        Member member = event.getGuild().getMemberById(userId);
+        if (member != null && hasIgnoredRole(settings, member)) {
+            return;
+        }
+
+        // Check max level
+        if (settings.maxLevel > 0) {
+            DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, userId);
+            if (userData.level >= settings.maxLevel) {
+                return; // User is at max level
+            }
+        }
+
+        // Add XP
+        int newLevel = handler.addXpToUser(guildId, userId, xpAmount);
+
+        // Handle level up if occurred
+        if (newLevel > 0 && member != null) {
+            handleReactionLevelUp(event, settings, guildId, member, newLevel);
+        }
+    }
+
+    /**
+     * Handle level up from reaction XP
+     */
+    private void handleReactionLevelUp(MessageReactionAddEvent event, DatabaseHandler.LevelSettingsData settings,
+                                        String guildId, Member member, int newLevel) {
+        // Apply role rewards
+        applyRoleRewardsForMember(event.getGuild(), settings, member, newLevel);
+
+        // Build and send level-up message
+        String levelUpMessage = buildLevelUpMessageForMember(settings, member, newLevel);
+        sendLevelUpNotificationForReaction(event, settings, member, levelUpMessage, newLevel);
+
+        // Fire level up event
+        LevelUpEvent levelUpEvent = new LevelUpEvent(event.getJDA(), event.getGuild(), member, newLevel, newLevel - 1);
+        event.getJDA().getEventManager().handle(levelUpEvent);
+    }
+
+    /**
+     * Apply role rewards for a member (generic version for non-message events)
+     */
+    private void applyRoleRewardsForMember(net.dv8tion.jda.api.entities.Guild guild,
+                                            DatabaseHandler.LevelSettingsData settings,
+                                            Member member, int newLevel) {
+        if (settings.rewards == null || settings.rewards.isEmpty()) {
+            return;
+        }
+
+        try {
+            JSONArray rewards = new JSONArray(settings.rewards);
+            Role previousRewardRole = null;
+            Role newRewardRole = null;
+            int previousRewardLevel = 0;
+
+            for (int i = 0; i < rewards.length(); i++) {
+                JSONObject reward = rewards.getJSONObject(i);
+                int rewardLevel = reward.getInt("level");
+                String roleId = reward.getString("role_id");
+
+                Role role = guild.getRoleById(roleId);
+                if (role == null) continue;
+
+                if (rewardLevel == newLevel) {
+                    newRewardRole = role;
+                } else if (rewardLevel < newLevel && !settings.stackRewards) {
+                    if (rewardLevel > previousRewardLevel) {
+                        previousRewardRole = role;
+                        previousRewardLevel = rewardLevel;
+                    }
+                }
+            }
+
+            if (newRewardRole != null) {
+                guild.addRoleToMember(member, newRewardRole).queue(
+                        success -> {},
+                        error -> System.err.println("Failed to add reward role: " + error.getMessage())
+                );
+            }
+
+            if (!settings.stackRewards && previousRewardRole != null && newRewardRole != null) {
+                guild.removeRoleFromMember(member, previousRewardRole).queue(
+                        success -> {},
+                        error -> System.err.println("Failed to remove previous reward role: " + error.getMessage())
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("Error applying role rewards: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Build level-up message for a member (generic version)
+     */
+    private String buildLevelUpMessageForMember(DatabaseHandler.LevelSettingsData settings, Member member, int newLevel) {
+        String message = settings.levelupMessages;
+
+        if (message == null || message.isEmpty()) {
+            message = "🎉 Congratulations {mention}, you reached **Level {level}**!";
+        }
+
+        DatabaseHandler.UserLevelData userData = handler.getUserLevel(member.getGuild().getId(), member.getId());
+
+        message = message
+                .replace("{mention}", member.getAsMention())
+                .replace("{username}", member.getEffectiveName())
+                .replace("{user}", member.getEffectiveName())
+                .replace("{level}", String.valueOf(newLevel))
+                .replace("{xp}", String.valueOf(userData.totalXp));
+
+        return message;
+    }
+
+    /**
+     * Send level-up notification for reaction events
+     */
+    private void sendLevelUpNotificationForReaction(MessageReactionAddEvent event,
+                                                     DatabaseHandler.LevelSettingsData settings,
+                                                     Member member, String message, int newLevel) {
+        // Send DM if enabled
+        if (settings.levelupDm) {
+            member.getUser().openPrivateChannel().queue(
+                    dm -> dm.sendMessage(message).queue(success -> {}, error -> {}),
+                    error -> {}
+            );
+        }
+
+        String channelSetting = settings.levelupChannelId;
+        if (channelSetting == null || channelSetting.equals("0") || channelSetting.isEmpty()) {
+            return;
+        }
+
+        TextChannel targetChannel = null;
+
+        if (channelSetting.equals("current")) {
+            if (event.getChannel() instanceof TextChannel) {
+                targetChannel = (TextChannel) event.getChannel();
+            }
+        } else {
+            targetChannel = event.getGuild().getTextChannelById(channelSetting);
+        }
+
+        if (targetChannel != null) {
+            DatabaseHandler.UserLevelData userData = handler.getUserLevel(member.getGuild().getId(), member.getId());
+            long xpForNext = userData.getXpForNextLevel();
+            double progress = userData.getProgressPercent();
+            String progressBar = buildProgressBar(progress);
+
+            Container levelUpContainer = Container.of(
+                    TextDisplay.of("# 🎉 Level Up!"),
+                    Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(message),
+                    Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(String.format(
+                            "**Level %d** → **Level %d**\n%s\n`%d / %d XP` (%.1f%%)",
+                            newLevel - 1, newLevel, progressBar, userData.xp, xpForNext, progress
+                    ))
+            ).withAccentColor(0x5865F2);
+
+            MessageCreateBuilder messageBuilder = new MessageCreateBuilder().setComponents(levelUpContainer);
+            targetChannel.sendMessage(messageBuilder.useComponentsV2().build()).queue(
+                    success -> {},
+                    error -> System.err.println("Failed to send level-up message: " + error.getMessage())
+            );
+        }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Check if a channel is in the ignored list
+     */
+    private boolean isChannelIgnored(DatabaseHandler.LevelSettingsData settings, String channelId) {
+        if (settings.ignoredChannels == null || settings.ignoredChannels.isEmpty()) {
+            return false;
+        }
+        String[] ignoredChannels = settings.ignoredChannels.split(",");
+        for (String ignored : ignoredChannels) {
+            if (ignored.trim().equals(channelId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if a member has an ignored role
+     */
+    private boolean hasIgnoredRole(DatabaseHandler.LevelSettingsData settings, Member member) {
+        if (settings.ignoredRoles == null || settings.ignoredRoles.isEmpty()) {
+            return false;
+        }
+        String[] ignoredRoles = settings.ignoredRoles.split(",");
+        for (Role role : member.getRoles()) {
+            for (String ignored : ignoredRoles) {
+                if (ignored.trim().equals(role.getId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -66,51 +688,54 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
         // Check if leveling is enabled
-        if (!settings.enabled) {
+        if (!settings.enabled || !settings.messageXpEnabled) {
             return;
         }
 
         // Check if channel is ignored
-        if (settings.ignoredChannels != null && !settings.ignoredChannels.isEmpty()) {
-            String[] ignoredChannels = settings.ignoredChannels.split(",");
-            for (String ignored : ignoredChannels) {
-                if (ignored.trim().equals(channelId)) {
-                    return;
-                }
-            }
+        if (isChannelIgnored(settings, channelId)) {
+            return;
         }
 
         // Check if user has an ignored role
-        if (settings.ignoredRoles != null && !settings.ignoredRoles.isEmpty()) {
-            Member member = event.getMember();
-            if (member != null) {
-                String[] ignoredRoles = settings.ignoredRoles.split(",");
-                for (Role role : member.getRoles()) {
-                    for (String ignored : ignoredRoles) {
-                        if (ignored.trim().equals(role.getId())) {
-                            return;
-                        }
-                    }
-                }
-            }
+        Member member = event.getMember();
+        if (member != null && hasIgnoredRole(settings, member)) {
+            return;
         }
 
         // Check minimum message length
-        /*String messageContent = event.getMessage().getContentRaw();
+        String messageContent = event.getMessage().getContentRaw();
         if (messageContent.length() < settings.minMessageLength) {
             return;
-        }*/
+        }
 
         // Check cooldown
         if (handler.isUserOnXpCooldown(guildId, userId, settings.cooldownSeconds)) {
             return;
         }
 
-        // Calculate random XP between min and max
-        int xpAmount = settings.xpMin;
-        if (settings.xpMax > settings.xpMin) {
-            xpAmount = random.nextInt(settings.xpMax - settings.xpMin + 1) + settings.xpMin;
+        // Check max level
+        if (settings.maxLevel > 0) {
+            DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, userId);
+            if (userData.level >= settings.maxLevel) {
+                return; // User is at max level
+            }
         }
+
+        // Calculate XP based on mode
+        int xpAmount;
+        if (settings.messageXpMode.equals("fixed")) {
+            xpAmount = settings.xpMax; // Fixed mode uses max value
+        } else {
+            // Random mode
+            xpAmount = settings.xpMin;
+            if (settings.xpMax > settings.xpMin) {
+                xpAmount = random.nextInt(settings.xpMax - settings.xpMin + 1) + settings.xpMin;
+            }
+        }
+
+        // Apply multiplier
+        xpAmount = (int) Math.round(xpAmount * settings.xpMultiplier);
 
         // Add XP and check for level up
         int newLevel = handler.addXpToUser(guildId, userId, xpAmount);
@@ -137,6 +762,11 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Send level-up notification
         sendLevelUpNotification(event, settings, member, levelUpMessage, newLevel);
+
+        LevelUpEvent levelUpEvent = new LevelUpEvent(event.getJDA(), event.getGuild(), member, newLevel,
+                newLevel - 1);
+
+        event.getJDA().getEventManager().handle(levelUpEvent);
     }
 
     /**
@@ -273,7 +903,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                             "**Level %d** → **Level %d**\n" +
                             "%s\n" +
                             "`%d / %d XP` (%.1f%%)",
-                            newLevel - 1, newLevel,
+                            newLevel, newLevel + 1,
                             progressBar,
                             userData.xp, xpForNext, progress
                     ))
@@ -322,7 +952,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         String guildId = event.getGuild().getId();
 
         // Permission check for settings buttons
-        if (componentId.startsWith("level_toggle_") || componentId.startsWith("level_settings_")) {
+        if (componentId.startsWith("level_toggle_") || componentId.startsWith("level_settings_") || componentId.startsWith("level_set_")) {
             if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
                 event.reply("❌ You need **Manage Server** permission to change these settings.").setEphemeral(true).queue();
                 return;
@@ -336,6 +966,12 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             return;
         }
 
+        // Handle set buttons (direct value changes)
+        if (componentId.startsWith("level_set_")) {
+            handleSetSetting(event, guildId, componentId);
+            return;
+        }
+
         // Handle leaderboard pagination
         if (componentId.startsWith("level_leaderboard_")) {
             handleLeaderboardPagination(event, guildId, componentId);
@@ -344,20 +980,42 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Handle navigation/action buttons
         switch (componentId) {
-            case "level_settings_xp" -> showXpSettingsPage(event, guildId);
+            // Navigation
+            case "level_settings_formula" -> showFormulaSettingsPage(event, guildId);
+            case "level_settings_message_xp" -> showMessageXpSettingsPage(event, guildId);
+            case "level_settings_voice_xp" -> showVoiceXpSettingsPage(event, guildId);
+            case "level_settings_reaction_xp" -> showReactionXpSettingsPage(event, guildId);
+            case "level_settings_xp" -> showMessageXpSettingsPage(event, guildId); // Legacy support
             case "level_settings_notifications" -> showNotificationSettingsPage(event, guildId);
             case "level_settings_rewards" -> showRewardSettingsPage(event, guildId);
             case "level_settings_exceptions" -> showExceptionsSettingsPage(event, guildId);
             case "level_settings_back" -> showMainSettingsPage(event, guildId);
             case "level_settings_refresh" -> showMainSettingsPage(event, guildId);
 
-            // Edit buttons that open modals
+            // Formula modals
+            case "level_settings_multiplier_change" -> showMultiplierModal(event, guildId);
+            case "level_settings_max_level_change" -> showMaxLevelModal(event, guildId);
+
+            // Message XP modals
             case "level_settings_xp_min_max_change" -> showXpMinMaxModal(event, guildId);
             case "level_settings_xp_cooldown_change" -> showCooldownModal(event, guildId);
-            case "level_settings_voice_xp_amount_change" -> showVoiceXpAmountModal(event, guildId);
             case "level_settings_min_message_length_change" -> showMinMessageLengthModal(event, guildId);
+
+            // Voice XP modals
+            case "level_settings_voice_xp_min_max_change" -> showVoiceXpMinMaxModal(event, guildId);
+            case "level_settings_voice_xp_cooldown_change" -> showVoiceXpCooldownModal(event, guildId);
+            case "level_settings_voice_min_members_change" -> showVoiceMinMembersModal(event, guildId);
+            case "level_settings_voice_xp_amount_change" -> showVoiceXpAmountModal(event, guildId); // Legacy
+
+            // Reaction XP modals
+            case "level_settings_reaction_xp_min_max_change" -> showReactionXpMinMaxModal(event, guildId);
+            case "level_settings_reaction_xp_cooldown_change" -> showReactionXpCooldownModal(event, guildId);
+
+            // Notification modals
             case "level_settings_levelup_channel_change" -> showLevelUpChannelModal(event, guildId);
             case "level_settings_levelup_message_change" -> showLevelUpMessageModal(event, guildId);
+
+            // Exception modals
             case "level_settings_ignored_channels_change" -> showIgnoredChannelsModal(event, guildId);
             case "level_settings_ignored_roles_change" -> showIgnoredRolesModal(event, guildId);
         }
@@ -377,12 +1035,30 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
 
         switch (modalId) {
+            // Formula modals
+            case "level_modal_multiplier" -> handleMultiplierModal(event, guildId);
+            case "level_modal_max_level" -> handleMaxLevelModal(event, guildId);
+
+            // Message XP modals
             case "level_modal_xp_min_max" -> handleXpMinMaxModal(event, guildId);
             case "level_modal_cooldown" -> handleCooldownModal(event, guildId);
-            case "level_modal_voice_xp_amount" -> handleVoiceXpAmountModal(event, guildId);
             case "level_modal_min_message_length" -> handleMinMessageLengthModal(event, guildId);
+
+            // Voice XP modals
+            case "level_modal_voice_xp_min_max" -> handleVoiceXpMinMaxModal(event, guildId);
+            case "level_modal_voice_xp_cooldown" -> handleVoiceXpCooldownModal(event, guildId);
+            case "level_modal_voice_min_members" -> handleVoiceMinMembersModal(event, guildId);
+            case "level_modal_voice_xp_amount" -> handleVoiceXpAmountModal(event, guildId); // Legacy
+
+            // Reaction XP modals
+            case "level_modal_reaction_xp_min_max" -> handleReactionXpMinMaxModal(event, guildId);
+            case "level_modal_reaction_xp_cooldown" -> handleReactionXpCooldownModal(event, guildId);
+
+            // Notification modals
             case "level_modal_levelup_channel" -> handleLevelUpChannelModal(event, guildId);
             case "level_modal_levelup_message" -> handleLevelUpMessageModal(event, guildId);
+
+            // Exception modals
             case "level_modal_ignored_channels" -> handleIgnoredChannelsModal(event, guildId);
             case "level_modal_ignored_roles" -> handleIgnoredRolesModal(event, guildId);
         }
@@ -650,9 +1326,13 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
         String enabledStatus = settings.enabled ? "✅ Enabled" : "❌ Disabled";
+        String messageXpStatus = settings.messageXpEnabled ? "✅" : "❌";
         String voiceXpStatus = settings.voiceXpEnabled ? "✅" : "❌";
+        String reactionXpStatus = settings.reactionXpEnabled ? "✅" : "❌";
         String stackRewardsStatus = settings.stackRewards ? "✅ Stack" : "🔄 Replace";
         String resetOnLeaveStatus = settings.resetOnLeave ? "✅ Reset" : "💾 Keep";
+        String maxLevelText = settings.maxLevel == 0 ? "Unlimited" : String.valueOf(settings.maxLevel);
+        String curveText = settings.xpCurve.substring(0, 1).toUpperCase() + settings.xpCurve.substring(1);
 
         return Container.of(
                 // Header
@@ -665,15 +1345,11 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 TextDisplay.of("## 📊 Current Status"),
                 TextDisplay.of(String.format(
                         "**System:** %s\n" +
-                        "**XP Range:** %d - %d per message\n" +
-                        "**Cooldown:** %ds between XP gains\n" +
-                        "**Min Message Length:** %d characters\n" +
-                        "**Voice XP:** %s (%d XP/interval)\n",
+                        "**Formula:** %s × %.2f | Max Level: %s\n" +
+                        "**Message XP:** %s | **Voice XP:** %s | **Reaction XP:** %s",
                         enabledStatus,
-                        settings.xpMin, settings.xpMax,
-                        settings.cooldownSeconds,
-                        settings.minMessageLength,
-                        voiceXpStatus, settings.voiceXpAmount
+                        curveText, settings.xpMultiplier, maxLevelText,
+                        messageXpStatus, voiceXpStatus, reactionXpStatus
                 )),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
@@ -683,12 +1359,16 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 ActionRow.of(
                         Button.of(settings.enabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
                                 "level_toggle_enabled", settings.enabled ? "✅ System ON" : "❌ System OFF"),
+                        Button.of(settings.messageXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_toggle_message_xp_enabled", "💬 Message XP"),
                         Button.of(settings.voiceXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
                                 "level_toggle_voice_xp_enabled", "🎤 Voice XP"),
-                        Button.of(settings.levelupDm ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_levelup_dm", "📬 DM Notifications")
+                        Button.of(settings.reactionXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_toggle_reaction_xp_enabled", "👍 Reaction XP")
                 ),
                 ActionRow.of(
+                        Button.of(settings.levelupDm ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_toggle_levelup_dm", "📬 DM Notifications"),
                         Button.of(settings.stackRewards ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
                                 "level_toggle_stack_rewards", stackRewardsStatus + " Roles"),
                         Button.of(settings.resetOnLeave ? net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER : net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS,
@@ -700,7 +1380,12 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 // Navigation Buttons
                 TextDisplay.of("## 🔧 Detailed Settings"),
                 ActionRow.of(
-                        Button.primary("level_settings_xp", "📈 XP Settings"),
+                        Button.primary("level_settings_formula", "📐 Formula"),
+                        Button.primary("level_settings_message_xp", "💬 Message XP"),
+                        Button.primary("level_settings_voice_xp", "🎤 Voice XP"),
+                        Button.primary("level_settings_reaction_xp", "👍 Reaction XP")
+                ),
+                ActionRow.of(
                         Button.primary("level_settings_notifications", "🔔 Notifications"),
                         Button.primary("level_settings_rewards", "🎁 Role Rewards"),
                         Button.primary("level_settings_exceptions", "🚫 Exceptions")
@@ -713,57 +1398,60 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         ).withAccentColor(settings.enabled ? 0x57F287 : 0xED4245); // Green if enabled, red if disabled
     }
 
-    // ==================== XP SETTINGS PAGE ====================
+    // ==================== FORMULA SETTINGS PAGE ====================
 
-    private Container buildXpSettingsContainer(String guildId) {
+    private Container buildFormulaSettingsContainer(String guildId) {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
+        String curveText = settings.xpCurve.substring(0, 1).toUpperCase() + settings.xpCurve.substring(1);
+        String maxLevelText = settings.maxLevel == 0 ? "Unlimited" : String.valueOf(settings.maxLevel);
+
         return Container.of(
-                TextDisplay.of("# 📈 XP Settings"),
-                TextDisplay.of("Configure how XP is earned on your server."),
+                TextDisplay.of("# 📐 Formula Settings"),
+                TextDisplay.of("Configure how XP requirements scale per level."),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## 💬 Message XP"),
+                TextDisplay.of("## 📈 XP Curve"),
                 TextDisplay.of(String.format(
-                        "**XP per Message:** %d - %d (random)\n" +
-                        "**Cooldown:** %d seconds\n" +
-                        "-# Users earn random XP between min/max for each qualifying message.\n" +
-                        "-# The cooldown prevents spam farming.\n",
-                        settings.xpMin, settings.xpMax,
-                        settings.cooldownSeconds
-                )),
-
-                ActionRow.of(Button.primary("level_settings_xp_min_max_change", "✏️ Change Min/Max XP"),
-                            Button.primary("level_settings_xp_cooldown_change", "✏️ Change Cooldown")),
-
-                Separator.createDivider(Separator.Spacing.LARGE),
-
-                TextDisplay.of("## 🎤 Voice XP"),
-                TextDisplay.of(String.format(
-                        "**Status:** %s\n" +
-                        "**XP per Interval:** %d\n\n" +
-                        "-# Voice XP is awarded periodically while users are in voice channels.\n",
-                        settings.voiceXpEnabled ? "✅ Enabled" : "❌ Disabled",
-                        settings.voiceXpAmount
+                        "**Current Curve:** %s\n\n" +
+                        "• **Linear** - Steady XP increase per level\n" +
+                        "• **Exponential** - Rapidly increasing XP requirements\n" +
+                        "• **Logarithmic** - Slower scaling at higher levels",
+                        curveText
                 )),
 
                 ActionRow.of(
-                        Button.of(settings.voiceXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_voice_xp_enabled", settings.voiceXpEnabled ? "✅ Voice XP ON" : "❌ Voice XP OFF"),
-                        Button.primary("level_settings_voice_xp_amount_change", "✏️ Change Voice XP")
+                        Button.of(settings.xpCurve.equals("linear") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_curve_linear", "Linear"),
+                        Button.of(settings.xpCurve.equals("exponential") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_curve_exponential", "Exponential"),
+                        Button.of(settings.xpCurve.equals("logarithmic") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_curve_logarithmic", "Logarithmic")
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## 📏 Message Requirements"),
+                TextDisplay.of("## ✖️ Multiplier"),
                 TextDisplay.of(String.format(
-                        "**Min Message Length:** %d characters\n\n" +
-                        "-# Messages shorter than this won't earn XP.\n",
-                        settings.minMessageLength
+                        "**Current Multiplier:** %.2fx\n\n" +
+                        "-# XP requirements are multiplied by this value.\n" +
+                        "-# Higher = harder to level up. Lower = easier.\n",
+                        settings.xpMultiplier
                 )),
 
-                ActionRow.of(Button.primary("level_settings_min_message_length_change", "✏️ Change Min Length")),
+                ActionRow.of(Button.primary("level_settings_multiplier_change", "✏️ Change Multiplier")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 🎯 Max Level"),
+                TextDisplay.of(String.format(
+                        "**Current Max Level:** %s\n\n" +
+                        "-# Set to 0 for unlimited levels.\n",
+                        maxLevelText
+                )),
+
+                ActionRow.of(Button.primary("level_settings_max_level_change", "✏️ Change Max Level")),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
@@ -771,7 +1459,197 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                         Button.secondary("level_settings_back", "⬅️ Back to Overview"),
                         Button.secondary("level_settings_refresh", "🔄 Refresh")
                 )
-        ).withAccentColor(0x5865F2); // Blurple
+        ).withAccentColor(0x9B59B6); // Purple
+    }
+
+    // ==================== MESSAGE XP SETTINGS PAGE ====================
+
+    private Container buildMessageXpSettingsContainer(String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        String modeText = settings.messageXpMode.equals("random") ? "Random" : "Fixed";
+
+        return Container.of(
+                TextDisplay.of("# 💬 Message XP"),
+                TextDisplay.of("Configure XP earned from messages."),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 🔘 Status & Mode"),
+                TextDisplay.of(String.format(
+                        "**Status:** %s\n" +
+                        "**Mode:** %s\n\n" +
+                        "• **Random** - XP between min and max\n" +
+                        "• **Fixed** - Always earns max XP value",
+                        settings.messageXpEnabled ? "✅ Enabled" : "❌ Disabled",
+                        modeText
+                )),
+
+                ActionRow.of(
+                        Button.of(settings.messageXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
+                                "level_toggle_message_xp_enabled", settings.messageXpEnabled ? "✅ Enabled" : "❌ Disabled"),
+                        Button.of(settings.messageXpMode.equals("random") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.PRIMARY : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_toggle_message_xp_mode", "Mode: " + modeText)
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 📊 XP Values"),
+                TextDisplay.of(String.format(
+                        "**Min XP:** %d\n" +
+                        "**Max XP:** %d\n" +
+                        "**Cooldown:** %d seconds\n",
+                        settings.xpMin, settings.xpMax, settings.cooldownSeconds
+                )),
+
+                ActionRow.of(
+                        Button.primary("level_settings_xp_min_max_change", "✏️ Min/Max XP"),
+                        Button.primary("level_settings_xp_cooldown_change", "✏️ Cooldown")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("level_settings_back", "⬅️ Back to Overview"),
+                        Button.secondary("level_settings_refresh", "🔄 Refresh")
+                )
+        ).withAccentColor(settings.messageXpEnabled ? 0x3498DB : 0x95A5A6); // Blue if enabled, gray if disabled
+    }
+
+    // ==================== VOICE XP SETTINGS PAGE ====================
+
+    private Container buildVoiceXpSettingsContainer(String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        return Container.of(
+                TextDisplay.of("# 🎤 Voice XP"),
+                TextDisplay.of("Configure XP earned from voice channels."),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 🔘 Status"),
+                TextDisplay.of(String.format(
+                        "**Status:** %s\n",
+                        settings.voiceXpEnabled ? "✅ Enabled" : "❌ Disabled"
+                )),
+
+                ActionRow.of(
+                        Button.of(settings.voiceXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
+                                "level_toggle_voice_xp_enabled", settings.voiceXpEnabled ? "✅ Enabled" : "❌ Disabled")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 📊 XP Values"),
+                TextDisplay.of(String.format(
+                        "**Min XP:** %d\n" +
+                        "**Max XP:** %d\n" +
+                        "**Cooldown:** %d seconds\n",
+                        settings.voiceXpMin, settings.voiceXpMax, settings.voiceXpCooldown
+                )),
+
+                ActionRow.of(
+                        Button.primary("level_settings_voice_xp_min_max_change", "✏️ Min/Max XP"),
+                        Button.primary("level_settings_voice_xp_cooldown_change", "✏️ Cooldown")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## ⚙️ Voice Settings"),
+                TextDisplay.of(String.format(
+                        "**Minimum Members:** %d\n" +
+                        "**Anti-AFK:** %s\n\n" +
+                        "-# Minimum members required in the channel.\n" +
+                        "-# Anti-AFK requires users to be unmuted.\n",
+                        settings.voiceXpMinMembers,
+                        settings.voiceXpAntiAfk ? "✅ Enabled" : "❌ Disabled"
+                )),
+
+                ActionRow.of(
+                        Button.primary("level_settings_voice_min_members_change", "✏️ Min Members"),
+                        Button.of(settings.voiceXpAntiAfk ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_toggle_voice_xp_anti_afk", settings.voiceXpAntiAfk ? "✅ Anti-AFK ON" : "❌ Anti-AFK OFF")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("level_settings_back", "⬅️ Back to Overview"),
+                        Button.secondary("level_settings_refresh", "🔄 Refresh")
+                )
+        ).withAccentColor(settings.voiceXpEnabled ? 0x9B59B6 : 0x95A5A6); // Purple if enabled, gray if disabled
+    }
+
+    // ==================== REACTION XP SETTINGS PAGE ====================
+
+    private Container buildReactionXpSettingsContainer(String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        String awardsText = switch (settings.reactionXpAwards) {
+            case "sender" -> "Sender Only";
+            case "receiver" -> "Receiver Only";
+            default -> "Both";
+        };
+
+        return Container.of(
+                TextDisplay.of("# 👍 Reaction XP"),
+                TextDisplay.of("Configure XP earned from reactions."),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 🔘 Status"),
+                TextDisplay.of(String.format(
+                        "**Status:** %s\n",
+                        settings.reactionXpEnabled ? "✅ Enabled" : "❌ Disabled"
+                )),
+
+                ActionRow.of(
+                        Button.of(settings.reactionXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
+                                "level_toggle_reaction_xp_enabled", settings.reactionXpEnabled ? "✅ Enabled" : "❌ Disabled")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 🎁 Awards"),
+                TextDisplay.of(String.format(
+                        "**Current:** %s\n\n" +
+                        "• **Both** - Sender and receiver get XP\n" +
+                        "• **Sender** - Only the reactor gets XP\n" +
+                        "• **Receiver** - Only the message author gets XP",
+                        awardsText
+                )),
+
+                ActionRow.of(
+                        Button.of(settings.reactionXpAwards.equals("both") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_reaction_awards_both", "Both"),
+                        Button.of(settings.reactionXpAwards.equals("sender") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_reaction_awards_sender", "Sender"),
+                        Button.of(settings.reactionXpAwards.equals("receiver") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
+                                "level_set_reaction_awards_receiver", "Receiver")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## 📊 XP Values"),
+                TextDisplay.of(String.format(
+                        "**Min XP:** %d\n" +
+                        "**Max XP:** %d\n" +
+                        "**Cooldown:** %d seconds\n",
+                        settings.reactionXpMin, settings.reactionXpMax, settings.reactionXpCooldown
+                )),
+
+                ActionRow.of(
+                        Button.primary("level_settings_reaction_xp_min_max_change", "✏️ Min/Max XP"),
+                        Button.primary("level_settings_reaction_xp_cooldown_change", "✏️ Cooldown")
+                ),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("level_settings_back", "⬅️ Back to Overview"),
+                        Button.secondary("level_settings_refresh", "🔄 Refresh")
+                )
+        ).withAccentColor(settings.reactionXpEnabled ? 0xE91E63 : 0x95A5A6); // Pink if enabled, gray if disabled
     }
 
     // ==================== NOTIFICATION SETTINGS PAGE ====================
@@ -948,27 +1826,37 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     private void handleToggleSetting(ButtonInteractionEvent event, String guildId, String setting) {
         String column = switch (setting) {
             case "enabled" -> "enabled";
+            case "message_xp_enabled" -> "message_xp_enabled";
             case "voice_xp_enabled" -> "voice_xp_enabled";
+            case "reaction_xp_enabled" -> "reaction_xp_enabled";
+            case "voice_xp_anti_afk" -> "voice_xp_anti_afk";
             case "levelup_dm" -> "levelup_dm";
             case "stack_rewards" -> "stack_rewards";
             case "reset_on_leave" -> "reset_on_leave";
+            case "message_xp_mode" -> null; // Special handling
             default -> null;
         };
 
-        if (column == null) {
+        // Special handling for message_xp_mode toggle
+        if (setting.equals("message_xp_mode")) {
+            DatabaseHandler.LevelSettingsData currentSettings = handler.getLevelSettings(guildId);
+            String newMode = currentSettings.messageXpMode.equals("random") ? "fixed" : "random";
+            handler.updateLevelSetting(guildId, "message_xp_mode", newMode);
+        } else if (column != null) {
+            handler.toggleLevelSetting(guildId, column);
+        } else {
             event.reply("❌ Unknown setting.").setEphemeral(true).queue();
             return;
         }
 
-        handler.toggleLevelSetting(guildId, column);
-
         // Determine which page to refresh based on which setting was toggled
-        String currentPage = getCurrentPageFromButton(event.getComponentId());
-        Container updatedContainer = switch (currentPage) {
-            case "xp" -> buildXpSettingsContainer(guildId);
-            case "notifications" -> buildNotificationSettingsContainer(guildId);
-            case "rewards" -> buildRewardSettingsContainer(guildId);
-            case "exceptions" -> buildExceptionsSettingsContainer(guildId);
+        Container updatedContainer = switch (setting) {
+            case "message_xp_enabled", "message_xp_mode" -> buildMessageXpSettingsContainer(guildId);
+            case "voice_xp_enabled", "voice_xp_anti_afk" -> buildVoiceXpSettingsContainer(guildId);
+            case "reaction_xp_enabled" -> buildReactionXpSettingsContainer(guildId);
+            case "levelup_dm" -> buildNotificationSettingsContainer(guildId);
+            case "stack_rewards" -> buildRewardSettingsContainer(guildId);
+            case "reset_on_leave" -> buildExceptionsSettingsContainer(guildId);
             default -> buildMainSettingsContainer(guildId);
         };
 
@@ -978,14 +1866,28 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         event.editMessage(editBuilder.useComponentsV2().build()).queue();
     }
 
-    private String getCurrentPageFromButton(String buttonId) {
-        // Determine page context based on which toggle was clicked
-        // Most toggles are on main page, but some specific ones are on sub-pages
-        if (buttonId.equals("level_toggle_voice_xp_enabled")) {
-            // Could be main or xp page - default to main for safety
-            return "main";
+    private void handleSetSetting(ButtonInteractionEvent event, String guildId, String componentId) {
+        // Handle curve settings
+        if (componentId.startsWith("level_set_curve_")) {
+            String curve = componentId.replace("level_set_curve_", "");
+            handler.updateLevelSetting(guildId, "xp_curve", curve);
+            Container container = buildFormulaSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+            return;
         }
-        return "main";
+
+        // Handle reaction awards settings
+        if (componentId.startsWith("level_set_reaction_awards_")) {
+            String awards = componentId.replace("level_set_reaction_awards_", "");
+            handler.updateLevelSetting(guildId, "reaction_xp_awards", awards);
+            Container container = buildReactionXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+            return;
+        }
+
+        event.reply("❌ Unknown setting.").setEphemeral(true).queue();
     }
 
     private void showMainSettingsPage(ButtonInteractionEvent event, String guildId) {
@@ -995,8 +1897,29 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         event.editMessage(editBuilder.useComponentsV2().build()).queue();
     }
 
-    private void showXpSettingsPage(ButtonInteractionEvent event, String guildId) {
-        Container container = buildXpSettingsContainer(guildId);
+    private void showFormulaSettingsPage(ButtonInteractionEvent event, String guildId) {
+        Container container = buildFormulaSettingsContainer(guildId);
+        MessageEditBuilder editBuilder = new MessageEditBuilder()
+                .setComponents(container);
+        event.editMessage(editBuilder.useComponentsV2().build()).queue();
+    }
+
+    private void showMessageXpSettingsPage(ButtonInteractionEvent event, String guildId) {
+        Container container = buildMessageXpSettingsContainer(guildId);
+        MessageEditBuilder editBuilder = new MessageEditBuilder()
+                .setComponents(container);
+        event.editMessage(editBuilder.useComponentsV2().build()).queue();
+    }
+
+    private void showVoiceXpSettingsPage(ButtonInteractionEvent event, String guildId) {
+        Container container = buildVoiceXpSettingsContainer(guildId);
+        MessageEditBuilder editBuilder = new MessageEditBuilder()
+                .setComponents(container);
+        event.editMessage(editBuilder.useComponentsV2().build()).queue();
+    }
+
+    private void showReactionXpSettingsPage(ButtonInteractionEvent event, String guildId) {
+        Container container = buildReactionXpSettingsContainer(guildId);
         MessageEditBuilder editBuilder = new MessageEditBuilder()
                 .setComponents(container);
         event.editMessage(editBuilder.useComponentsV2().build()).queue();
@@ -1025,6 +1948,40 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
     // ==================== MODAL SHOW METHODS ====================
 
+    // Formula Modals
+    private void showMultiplierModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput multiplier = TextInput.create("multiplier", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 1.5")
+                .setValue(String.valueOf(settings.xpMultiplier))
+                .setRequiredRange(1, 10)
+                .build();
+
+        Modal modal = Modal.create("level_modal_multiplier", "✖️ XP Multiplier")
+                .addComponents(Label.of("Multiplier (e.g., 1.0, 1.5, 2.0)", multiplier))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    private void showMaxLevelModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput maxLevel = TextInput.create("max_level", TextInputStyle.SHORT)
+                .setPlaceholder("0 for unlimited")
+                .setValue(String.valueOf(settings.maxLevel))
+                .setRequiredRange(1, 5)
+                .build();
+
+        Modal modal = Modal.create("level_modal_max_level", "🎯 Max Level")
+                .addComponents(Label.of("Maximum Level (0 = unlimited)", maxLevel))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    // Message XP Modals
     private void showXpMinMaxModal(ButtonInteractionEvent event, String guildId) {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
@@ -1040,7 +1997,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 .setRequiredRange(1, 5)
                 .build();
 
-        Modal modal = Modal.create("level_modal_xp_min_max", "📈 XP Range Settings")
+        Modal modal = Modal.create("level_modal_xp_min_max", "💬 Message XP Range")
                 .addComponents(
                         Label.of("Minimum XP per Message", minXp),
                         Label.of("Maximum XP per Message", maxXp)
@@ -1059,8 +2016,66 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 .setRequiredRange(1, 5)
                 .build();
 
-        Modal modal = Modal.create("level_modal_cooldown", "⏱️ XP Cooldown Settings")
+        Modal modal = Modal.create("level_modal_cooldown", "⏱️ Message XP Cooldown")
                 .addComponents(Label.of("Cooldown (seconds)", cooldown))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    // Voice XP Modals
+    private void showVoiceXpMinMaxModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput minXp = TextInput.create("voice_xp_min", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 15")
+                .setValue(String.valueOf(settings.voiceXpMin))
+                .setRequiredRange(1, 5)
+                .build();
+
+        TextInput maxXp = TextInput.create("voice_xp_max", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 40")
+                .setValue(String.valueOf(settings.voiceXpMax))
+                .setRequiredRange(1, 5)
+                .build();
+
+        Modal modal = Modal.create("level_modal_voice_xp_min_max", "🎤 Voice XP Range")
+                .addComponents(
+                        Label.of("Minimum Voice XP", minXp),
+                        Label.of("Maximum Voice XP", maxXp)
+                )
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    private void showVoiceXpCooldownModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput cooldown = TextInput.create("voice_xp_cooldown", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 180")
+                .setValue(String.valueOf(settings.voiceXpCooldown))
+                .setRequiredRange(1, 5)
+                .build();
+
+        Modal modal = Modal.create("level_modal_voice_xp_cooldown", "⏱️ Voice XP Cooldown")
+                .addComponents(Label.of("Cooldown (seconds)", cooldown))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    private void showVoiceMinMembersModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput minMembers = TextInput.create("voice_min_members", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 2")
+                .setValue(String.valueOf(settings.voiceXpMinMembers))
+                .setRequiredRange(1, 3)
+                .build();
+
+        Modal modal = Modal.create("level_modal_voice_min_members", "👥 Minimum Members")
+                .addComponents(Label.of("Minimum members in voice channel", minMembers))
                 .build();
 
         event.replyModal(modal).queue();
@@ -1082,6 +2097,49 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         event.replyModal(modal).queue();
     }
 
+    // Reaction XP Modals
+    private void showReactionXpMinMaxModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput minXp = TextInput.create("reaction_xp_min", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 5")
+                .setValue(String.valueOf(settings.reactionXpMin))
+                .setRequiredRange(1, 5)
+                .build();
+
+        TextInput maxXp = TextInput.create("reaction_xp_max", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 25")
+                .setValue(String.valueOf(settings.reactionXpMax))
+                .setRequiredRange(1, 5)
+                .build();
+
+        Modal modal = Modal.create("level_modal_reaction_xp_min_max", "👍 Reaction XP Range")
+                .addComponents(
+                        Label.of("Minimum Reaction XP", minXp),
+                        Label.of("Maximum Reaction XP", maxXp)
+                )
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    private void showReactionXpCooldownModal(ButtonInteractionEvent event, String guildId) {
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        TextInput cooldown = TextInput.create("reaction_xp_cooldown", TextInputStyle.SHORT)
+                .setPlaceholder("e.g., 300")
+                .setValue(String.valueOf(settings.reactionXpCooldown))
+                .setRequiredRange(1, 5)
+                .build();
+
+        Modal modal = Modal.create("level_modal_reaction_xp_cooldown", "⏱️ Reaction XP Cooldown")
+                .addComponents(Label.of("Cooldown (seconds)", cooldown))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    // Notification Modals
     private void showMinMessageLengthModal(ButtonInteractionEvent event, String guildId) {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
@@ -1175,6 +2233,62 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
     // ==================== MODAL HANDLE METHODS ====================
 
+    // Formula Modal Handlers
+    private void handleMultiplierModal(ModalInteractionEvent event, String guildId) {
+        String multiplierStr = Objects.requireNonNull(event.getValue("multiplier")).getAsString().trim();
+
+        try {
+            double multiplier = Double.parseDouble(multiplierStr);
+
+            if (multiplier < 0.1) {
+                event.reply("❌ Multiplier must be at least 0.1.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (multiplier > 10.0) {
+                event.reply("❌ Multiplier cannot exceed 10.0.").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "xp_multiplier", multiplier);
+
+            Container container = buildFormulaSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter a valid number for multiplier.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleMaxLevelModal(ModalInteractionEvent event, String guildId) {
+        String maxLevelStr = Objects.requireNonNull(event.getValue("max_level")).getAsString().trim();
+
+        try {
+            int maxLevel = Integer.parseInt(maxLevelStr);
+
+            if (maxLevel < 0) {
+                event.reply("❌ Max level cannot be negative.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (maxLevel > 10000) {
+                event.reply("❌ Max level cannot exceed 10,000.").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "max_level", maxLevel);
+
+            Container container = buildFormulaSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter a valid number for max level.").setEphemeral(true).queue();
+        }
+    }
+
+    // Message XP Modal Handlers
     private void handleXpMinMaxModal(ModalInteractionEvent event, String guildId) {
         String minXpStr = Objects.requireNonNull(event.getValue("xp_min")).getAsString().trim();
         String maxXpStr = Objects.requireNonNull(event.getValue("xp_max")).getAsString().trim();
@@ -1201,7 +2315,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             handler.updateLevelSetting(guildId, "xp_min", minXp);
             handler.updateLevelSetting(guildId, "xp_max", maxXp);
 
-            Container container = buildXpSettingsContainer(guildId);
+            Container container = buildMessageXpSettingsContainer(guildId);
             MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
             event.editMessage(editBuilder.useComponentsV2().build()).queue();
 
@@ -1228,12 +2342,102 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
             handler.updateLevelSetting(guildId, "cooldown_seconds", cooldown);
 
-            Container container = buildXpSettingsContainer(guildId);
+            Container container = buildMessageXpSettingsContainer(guildId);
             MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
             event.editMessage(editBuilder.useComponentsV2().build()).queue();
 
         } catch (NumberFormatException e) {
             event.reply("❌ Please enter a valid number for cooldown.").setEphemeral(true).queue();
+        }
+    }
+
+    // Voice XP Modal Handlers
+    private void handleVoiceXpMinMaxModal(ModalInteractionEvent event, String guildId) {
+        String minXpStr = Objects.requireNonNull(event.getValue("voice_xp_min")).getAsString().trim();
+        String maxXpStr = Objects.requireNonNull(event.getValue("voice_xp_max")).getAsString().trim();
+
+        try {
+            int minXp = Integer.parseInt(minXpStr);
+            int maxXp = Integer.parseInt(maxXpStr);
+
+            if (minXp < 1 || maxXp < 1) {
+                event.reply("❌ XP values must be at least 1.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (minXp > maxXp) {
+                event.reply("❌ Minimum XP cannot be greater than maximum XP.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (maxXp > 10000) {
+                event.reply("❌ Maximum XP cannot exceed 10,000.").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "voice_xp_min", minXp);
+            handler.updateLevelSetting(guildId, "voice_xp_max", maxXp);
+
+            Container container = buildVoiceXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter valid numbers for voice XP values.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleVoiceXpCooldownModal(ModalInteractionEvent event, String guildId) {
+        String cooldownStr = Objects.requireNonNull(event.getValue("voice_xp_cooldown")).getAsString().trim();
+
+        try {
+            int cooldown = Integer.parseInt(cooldownStr);
+
+            if (cooldown < 0) {
+                event.reply("❌ Cooldown cannot be negative.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (cooldown > 86400) {
+                event.reply("❌ Cooldown cannot exceed 86,400 seconds (24 hours).").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "voice_xp_cooldown", cooldown);
+
+            Container container = buildVoiceXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter a valid number for voice XP cooldown.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleVoiceMinMembersModal(ModalInteractionEvent event, String guildId) {
+        String minMembersStr = Objects.requireNonNull(event.getValue("voice_min_members")).getAsString().trim();
+
+        try {
+            int minMembers = Integer.parseInt(minMembersStr);
+
+            if (minMembers < 1) {
+                event.reply("❌ Minimum members must be at least 1.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (minMembers > 100) {
+                event.reply("❌ Minimum members cannot exceed 100.").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "voice_xp_min_members", minMembers);
+
+            Container container = buildVoiceXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter a valid number for minimum members.").setEphemeral(true).queue();
         }
     }
 
@@ -1255,7 +2459,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
             handler.updateLevelSetting(guildId, "voice_xp_amount", voiceXp);
 
-            Container container = buildXpSettingsContainer(guildId);
+            Container container = buildVoiceXpSettingsContainer(guildId);
             MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
             event.editMessage(editBuilder.useComponentsV2().build()).queue();
 
@@ -1264,6 +2468,70 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
     }
 
+    // Reaction XP Modal Handlers
+    private void handleReactionXpMinMaxModal(ModalInteractionEvent event, String guildId) {
+        String minXpStr = Objects.requireNonNull(event.getValue("reaction_xp_min")).getAsString().trim();
+        String maxXpStr = Objects.requireNonNull(event.getValue("reaction_xp_max")).getAsString().trim();
+
+        try {
+            int minXp = Integer.parseInt(minXpStr);
+            int maxXp = Integer.parseInt(maxXpStr);
+
+            if (minXp < 1 || maxXp < 1) {
+                event.reply("❌ XP values must be at least 1.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (minXp > maxXp) {
+                event.reply("❌ Minimum XP cannot be greater than maximum XP.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (maxXp > 10000) {
+                event.reply("❌ Maximum XP cannot exceed 10,000.").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "reaction_xp_min", minXp);
+            handler.updateLevelSetting(guildId, "reaction_xp_max", maxXp);
+
+            Container container = buildReactionXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter valid numbers for reaction XP values.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleReactionXpCooldownModal(ModalInteractionEvent event, String guildId) {
+        String cooldownStr = Objects.requireNonNull(event.getValue("reaction_xp_cooldown")).getAsString().trim();
+
+        try {
+            int cooldown = Integer.parseInt(cooldownStr);
+
+            if (cooldown < 0) {
+                event.reply("❌ Cooldown cannot be negative.").setEphemeral(true).queue();
+                return;
+            }
+
+            if (cooldown > 86400) {
+                event.reply("❌ Cooldown cannot exceed 86,400 seconds (24 hours).").setEphemeral(true).queue();
+                return;
+            }
+
+            handler.updateLevelSetting(guildId, "reaction_xp_cooldown", cooldown);
+
+            Container container = buildReactionXpSettingsContainer(guildId);
+            MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+            event.editMessage(editBuilder.useComponentsV2().build()).queue();
+
+        } catch (NumberFormatException e) {
+            event.reply("❌ Please enter a valid number for reaction XP cooldown.").setEphemeral(true).queue();
+        }
+    }
+
+    // Notification Modal Handlers
     private void handleMinMessageLengthModal(ModalInteractionEvent event, String guildId) {
         String minLengthStr = Objects.requireNonNull(event.getValue("min_message_length")).getAsString().trim();
 
@@ -1282,7 +2550,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
             handler.updateLevelSetting(guildId, "min_message_length", minLength);
 
-            Container container = buildXpSettingsContainer(guildId);
+            Container container = buildMessageXpSettingsContainer(guildId);
             MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
             event.editMessage(editBuilder.useComponentsV2().build()).queue();
 

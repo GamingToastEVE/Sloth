@@ -3,6 +3,7 @@ package org.ToastiCodingStuff.Sloth;
 import java.awt.Color;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -1430,7 +1431,7 @@ public class DatabaseHandler {
         try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32)
             String upsertGuild = "INSERT INTO guilds (id, name, prefix, language, created_at, updated_at, active) " +
-                    "VALUES (?, ?, '!', 'de', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1) " +
+                    "VALUES (?, ?, '!', 'en', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1) " +
                     "ON DUPLICATE KEY UPDATE " +
                     "name = VALUES(name), " +
                     "updated_at = CURRENT_TIMESTAMP, " +
@@ -4587,34 +4588,84 @@ public class DatabaseHandler {
     public static class LevelSettingsData {
         public final String guildId;
         public final boolean enabled;
+
+        // Formula Settings
+        public final String xpCurve;
+        public final double xpMultiplier;
+        public final int maxLevel;
+
+        // Message XP
+        public final boolean messageXpEnabled;
+        public final String messageXpMode;
         public final int xpMin;
         public final int xpMax;
         public final int cooldownSeconds;
         public final int minMessageLength;
+
+        // Voice XP
         public final boolean voiceXpEnabled;
-        public final int voiceXpAmount;
+        public final int voiceXpMin;
+        public final int voiceXpMax;
+        public final int voiceXpAmount; // Legacy
+        public final int voiceXpCooldown;
+        public final int voiceXpMinMembers;
+        public final boolean voiceXpAntiAfk;
+
+        // Reaction XP
+        public final boolean reactionXpEnabled;
+        public final String reactionXpAwards;
+        public final int reactionXpMin;
+        public final int reactionXpMax;
+        public final int reactionXpCooldown;
+
+        // Notifications
         public final String levelupChannelId;
         public final String levelupMessages;
         public final boolean levelupDm;
+
+        // Roles
         public final boolean stackRewards;
         public final String rewards;
+
+        // Exceptions
         public final String ignoredChannels;
         public final String ignoredRoles;
         public final boolean resetOnLeave;
 
-        public LevelSettingsData(String guildId, boolean enabled, int xpMin, int xpMax, int cooldownSeconds,
-                                  int minMessageLength, boolean voiceXpEnabled, int voiceXpAmount,
+        public LevelSettingsData(String guildId, boolean enabled,
+                                  String xpCurve, double xpMultiplier, int maxLevel,
+                                  boolean messageXpEnabled, String messageXpMode,
+                                  int xpMin, int xpMax, int cooldownSeconds, int minMessageLength,
+                                  boolean voiceXpEnabled, int voiceXpMin, int voiceXpMax,
+                                  int voiceXpAmount, int voiceXpCooldown, int voiceXpMinMembers, boolean voiceXpAntiAfk,
+                                  boolean reactionXpEnabled, String reactionXpAwards,
+                                  int reactionXpMin, int reactionXpMax, int reactionXpCooldown,
                                   String levelupChannelId, String levelupMessages, boolean levelupDm,
-                                  boolean stackRewards, String rewards, String ignoredChannels,
-                                  String ignoredRoles, boolean resetOnLeave) {
+                                  boolean stackRewards, String rewards,
+                                  String ignoredChannels, String ignoredRoles, boolean resetOnLeave) {
             this.guildId = guildId;
             this.enabled = enabled;
+            this.xpCurve = xpCurve != null ? xpCurve : "linear";
+            this.xpMultiplier = xpMultiplier;
+            this.maxLevel = maxLevel;
+            this.messageXpEnabled = messageXpEnabled;
+            this.messageXpMode = messageXpMode != null ? messageXpMode : "random";
             this.xpMin = xpMin;
             this.xpMax = xpMax;
             this.cooldownSeconds = cooldownSeconds;
             this.minMessageLength = minMessageLength;
             this.voiceXpEnabled = voiceXpEnabled;
+            this.voiceXpMin = voiceXpMin;
+            this.voiceXpMax = voiceXpMax;
             this.voiceXpAmount = voiceXpAmount;
+            this.voiceXpCooldown = voiceXpCooldown;
+            this.voiceXpMinMembers = voiceXpMinMembers;
+            this.voiceXpAntiAfk = voiceXpAntiAfk;
+            this.reactionXpEnabled = reactionXpEnabled;
+            this.reactionXpAwards = reactionXpAwards != null ? reactionXpAwards : "both";
+            this.reactionXpMin = reactionXpMin;
+            this.reactionXpMax = reactionXpMax;
+            this.reactionXpCooldown = reactionXpCooldown;
             this.levelupChannelId = levelupChannelId;
             this.levelupMessages = levelupMessages;
             this.levelupDm = levelupDm;
@@ -4639,17 +4690,39 @@ public class DatabaseHandler {
                 return new LevelSettingsData(
                         rs.getString("guild_id"),
                         rs.getInt("enabled") == 1,
+                        // Formula
+                        rs.getString("xp_curve"),
+                        rs.getDouble("xp_multiplier"),
+                        rs.getInt("max_level"),
+                        // Message XP
+                        rs.getInt("message_xp_enabled") == 1,
+                        rs.getString("message_xp_mode"),
                         rs.getInt("xp_min"),
                         rs.getInt("xp_max"),
                         rs.getInt("cooldown_seconds"),
                         rs.getInt("min_message_length"),
+                        // Voice XP
                         rs.getInt("voice_xp_enabled") == 1,
+                        rs.getInt("voice_xp_min"),
+                        rs.getInt("voice_xp_max"),
                         rs.getInt("voice_xp_amount"),
+                        rs.getInt("voice_xp_cooldown"),
+                        rs.getInt("voice_xp_min_members"),
+                        rs.getInt("voice_xp_anti_afk") == 1,
+                        // Reaction XP
+                        rs.getInt("reaction_xp_enabled") == 1,
+                        rs.getString("reaction_xp_awards"),
+                        rs.getInt("reaction_xp_min"),
+                        rs.getInt("reaction_xp_max"),
+                        rs.getInt("reaction_xp_cooldown"),
+                        // Notifications
                         rs.getString("levelup_channel_id"),
                         rs.getString("levelup_messages"),
                         rs.getInt("levelup_dm") == 1,
+                        // Roles
                         rs.getInt("stack_rewards") == 1,
                         rs.getString("rewards"),
+                        // Exceptions
                         rs.getString("ignored_channels"),
                         rs.getString("ignored_roles"),
                         rs.getInt("reset_on_leave") == 1
@@ -4954,6 +5027,29 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return false;
+    }
+
+    /**
+     * Check if user is on reaction XP cooldown
+     */
+    private final Map<String, Long> reactionCooldowns = new ConcurrentHashMap<>();
+
+    public boolean isUserOnReactionXpCooldown(String guildId, String userId, String cooldownType, int cooldownSeconds) {
+        String key = guildId + ":" + userId + ":" + cooldownType;
+        Long lastTime = reactionCooldowns.get(key);
+
+        if (lastTime == null) {
+            reactionCooldowns.put(key, System.currentTimeMillis());
+            return false;
+        }
+
+        long elapsed = System.currentTimeMillis() - lastTime;
+        if (elapsed >= (cooldownSeconds * 1000L)) {
+            reactionCooldowns.put(key, System.currentTimeMillis());
+            return false;
+        }
+
+        return true;
     }
 
     /**

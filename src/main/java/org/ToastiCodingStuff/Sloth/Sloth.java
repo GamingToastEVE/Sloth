@@ -131,7 +131,7 @@ public class Sloth {
                 System.err.println("Error in TimedRole loop: " + e.getMessage());
                 e.printStackTrace();
             }
-        }, 0, 60*5, java.util.concurrent.TimeUnit.SECONDS);
+        }, 0, 60, java.util.concurrent.TimeUnit.SECONDS);
 
         java.util.concurrent.ScheduledExecutorService reminderScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         reminderScheduler.scheduleAtFixedRate(() -> {

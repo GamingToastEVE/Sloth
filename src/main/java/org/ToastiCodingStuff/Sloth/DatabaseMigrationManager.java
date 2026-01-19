@@ -445,24 +445,45 @@ public class DatabaseMigrationManager {
                 .addColumn("guild_id", "VARCHAR(32) PRIMARY KEY")
                 .addColumn("enabled", "TINYINT(1) DEFAULT 1")
 
-                // 1. XP Balance
-                .addColumn("xp_min", "INTEGER DEFAULT 15")
-                .addColumn("xp_max", "INTEGER DEFAULT 25")
-                .addColumn("cooldown_seconds", "INTEGER DEFAULT 60")
-                .addColumn("min_message_length", "INTEGER DEFAULT 5") // Neu
-                .addColumn("voice_xp_enabled", "TINYINT(1) DEFAULT 0") // Neu
-                .addColumn("voice_xp_amount", "INTEGER DEFAULT 10") // Neu
+                // Formula Settings
+                .addColumn("xp_curve", "VARCHAR(32) DEFAULT 'linear'") // linear, exponential, logarithmic
+                .addColumn("xp_multiplier", "DOUBLE DEFAULT 1.0")
+                .addColumn("max_level", "INTEGER DEFAULT 0") // 0 = unlimited
 
-                // 2. Benachrichtigungen
+                // 1. Message XP
+                .addColumn("message_xp_enabled", "TINYINT(1) DEFAULT 1")
+                .addColumn("message_xp_mode", "VARCHAR(32) DEFAULT 'random'") // random, fixed
+                .addColumn("xp_min", "INTEGER DEFAULT 15")
+                .addColumn("xp_max", "INTEGER DEFAULT 40")
+                .addColumn("cooldown_seconds", "INTEGER DEFAULT 60")
+                .addColumn("min_message_length", "INTEGER DEFAULT 5")
+
+                // 2. Voice XP
+                .addColumn("voice_xp_enabled", "TINYINT(1) DEFAULT 0")
+                .addColumn("voice_xp_min", "INTEGER DEFAULT 15")
+                .addColumn("voice_xp_max", "INTEGER DEFAULT 40")
+                .addColumn("voice_xp_amount", "INTEGER DEFAULT 10") // Legacy - kept for compatibility
+                .addColumn("voice_xp_cooldown", "INTEGER DEFAULT 180") // seconds
+                .addColumn("voice_xp_min_members", "INTEGER DEFAULT 2") // minimum members in channel
+                .addColumn("voice_xp_anti_afk", "TINYINT(1) DEFAULT 1") // require unmuted/undeafened
+
+                // 3. Reaction XP (NEW)
+                .addColumn("reaction_xp_enabled", "TINYINT(1) DEFAULT 0")
+                .addColumn("reaction_xp_awards", "VARCHAR(32) DEFAULT 'both'") // both, sender, receiver
+                .addColumn("reaction_xp_min", "INTEGER DEFAULT 5")
+                .addColumn("reaction_xp_max", "INTEGER DEFAULT 25")
+                .addColumn("reaction_xp_cooldown", "INTEGER DEFAULT 300") // seconds
+
+                // 4. Benachrichtigungen
                 .addColumn("levelup_channel_id", "VARCHAR(32) DEFAULT 'current'") // '0', 'current' oder ID
                 .addColumn("levelup_messages", "TEXT DEFAULT 'Herzlichen Glückwunsch {mention}, du bist nun Level {level}!'") // JSON Array (Sollen auch Embeds unterstützen)
                 .addColumn("levelup_dm", "TINYINT(1) DEFAULT 0") // Default: keine DMs
 
-                // 3. Rollen
+                // 5. Rollen
                 .addColumn("stack_rewards", "TINYINT(1) DEFAULT 1") // Standard: Rollen behalten
                 .addColumn("rewards", "TEXT") // JSON Array: [{level:1,role_id:"123"}, {level:5,role_id:"456"}]
 
-                // 4. Ausnahmen & Reset
+                // 6. Ausnahmen & Reset
                 .addColumn("ignored_channels", "TEXT") // IDs kommagetrennt
                 .addColumn("ignored_roles", "TEXT")    // IDs kommagetrennt
                 .addColumn("reset_on_leave", "TINYINT(1) DEFAULT 0") // Default: Daten behalten

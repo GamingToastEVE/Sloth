@@ -279,7 +279,16 @@ public class RoleEventConfigListener extends ListenerAdapter {
                             handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
                         } catch (NumberFormatException e) { success = false; }
 
+                    } else if (data.eventType.equals("LEVEL_UP") || data.eventType.equals("LEVEL_REACHED")) {
+                        try {
+                            int level = Integer.parseInt(input);
+                            // Preserve existing conditions and add/update level_threshold
+                            JSONObject jsonObj = parseExistingConditions(data.triggerData);
+                            jsonObj.put("level_threshold", level);
+                            handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", jsonObj.toString(), data.active);
+                        } catch (NumberFormatException e) { success = false; }
                     } else {
+                        // For other event types, just store the raw input as triggerData
                         handler.updateRoleEvent(eventId, guildId, data.name, data.eventType, data.roleId, data.actionType, data.durationSeconds, "REFRESH", input, data.active);
                     }
                     break;
@@ -324,7 +333,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                         .setPlaceholder("Search and select target role...")
                         .setMinValues(1).setMaxValues(1).build();
                 event.getMessage().delete().queue();
-                event.reply("When should this event fire?")
+                event.reply("Which role should this event give/take?")
                         .setComponents(ActionRow.of(roleMenu))
                         .setEphemeral(true).queue();
                 break;
@@ -346,21 +355,24 @@ public class RoleEventConfigListener extends ListenerAdapter {
                 } else if (data.eventType.equals("MESSAGE_THRESHOLD")) {
                     String defaultMsgThreshold = "100";
                     Modal modal = Modal.create("modal_event_data_" + eventId, "Message Threshold")
-                                    .addComponents(Label.of("Number of Messages",
+                            .addComponents(Label.of("Number of Messages",
                                             TextInput.create("input_field", TextInputStyle.SHORT)
                                                     .setPlaceholder("e.g. " + defaultMsgThreshold)
                                                     .setRequired(true)
                                                     .build()),
-                                            Label.of("Activate Message tracking?", TextInput.create("message_count_tracking", TextInputStyle.SHORT)
-                                                    .setPlaceholder("Activate Message count tracking? " + "true/false/y/n")
-                                                    .setRequired(true)
-                                                    .build()),
-                                            Label.of("Time Window", TextInput.create("time_window", TextInputStyle.SHORT)
-                                                    .setPlaceholder("Considering the last (e.g. 1d, 30m, 0), Default 1d")
-                                                    .setRequired(false)
-                                                    .build())).build();
+                                    Label.of("Activate Message tracking?", TextInput.create("message_count_tracking", TextInputStyle.SHORT)
+                                            .setPlaceholder("Activate Message count tracking? " + "true/false/y/n")
+                                            .setRequired(true)
+                                            .build()),
+                                    Label.of("Time Window", TextInput.create("time_window", TextInputStyle.SHORT)
+                                            .setPlaceholder("Considering the last (e.g. 1d, 30m, 0), Default 1d")
+                                            .setRequired(false)
+                                            .build())).build();
                     event.replyModal(modal).queue();
 
+                } else if (data.eventType.equals("LEVEL_UP") || data.eventType.equals("LEVEL_REACHED")) {
+                    String defaultLevel = "10";
+                    event.replyModal(createModal("modal_event_data_" + eventId, "Level Threshold", "Level (e.g. " + defaultLevel + ")", defaultLevel)).queue();
                 } else {
                     event.replyModal(createModal("modal_event_data_" + eventId, "Conditions", "JSON", data.triggerData)).queue();
                 }
@@ -411,6 +423,9 @@ public class RoleEventConfigListener extends ListenerAdapter {
                     String roleIdStr = jsonObj.getString("trigger_role_id");
                     Role tr = event.getGuild().getRoleById(roleIdStr);
                     conditionBuilder.append("**Trigger Role:** ").append(tr != null ? tr.getAsMention() : roleIdStr).append("\n");
+                } else {
+                    conditionBuilder.append("**Other Conditions:** ");
+                    conditionBuilder.append("`").append(data.triggerData).append("`\n");
                 }
                 
                 // Show required roles
