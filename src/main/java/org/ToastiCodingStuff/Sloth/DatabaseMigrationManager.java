@@ -140,6 +140,8 @@ public class DatabaseMigrationManager {
         schemas.put("role_events", createRoleEventsSchema());
         schemas.put("active_timers", createActiveTimersSchema());
         schemas.put("reminders", createRemindersSchema());
+        schemas.put("level_settings", createLevelSettingsSchema());
+        schemas.put("user_levels", createUserLevelsSchema());
 
         return schemas;
     }
@@ -438,6 +440,95 @@ public class DatabaseMigrationManager {
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 
+    private TableSchema createLevelSettingsSchema() {
+        return new TableSchema("level_settings")
+                .addColumn("guild_id", "VARCHAR(32) PRIMARY KEY")
+                .addColumn("enabled", "TINYINT(1) DEFAULT 1")
+
+                // 1. XP Balance
+                .addColumn("xp_min", "INTEGER DEFAULT 15")
+                .addColumn("xp_max", "INTEGER DEFAULT 25")
+                .addColumn("cooldown_seconds", "INTEGER DEFAULT 60")
+                .addColumn("min_message_length", "INTEGER DEFAULT 5") // Neu
+                .addColumn("voice_xp_enabled", "TINYINT(1) DEFAULT 0") // Neu
+                .addColumn("voice_xp_amount", "INTEGER DEFAULT 10") // Neu
+
+                // 2. Benachrichtigungen
+                .addColumn("levelup_channel_id", "VARCHAR(32) DEFAULT 'current'") // '0', 'current' oder ID
+                .addColumn("levelup_messages", "TEXT DEFAULT 'Herzlichen Glückwunsch {mention}, du bist nun Level {level}!'") // JSON Array (Sollen auch Embeds unterstützen)
+                .addColumn("levelup_dm", "TINYINT(1) DEFAULT 0") // Default: keine DMs
+
+                // 3. Rollen
+                .addColumn("stack_rewards", "TINYINT(1) DEFAULT 1") // Standard: Rollen behalten
+                .addColumn("rewards", "TEXT") // JSON Array: [{level:1,role_id:"123"}, {level:5,role_id:"456"}]
+
+                // 4. Ausnahmen & Reset
+                .addColumn("ignored_channels", "TEXT") // IDs kommagetrennt
+                .addColumn("ignored_roles", "TEXT")    // IDs kommagetrennt
+                .addColumn("reset_on_leave", "TINYINT(1) DEFAULT 0") // Default: Daten behalten
+
+                .addColumn("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * User levels table schema - tracks XP and level for each user per guild
+     */
+    private TableSchema createUserLevelsSchema() {
+        return new TableSchema("user_levels")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("xp", "BIGINT DEFAULT 0")
+                .addColumn("level", "INT DEFAULT 0")
+                .addColumn("total_xp", "BIGINT DEFAULT 0") // Lifetime XP (never resets)
+                .addColumn("messages_count", "INT DEFAULT 0") // Total messages that earned XP
+                .addColumn("voice_minutes", "INT DEFAULT 0") // Total minutes in voice channels
+                .addColumn("last_xp_time", "DATETIME DEFAULT NULL") // For cooldown tracking
+                .addColumn("last_voice_xp_time", "DATETIME DEFAULT NULL") // For voice XP cooldown
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addColumn("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE UNIQUE INDEX idx_user_levels_guild_user ON user_levels(guild_id, user_id)")
+                .addIndex("CREATE INDEX idx_user_levels_guild_level ON user_levels(guild_id, level DESC)")
+                .addIndex("CREATE INDEX idx_user_levels_guild_xp ON user_levels(guild_id, total_xp DESC)");
+    }
+
+    public void detectAndApplyMissingTables() throws SQLException {
+        System.out.println("Checking for missing tables...");
+
+        Map<String, TableSchema> expectedSchemas = getExpectedSchemas();
+
+        for (Map.Entry<String, TableSchema> entry : expectedSchemas.entrySet()) {
+            String tableName = entry.getKey();
+            TableSchema schema = entry.getValue();
+
+            if (!tableExists(tableName)) {
+                System.out.println("Table '" + tableName + "' is missing - creating it now.");
+
+                // Create table
+                StringBuilder createQuery = new StringBuilder("CREATE TABLE " + tableName + " (");
+                List<String> columnDefs = new ArrayList<>();
+
+                for (ColumnDefinition column : schema.columns.values()) {
+                    columnDefs.add(column.name + " " + column.sqlDefinition);
+                }
+
+                createQuery.append(String.join(", ", columnDefs));
+                createQuery.append(")");
+
+                try (Connection connection = databaseHandler.getConnection();
+                     Statement stmt = connection.createStatement()) {
+                    stmt.execute(createQuery.toString());
+                    System.out.println("Successfully created table '" + tableName + "'");
+
+                    // Apply indexes
+                    applyIndexes(tableName, schema);
+                } catch (SQLException e) {
+                    System.err.println("Failed to create table '" + tableName + "': " + e.getMessage());
+                }
+            }
+        }
+    }
+
     /**
      * Core algorithm to detect and apply missing columns.
      * This method compares expected schemas with actual database schemas
@@ -481,7 +572,7 @@ public class DatabaseMigrationManager {
         // Record this migration run
         recordMigrationRun("automatic_column_detection", "1.0", executionTime, true);
         
-        System.out.println("Migration check completed in " + executionTime + "ms");
+        System.out.println("Column Migration check completed in " + executionTime + "ms");
         System.out.println("Processed " + tablesProcessed + " tables, added " + totalColumnsAdded + " total columns");
     }
     

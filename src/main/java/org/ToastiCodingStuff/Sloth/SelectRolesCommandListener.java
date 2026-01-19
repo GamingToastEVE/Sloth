@@ -47,17 +47,14 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
         switch (subcommand) {
             case "remove":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("select-roles-remove");
                 handleRemoveSelectRole(event, Objects.requireNonNull(event.getOption("role")).getAsRole());
                 break;
             case "add":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("select-roles-add");
                 handleAddSelectRole(event);
                 break;
             case "send":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("select-roles-send");
                 handleSendSelectRole(event);
                 break;

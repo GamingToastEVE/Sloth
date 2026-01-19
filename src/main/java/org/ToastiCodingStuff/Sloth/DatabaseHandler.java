@@ -109,7 +109,6 @@ public class DatabaseHandler {
             }
             if (color != null && !color.isEmpty()) {
                 try {
-                    // Handle hex colors (e.g., "#FF0000") and named colors
                     if (color.startsWith("#")) {
                         Color parsedColor = Color.decode(color);
                         embed.setColor(parsedColor);
@@ -897,6 +896,7 @@ public class DatabaseHandler {
         try {
             System.out.println("Manually triggering migration check...");
             initializeTables();
+            migrationManager.detectAndApplyMissingTables();
             migrationManager.detectAndApplyMissingColumns();
             applyMissingIndexes();
             migrationManager.validateDatabaseSchema();
@@ -3358,6 +3358,8 @@ public class DatabaseHandler {
             pstmt.setString(1, guildId);
             pstmt.setString(2, channelId);
             pstmt.setString(3, messageId);
+            pstmt.setString(4, description);
+            pstmt.setString(5, "Select your role"); // Default title
             pstmt.executeUpdate();
             System.out.println("Select Roles Embed added for guild " + guildId);
             return true;
@@ -4018,8 +4020,6 @@ public class DatabaseHandler {
         return userTimers;
     }
 
-    // In DatabaseHandler.java einfügen:
-
     public static class RoleEventData {
         public final int id;
         public final String name;
@@ -4189,7 +4189,7 @@ public class DatabaseHandler {
     private static final String[] ALL_SYSTEMS = {
             "log-channel", "warn", "ticket", "mod", "stats",
             "verify-button", "select-roles", "temprole", "role-event",
-            "embed", "reminders"
+            "embed", "reminders", "leveling"
     };
 
     /**
@@ -4577,5 +4577,622 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return null;
+    }
+
+    // ==================== LEVELING SYSTEM SETTINGS ====================
+
+    /**
+     * Data class to hold leveling system settings
+     */
+    public static class LevelSettingsData {
+        public final String guildId;
+        public final boolean enabled;
+        public final int xpMin;
+        public final int xpMax;
+        public final int cooldownSeconds;
+        public final int minMessageLength;
+        public final boolean voiceXpEnabled;
+        public final int voiceXpAmount;
+        public final String levelupChannelId;
+        public final String levelupMessages;
+        public final boolean levelupDm;
+        public final boolean stackRewards;
+        public final String rewards;
+        public final String ignoredChannels;
+        public final String ignoredRoles;
+        public final boolean resetOnLeave;
+
+        public LevelSettingsData(String guildId, boolean enabled, int xpMin, int xpMax, int cooldownSeconds,
+                                  int minMessageLength, boolean voiceXpEnabled, int voiceXpAmount,
+                                  String levelupChannelId, String levelupMessages, boolean levelupDm,
+                                  boolean stackRewards, String rewards, String ignoredChannels,
+                                  String ignoredRoles, boolean resetOnLeave) {
+            this.guildId = guildId;
+            this.enabled = enabled;
+            this.xpMin = xpMin;
+            this.xpMax = xpMax;
+            this.cooldownSeconds = cooldownSeconds;
+            this.minMessageLength = minMessageLength;
+            this.voiceXpEnabled = voiceXpEnabled;
+            this.voiceXpAmount = voiceXpAmount;
+            this.levelupChannelId = levelupChannelId;
+            this.levelupMessages = levelupMessages;
+            this.levelupDm = levelupDm;
+            this.stackRewards = stackRewards;
+            this.rewards = rewards;
+            this.ignoredChannels = ignoredChannels;
+            this.ignoredRoles = ignoredRoles;
+            this.resetOnLeave = resetOnLeave;
+        }
+    }
+
+    /**
+     * Get leveling settings for a guild. Creates default settings if none exist.
+     */
+    public LevelSettingsData getLevelSettings(String guildId) {
+        String query = "SELECT * FROM level_settings WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new LevelSettingsData(
+                        rs.getString("guild_id"),
+                        rs.getInt("enabled") == 1,
+                        rs.getInt("xp_min"),
+                        rs.getInt("xp_max"),
+                        rs.getInt("cooldown_seconds"),
+                        rs.getInt("min_message_length"),
+                        rs.getInt("voice_xp_enabled") == 1,
+                        rs.getInt("voice_xp_amount"),
+                        rs.getString("levelup_channel_id"),
+                        rs.getString("levelup_messages"),
+                        rs.getInt("levelup_dm") == 1,
+                        rs.getInt("stack_rewards") == 1,
+                        rs.getString("rewards"),
+                        rs.getString("ignored_channels"),
+                        rs.getString("ignored_roles"),
+                        rs.getInt("reset_on_leave") == 1
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        // Create default settings if none exist
+        createDefaultLevelSettings(guildId);
+        return getLevelSettings(guildId);
+    }
+
+    /**
+     * Create default leveling settings for a guild
+     */
+    public void createDefaultLevelSettings(String guildId) {
+        String query = "INSERT IGNORE INTO level_settings (guild_id) VALUES (?)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Update a single leveling setting
+     */
+    public boolean updateLevelSetting(String guildId, String column, Object value) {
+        String query = "UPDATE level_settings SET " + column + " = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setObject(1, value);
+            stmt.setString(2, guildId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Toggle a boolean leveling setting
+     */
+    public boolean toggleLevelSetting(String guildId, String column) {
+        String query = "UPDATE level_settings SET " + column + " = NOT " + column + ", updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get the current value of a boolean leveling setting after toggle
+     */
+    public boolean getLevelSettingBoolean(String guildId, String column) {
+        String query = "SELECT " + column + " FROM level_settings WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) == 1;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // ==================== USER LEVELS ====================
+
+    /**
+     * Data class to hold user level information
+     */
+    public static class UserLevelData {
+        public final int id;
+        public final String guildId;
+        public final String userId;
+        public final long xp;
+        public final int level;
+        public final long totalXp;
+        public final int messagesCount;
+        public final int voiceMinutes;
+        public final java.time.LocalDateTime lastXpTime;
+        public final java.time.LocalDateTime lastVoiceXpTime;
+
+        public UserLevelData(int id, String guildId, String userId, long xp, int level, long totalXp,
+                             int messagesCount, int voiceMinutes,
+                             java.time.LocalDateTime lastXpTime, java.time.LocalDateTime lastVoiceXpTime) {
+            this.id = id;
+            this.guildId = guildId;
+            this.userId = userId;
+            this.xp = xp;
+            this.level = level;
+            this.totalXp = totalXp;
+            this.messagesCount = messagesCount;
+            this.voiceMinutes = voiceMinutes;
+            this.lastXpTime = lastXpTime;
+            this.lastVoiceXpTime = lastVoiceXpTime;
+        }
+
+        /**
+         * Calculate XP required for a specific level using a scaling formula
+         */
+        public static long getXpForLevel(int level) {
+            if (level <= 0) return 0;
+            // Formula: 5 * (level^2) + 50 * level + 100
+            return (long) (5 * Math.pow(level, 2) + 50 * level + 100);
+        }
+
+        /**
+         * Calculate total XP required to reach a specific level
+         */
+        public static long getTotalXpForLevel(int level) {
+            long total = 0;
+            for (int i = 1; i <= level; i++) {
+                total += getXpForLevel(i);
+            }
+            return total;
+        }
+
+        /**
+         * Calculate XP needed for next level
+         */
+        public long getXpForNextLevel() {
+            return getXpForLevel(level + 1);
+        }
+
+        /**
+         * Calculate progress percentage to next level
+         */
+        public double getProgressPercent() {
+            long needed = getXpForNextLevel();
+            if (needed == 0) return 100.0;
+            return (double) xp / needed * 100.0;
+        }
+    }
+
+    /**
+     * Get user level data for a specific user in a guild
+     */
+    public UserLevelData getUserLevel(String guildId, String userId) {
+        String query = "SELECT * FROM user_levels WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return extractUserLevelData(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        // Return default data if not found
+        return new UserLevelData(0, guildId, userId, 0, 0, 0, 0, 0, null, null);
+    }
+
+    /**
+     * Create or get user level entry
+     */
+    public UserLevelData getOrCreateUserLevel(String guildId, String userId) {
+        UserLevelData existing = getUserLevel(guildId, userId);
+        if (existing.id != 0) {
+            return existing;
+        }
+
+        String query = "INSERT INTO user_levels (guild_id, user_id) VALUES (?, ?)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return getUserLevel(guildId, userId);
+    }
+
+    /**
+     * Add XP to a user and handle level-ups
+     * @return The new level if leveled up, -1 if no level up, or the current level
+     */
+    public int addXpToUser(String guildId, String userId, int xpAmount) {
+        UserLevelData userData = getOrCreateUserLevel(guildId, userId);
+
+        long newXp = userData.xp + xpAmount;
+        long newTotalXp = userData.totalXp + xpAmount;
+        int newLevel = userData.level;
+        int newMessagesCount = userData.messagesCount + 1;
+
+        // Check for level up(s)
+        while (newXp >= UserLevelData.getXpForLevel(newLevel + 1)) {
+            newXp -= UserLevelData.getXpForLevel(newLevel + 1);
+            newLevel++;
+        }
+
+        String query = "UPDATE user_levels SET xp = ?, level = ?, total_xp = ?, messages_count = ?, " +
+                       "last_xp_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP " +
+                       "WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setLong(1, newXp);
+            stmt.setInt(2, newLevel);
+            stmt.setLong(3, newTotalXp);
+            stmt.setInt(4, newMessagesCount);
+            stmt.setString(5, guildId);
+            stmt.setString(6, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // Return new level if leveled up
+        return newLevel > userData.level ? newLevel : -1;
+    }
+
+    /**
+     * Add voice XP to a user
+     */
+    public int addVoiceXpToUser(String guildId, String userId, int xpAmount, int minutesInVoice) {
+        UserLevelData userData = getOrCreateUserLevel(guildId, userId);
+
+        long newXp = userData.xp + xpAmount;
+        long newTotalXp = userData.totalXp + xpAmount;
+        int newLevel = userData.level;
+        int newVoiceMinutes = userData.voiceMinutes + minutesInVoice;
+
+        // Check for level up(s)
+        while (newXp >= UserLevelData.getXpForLevel(newLevel + 1)) {
+            newXp -= UserLevelData.getXpForLevel(newLevel + 1);
+            newLevel++;
+        }
+
+        String query = "UPDATE user_levels SET xp = ?, level = ?, total_xp = ?, voice_minutes = ?, " +
+                       "last_voice_xp_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP " +
+                       "WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setLong(1, newXp);
+            stmt.setInt(2, newLevel);
+            stmt.setLong(3, newTotalXp);
+            stmt.setInt(4, newVoiceMinutes);
+            stmt.setString(5, guildId);
+            stmt.setString(6, userId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return newLevel > userData.level ? newLevel : -1;
+    }
+
+    /**
+     * Check if user is on XP cooldown
+     */
+    public boolean isUserOnXpCooldown(String guildId, String userId, int cooldownSeconds) {
+        String query = "SELECT last_xp_time FROM user_levels WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                Timestamp lastXpTime = rs.getTimestamp("last_xp_time");
+                if (lastXpTime == null) return false;
+
+                long elapsed = System.currentTimeMillis() - lastXpTime.getTime();
+                return elapsed < (cooldownSeconds * 1000L);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Check if user is on voice XP cooldown
+     */
+    public boolean isUserOnVoiceXpCooldown(String guildId, String userId, int cooldownSeconds) {
+        String query = "SELECT last_voice_xp_time FROM user_levels WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                Timestamp lastVoiceXpTime = rs.getTimestamp("last_voice_xp_time");
+                if (lastVoiceXpTime == null) return false;
+
+                long elapsed = System.currentTimeMillis() - lastVoiceXpTime.getTime();
+                return elapsed < (cooldownSeconds * 1000L);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Set user level directly (for admin commands)
+     */
+    public boolean setUserLevel(String guildId, String userId, int level) {
+        getOrCreateUserLevel(guildId, userId);
+
+        String query = "UPDATE user_levels SET level = ?, xp = 0, updated_at = CURRENT_TIMESTAMP " +
+                       "WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, level);
+            stmt.setString(2, guildId);
+            stmt.setString(3, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Set user XP directly (for admin commands)
+     */
+    public boolean setUserXp(String guildId, String userId, long xp) {
+        getOrCreateUserLevel(guildId, userId);
+
+        // Calculate level from XP
+        int level = 0;
+        long remainingXp = xp;
+        while (remainingXp >= UserLevelData.getXpForLevel(level + 1)) {
+            remainingXp -= UserLevelData.getXpForLevel(level + 1);
+            level++;
+        }
+
+        String query = "UPDATE user_levels SET xp = ?, level = ?, total_xp = ?, updated_at = CURRENT_TIMESTAMP " +
+                       "WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setLong(1, remainingXp);
+            stmt.setInt(2, level);
+            stmt.setLong(3, xp);
+            stmt.setString(4, guildId);
+            stmt.setString(5, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Add XP to user (for admin commands)
+     */
+    public int addUserXp(String guildId, String userId, long xpToAdd) {
+        return addXpToUser(guildId, userId, (int) xpToAdd);
+    }
+
+    /**
+     * Remove XP from user
+     */
+    public boolean removeUserXp(String guildId, String userId, long xpToRemove) {
+        UserLevelData userData = getOrCreateUserLevel(guildId, userId);
+
+        long newTotalXp = Math.max(0, userData.totalXp - xpToRemove);
+
+        // Recalculate level from total XP
+        int level = 0;
+        long remainingXp = newTotalXp;
+        while (remainingXp >= UserLevelData.getXpForLevel(level + 1)) {
+            remainingXp -= UserLevelData.getXpForLevel(level + 1);
+            level++;
+        }
+
+        String query = "UPDATE user_levels SET xp = ?, level = ?, total_xp = ?, updated_at = CURRENT_TIMESTAMP " +
+                       "WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setLong(1, remainingXp);
+            stmt.setInt(2, level);
+            stmt.setLong(3, newTotalXp);
+            stmt.setString(4, guildId);
+            stmt.setString(5, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Reset user level data
+     */
+    public boolean resetUserLevel(String guildId, String userId) {
+        String query = "UPDATE user_levels SET xp = 0, level = 0, total_xp = 0, messages_count = 0, " +
+                       "voice_minutes = 0, last_xp_time = NULL, last_voice_xp_time = NULL, " +
+                       "updated_at = CURRENT_TIMESTAMP WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete user level data (for when user leaves and reset_on_leave is true)
+     */
+    public boolean deleteUserLevel(String guildId, String userId) {
+        String query = "DELETE FROM user_levels WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get leaderboard for a guild
+     */
+    public List<UserLevelData> getLeaderboard(String guildId, int limit, int offset) {
+        List<UserLevelData> leaderboard = new ArrayList<>();
+        String query = "SELECT * FROM user_levels WHERE guild_id = ? ORDER BY total_xp DESC LIMIT ? OFFSET ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, limit);
+            stmt.setInt(3, offset);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                leaderboard.add(extractUserLevelData(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return leaderboard;
+    }
+
+    /**
+     * Get user rank in the guild
+     */
+    public int getUserRank(String guildId, String userId) {
+        String query = "SELECT COUNT(*) + 1 AS rank FROM user_levels " +
+                       "WHERE guild_id = ? AND total_xp > (SELECT COALESCE(total_xp, 0) FROM user_levels WHERE guild_id = ? AND user_id = ?)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, guildId);
+            stmt.setString(3, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("rank");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Get total user count with levels in a guild
+     */
+    public int getTotalLeveledUsers(String guildId) {
+        String query = "SELECT COUNT(*) FROM user_levels WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Get users at a specific level
+     */
+    public List<UserLevelData> getUsersAtLevel(String guildId, int level) {
+        List<UserLevelData> users = new ArrayList<>();
+        String query = "SELECT * FROM user_levels WHERE guild_id = ? AND level = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, level);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                users.add(extractUserLevelData(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
+
+    /**
+     * Reset all levels for a guild
+     */
+    public boolean resetGuildLevels(String guildId) {
+        String query = "DELETE FROM user_levels WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Helper method to extract UserLevelData from ResultSet
+     */
+    private UserLevelData extractUserLevelData(ResultSet rs) throws SQLException {
+        Timestamp lastXpTimestamp = rs.getTimestamp("last_xp_time");
+        Timestamp lastVoiceXpTimestamp = rs.getTimestamp("last_voice_xp_time");
+
+        return new UserLevelData(
+                rs.getInt("id"),
+                rs.getString("guild_id"),
+                rs.getString("user_id"),
+                rs.getLong("xp"),
+                rs.getInt("level"),
+                rs.getLong("total_xp"),
+                rs.getInt("messages_count"),
+                rs.getInt("voice_minutes"),
+                lastXpTimestamp != null ? lastXpTimestamp.toLocalDateTime() : null,
+                lastVoiceXpTimestamp != null ? lastVoiceXpTimestamp.toLocalDateTime() : null
+        );
     }
 }

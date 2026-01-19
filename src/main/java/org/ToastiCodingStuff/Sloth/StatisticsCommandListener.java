@@ -28,6 +28,8 @@ public class StatisticsCommandListener extends ListenerAdapter {
         boolean needsMessages = handler.doesGuildTrackMessages(event.getGuild().getId());
         if (needsMessages) {
             handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());
+        } else if (handler.isSystemActive("leveling", event.getGuild().getId())) {
+            handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());
         }
     }
 

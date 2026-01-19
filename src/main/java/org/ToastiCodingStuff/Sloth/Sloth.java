@@ -46,6 +46,8 @@ public class Sloth {
         api.addEventListener(new EmbedEditorCommandListener(handler));
         api.addEventListener(new SystemsCommandListener(handler));
         api.addEventListener(new ReminderCommandListener(handler));
+        api.addEventListener(new LevelingSystemCommandListener(handler));
+        //api.addEventListener(new BotListener());
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -203,6 +205,7 @@ public class Sloth {
         assert testServer != null;
         //testServer.updateCommands().addCommands(allCommands).queue();
 
+        api.updateCommands().addCommands(allCommands).queue();
         System.out.println("Finished registering " + allCommands.size() + " global commands");
 
         System.out.println("Starting registering commands in servers...");

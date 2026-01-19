@@ -22,7 +22,9 @@ public enum RoleEventType {
     */// Custom
     MESSAGE_THRESHOLD,
     ROLE_REMOVE,
-    ROLE_ADD;
+    ROLE_ADD,
+    LEVEL_UP,
+    LEVEL_REACHED;
 
     /**
      * Sichere Methode, um einen String aus der Datenbank in ein Enum zu wandeln.

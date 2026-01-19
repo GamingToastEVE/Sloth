@@ -103,15 +103,18 @@ public class SystemsCommandListener extends ListenerAdapter {
         String[] order = {
                 "log-channel", "warn", "ticket", "mod", "stats",
                 "verify-button", "select-roles", "temprole", "role-event",
-                "embed", "reminders"
+                "embed", "reminders", "leveling"
         };
 
         for (String sys : order) {
-            boolean isActive = statuses.getOrDefault(sys, true);
+            boolean isActive = statuses.getOrDefault(sys, false);
             String label = formatSystemName(sys);
 
             if (isActive) {
                 buttons.add(Button.success("sys_toggle:" + sys, label).withEmoji(Emoji.fromFormatted("✅")));
+            } else if (sys.equals("leveling")) {
+                // Special case: Leveling system cannot be enabled for now
+                buttons.add(Button.secondary("sys_toggle:" + sys, label + " to be implemented").withEmoji(Emoji.fromFormatted("⚠️")));
             } else {
                 buttons.add(Button.danger("sys_toggle:" + sys, label).withEmoji(Emoji.fromFormatted("❌")));
             }
@@ -133,19 +136,20 @@ public class SystemsCommandListener extends ListenerAdapter {
     }
 
     private String formatSystemName(String key) {
-        switch (key) {
-            case "log-channel": return "Logging";
-            case "warn": return "Warnings";
-            case "ticket": return "Tickets";
-            case "mod": return "Moderation";
-            case "stats": return "Statistics";
-            case "verify-button": return "Verify";
-            case "select-roles": return "Self Roles";
-            case "temprole": return "Temp Roles";
-            case "role-event": return "Role Events";
-            case "embed": return "Embed Creation";
-            case "reminders": return "Reminders";
-            default: return key;
-        }
+        return switch (key) {
+            case "log-channel" -> "Logging";
+            case "warn" -> "Warnings";
+            case "ticket" -> "Tickets";
+            case "mod" -> "Moderation";
+            case "stats" -> "Statistics";
+            case "verify-button" -> "Verify";
+            case "select-roles" -> "Self Roles";
+            case "temprole" -> "Temp Roles";
+            case "role-event" -> "Role Events";
+            case "embed" -> "Embed Creation";
+            case "reminders" -> "Reminders";
+            case "leveling" -> "Level/XP System";
+            default -> key;
+        };
     }
 }

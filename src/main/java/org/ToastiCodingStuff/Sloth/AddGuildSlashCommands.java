@@ -51,7 +51,7 @@ public class AddGuildSlashCommands {
                         new SubcommandData("set", "Set the log channel")
                                 .addOption(OptionType.CHANNEL, "channel", "Channel to use as log channel", true),
                         new SubcommandData("get", "Get the current log channel")
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
     /**
@@ -67,7 +67,7 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false),
                         new SubcommandData("remove", "Remove a role from the select roles message")
                                 .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true)
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
     /**
@@ -84,7 +84,7 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.STRING, "button-label", "Name of the button", false)
                                 .addOption(OptionType.STRING, "button-emoji", "Emoji for the button", false),
                         new SubcommandData("list", "List all verify button configurations in this server")
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
     private List<SlashCommandData> getFeedbackCommands() {
@@ -193,7 +193,7 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.USER, "user", "Only delete messages from this user", false),
                         new SubcommandData("slowmode", "Set slowmode for the current channel")
                                 .addOption(OptionType.INTEGER, "seconds", "Slowmode delay in seconds (0 to disable, max 21600)", true)
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
     /**
@@ -221,7 +221,7 @@ public class AddGuildSlashCommands {
                                         .addChoice("High", "HIGH")
                                         .addChoice("Urgent", "URGENT")),
                         new SubcommandData("info", "Get information about the current ticket")
-                );
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
     // In AddGuildSlashCommands.java
@@ -315,6 +315,7 @@ public class AddGuildSlashCommands {
             case "role-event": cmds.addAll(getRoleEventCommands()); break;
             case "embed": cmds.add(getEmbedEditorCommand()); break;
             case "reminders": cmds.add(getReminderCommand()); break;
+            case "leveling": cmds.add(getLevelingCommands()); break;
         }
         return cmds;
     }
@@ -371,5 +372,15 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.USER, "user", "User to view information for", true)
                                 .addOption(OptionType.STRING, "date", "Date in YYYY-MM-DD format to view stats for (optional)", false)
                 ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
+    }
+
+    private SlashCommandData getLevelingCommands() {
+        return Commands.slash("leveling", "Manage the leveling system")
+                .addSubcommands(
+                        new SubcommandData("settings", "View or change leveling settings"),
+                        new SubcommandData("leaderboard", "View the server's leveling leaderboard"),
+                        new SubcommandData("rank", "View your current level and XP")
+                                .addOption(OptionType.USER, "user", "User to view rank for (optional)", false)
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 }
