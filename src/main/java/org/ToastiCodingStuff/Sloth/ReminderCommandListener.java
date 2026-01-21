@@ -30,6 +30,28 @@ public class ReminderCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null && guildId != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null && guildId != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("reminder")) return;
@@ -178,21 +200,23 @@ public class ReminderCommandListener extends ListenerAdapter {
         handler.addReminder(userId, guildId, channelId, title, message, dm, remindAt);
 
         long timestampSeconds = futureTimeMillis / 1000;
-        event.reply("✅ I will remind you in <t:" + timestampSeconds + ":R> of this:\n`" + title + "\n" + message + "`" + (dm ? " (per DM)" : ""))
+        event.reply(t(guildId, "reminders.set_success", "<t:" + timestampSeconds + ":R>") +
+                    "\n`" + title + "\n" + message + "`" + (dm ? " (DM)" : ""))
                 .setEphemeral(true)
                 .queue();
     }
 
-    private void handleListReminders(SlashCommandInteractionEvent event, String userId) {
-        List<DatabaseHandler.ReminderData> reminders = handler.getUserReminders(userId);
+    private void handleListReminders(SlashCommandInteractionEvent event, String oderId) {
+        List<DatabaseHandler.ReminderData> reminders = handler.getUserReminders(oderId);
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
 
         if (reminders.isEmpty()) {
-            event.reply("📭 You do not have any active reminders.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.no_reminders")).setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⏰ Your reminders");
+        embed.setTitle(t(guildId, "reminders.list_title"));
         embed.setColor(Color.CYAN);
 
         StringBuilder desc = new StringBuilder();
@@ -201,7 +225,7 @@ public class ReminderCommandListener extends ListenerAdapter {
             desc.append("**ID: ").append(rem.id).append("** | <t:").append(unixSec).append(":R>\n")
                     .append(rem.title.isEmpty() ? "" : "**" + rem.title + "**\n")
                     .append("📝 `").append(rem.message).append("`\n")
-                    .append(rem.dm ? "📩 via DM" : "📢 in Channel")
+                    .append(rem.dm ? "📩 DM" : "📢 Channel")
                     .append("\n\n");
         }
         embed.setDescription(desc.toString());

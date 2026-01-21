@@ -39,6 +39,28 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     private EmbedBuilder getBuilderFromMessage(MessageEmbed embed) {
         if (embed == null) return new EmbedBuilder();
         return new EmbedBuilder(embed);

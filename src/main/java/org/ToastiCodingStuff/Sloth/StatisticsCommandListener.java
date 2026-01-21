@@ -22,6 +22,28 @@ public class StatisticsCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
         if (event.getAuthor().isBot() || event.getChannel() instanceof PrivateChannel) { return; }
@@ -68,11 +90,6 @@ public class StatisticsCommandListener extends ListenerAdapter {
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
                 handler.insertOrUpdateGlobalStatistic("stats-user");
                 handleUserInfoCommand(event, guildId);
-                break;
-            case "lifetime":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("stats-lifetime");
-                handleStatsCommand(event, guildId);
                 break;
         }
     }

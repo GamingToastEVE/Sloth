@@ -28,6 +28,28 @@ public class WarnCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("warn")) {
             return;
@@ -43,22 +65,18 @@ public class WarnCommandListener extends ListenerAdapter {
         switch (subcommand) {
             case "user":
                 if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {return;}
-                handler.insertOrUpdateGlobalStatistic("warn-user");
                 handleWarnCommand(event, guildId);
                 break;
             case "list":
                 if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) return;
-                handler.insertOrUpdateGlobalStatistic("warn-list");
                 handleListWarningsCommand(event, guildId);
                 break;
             case "settings-set":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("warn-settings-set");
                 handleSetWarnSettingsCommand(event, guildId);
                 break;
             case "settings-get":
                 if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("warn-settings-get");
                 handleGetWarnSettingsCommand(event, guildId);
                 break;
         }
@@ -80,12 +98,12 @@ public class WarnCommandListener extends ListenerAdapter {
         List<DatabaseHandler.WarningData> warnings = handler.getUserActiveWarnings(guildId, targetUser.getId());
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⚠️ Active Warnings for " + targetUser.getName());
+        embed.setTitle(t(guildId, "moderation.warnings_title", targetUser.getName()));
         embed.setColor(Color.ORANGE);
         embed.setThumbnail(targetUser.getAvatarUrl());
 
         if (warnings.isEmpty()) {
-            embed.setDescription("✅ This user has no active warnings.");
+            embed.setDescription(t(guildId, "moderation.no_warnings"));
             embed.setColor(Color.GREEN);
             // Wenn keine Warns da sind, senden wir nur das Embed ohne Menü
             if (event instanceof SlashCommandInteractionEvent) {

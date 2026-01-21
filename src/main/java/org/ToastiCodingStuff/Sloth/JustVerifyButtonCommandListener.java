@@ -19,6 +19,28 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("verify-button")) {
@@ -109,8 +131,9 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
             return;
         }
 
-        String roleToGiveID = handler.getJustVerifyButtonRoleToGiveID(event.getGuild().getId());
-        String roleToRemoveID = handler.getJustVerifyButtonRoleToRemoveID(event.getGuild().getId());
+        String guildId = event.getGuild().getId();
+        String roleToGiveID = handler.getJustVerifyButtonRoleToGiveID(guildId);
+        String roleToRemoveID = handler.getJustVerifyButtonRoleToRemoveID(guildId);
 
         Role roleToGive = null;
         Role roleToRemove = null;
@@ -123,7 +146,7 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
         }
 
         if (event.getMember().getRoles().contains(roleToGive)) {
-            event.getHook().sendMessage("❌ You are already verified!").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "verify.already_verified")).setEphemeral(true).queue();
             return;
         }
 
@@ -137,9 +160,9 @@ public class JustVerifyButtonCommandListener extends ListenerAdapter {
             event.getGuild().removeRoleFromMember(event.getMember(), roleToRemove).queue();
         }
 
-        handler.incrementVerificationsPerformed(event.getGuild().getId());
+        handler.incrementVerificationsPerformed(guildId);
 
-        event.getHook().sendMessage("✅ You have been verified!").setEphemeral(true).queue();
+        event.getHook().sendMessage(t(guildId, "verify.success")).setEphemeral(true).queue();
     }
 
     private void handleSendJustVerifyButtonCommand(SlashCommandInteractionEvent event) {

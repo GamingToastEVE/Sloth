@@ -25,6 +25,9 @@ public class Sloth {
 
         DatabaseHandler handler = new DatabaseHandler();
 
+        // Initialize language manager
+        LanguageManager languageManager = new LanguageManager(handler);
+
         Guild guild = api.getGuildById("1169699077986988112");
 
         // Set bot status to "Playing /help"
@@ -47,7 +50,8 @@ public class Sloth {
         api.addEventListener(new SystemsCommandListener(handler));
         api.addEventListener(new ReminderCommandListener(handler));
         api.addEventListener(new LevelingSystemCommandListener(handler));
-        //api.addEventListener(new BotListener());
+        api.addEventListener(new LanguageCommandListener(languageManager));
+        api.addEventListener(new BotListener());
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -68,11 +72,8 @@ public class Sloth {
         activityRotator.scheduleAtFixedRate(() -> {
             Random rand = new Random();
             String[] activities = {
-                    "/help | in " + api.getGuilds().size() + " servers!"/*,
-                    "New Features out now!",
-                    "Check out /feedback",
-                    "For support, join our Discord!",
-                    "Activate systems with /systems"*/
+                    "/help | in " + api.getGuilds().size() + " servers!",
+                    "/help | /feedback for bugreports"
             };
             String activity = activities[rand.nextInt(activities.length)];
             api.getPresence().setActivity(Activity.customStatus(activity));

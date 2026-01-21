@@ -22,21 +22,44 @@ public class SystemsCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("systems")) return;
 
         event.deferReply().queue();
 
+        String guildId = event.getGuild().getId();
+
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.getHook().sendMessage("❌ You need **Manage Server** permission to manage bot systems.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
-        String guildId = event.getGuild().getId();
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
 
-        event.getHook().sendMessageEmbeds(buildEmbed(statuses).build())
+        event.getHook().sendMessageEmbeds(buildEmbed(guildId, statuses).build())
                 .setComponents(buildButtons(statuses))
                 .setEphemeral(true)
                 .queue();
@@ -48,13 +71,14 @@ public class SystemsCommandListener extends ListenerAdapter {
 
         event.deferReply().queue();
 
+        String guildId = event.getGuild().getId();
+
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.getHook().sendMessage("❌ You need **Manage Server** permission to use this.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
         String systemName = event.getComponentId().split(":")[1];
-        String guildId = event.getGuild().getId();
 
         // 1. Toggle state in DB
         boolean newState = handler.toggleSystem(guildId, systemName);
@@ -66,18 +90,25 @@ public class SystemsCommandListener extends ListenerAdapter {
         AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
         cmdUpdater.updateGuildCommandsFromActiveSystems("");
 
-        event.getMessage().editMessageEmbeds(buildEmbed(statuses).build())
+        event.getMessage().editMessageEmbeds(buildEmbed(guildId, statuses).build())
                 .setComponents(buildButtons(statuses))
                 .queue();
         event.getHook().deleteOriginal().queue();
     }
 
-    private EmbedBuilder buildEmbed(Map<String, Boolean> statuses) {
+    private EmbedBuilder buildEmbed(String guildId, Map<String, Boolean> statuses) {
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⚙️ System Configuration");
-        embed.setDescription("Click the buttons below to enable or disable specific bot systems for this server.\n" +
+        embed.setTitle(t(guildId, "systems.title"));
+
+        String descEn = "Click the buttons below to enable or disable specific bot systems for this server.\n" +
                 "\n**Note:** Disabling a system will remove its slash commands from the server. \nData will remain intact.\n\n" +
-                "**It might take a while for changes to take effect. Refreshing discord can help.**");
+                "**It might take a while for changes to take effect. Refreshing discord can help.**";
+        String descDe = "Klicke auf die Buttons unten, um bestimmte Bot-Systeme für diesen Server zu aktivieren oder zu deaktivieren.\n" +
+                "\n**Hinweis:** Das Deaktivieren eines Systems entfernt dessen Slash-Befehle vom Server. \nDaten bleiben erhalten.\n\n" +
+                "**Es kann eine Weile dauern, bis Änderungen wirksam werden. Das Aktualisieren von Discord kann helfen.**";
+
+        LanguageManager lang = LanguageManager.getInstance();
+        embed.setDescription(lang != null && lang.getGuildLanguage(guildId).equals("de") ? descDe : descEn);
         embed.setColor(Color.decode("#2b2d31"));
         embed.setFooter("Sloth Bot Systems Management");
 
@@ -112,9 +143,6 @@ public class SystemsCommandListener extends ListenerAdapter {
 
             if (isActive) {
                 buttons.add(Button.success("sys_toggle:" + sys, label).withEmoji(Emoji.fromFormatted("✅")));
-            } else if (sys.equals("leveling")) {
-                // Special case: Leveling system cannot be enabled for now
-                buttons.add(Button.secondary("sys_toggle:" + sys, label + " to be implemented").withEmoji(Emoji.fromFormatted("⚠️")));
             } else {
                 buttons.add(Button.danger("sys_toggle:" + sys, label).withEmoji(Emoji.fromFormatted("❌")));
             }

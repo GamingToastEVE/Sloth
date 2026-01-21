@@ -60,6 +60,34 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         voiceXpScheduler.scheduleAtFixedRate(this::awardVoiceXp, 60, 60, TimeUnit.SECONDS);
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    /**
+     * Get a translated string for a guild
+     */
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    /**
+     * Get a translated string with format arguments
+     */
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     // ==================== MESSAGE EVENT FOR XP ====================
 
     @Override
@@ -362,13 +390,15 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             String progressBar = buildProgressBar(progress);
 
             Container levelUpContainer = Container.of(
-                    TextDisplay.of("# 🎉 Level Up! (Voice)"),
+                    TextDisplay.of("# " + t(guild.getId(), "leveling.level_up_voice")),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(message),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(String.format(
-                            "**Level %d** → **Level %d**\n%s\n`%d / %d XP` (%.1f%%)",
-                            newLevel - 1, newLevel, progressBar, userData.xp, xpForNext, progress
+                            "**%s %d** → **%s %d**\n%s\n`%d / %d XP` (%.1f%%)",
+                            t(guild.getId(), "leveling.level"), newLevel - 1,
+                            t(guild.getId(), "leveling.level"), newLevel,
+                            progressBar, userData.xp, xpForNext, progress
                     ))
             ).withAccentColor(0x9B59B6); // Purple for voice
 
@@ -573,12 +603,13 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
      */
     private String buildLevelUpMessageForMember(DatabaseHandler.LevelSettingsData settings, Member member, int newLevel) {
         String message = settings.levelupMessages;
+        String guildId = member.getGuild().getId();
 
         if (message == null || message.isEmpty()) {
-            message = "🎉 Congratulations {mention}, you reached **Level {level}**!";
+            message = t(guildId, "leveling.level_up_message");
         }
 
-        DatabaseHandler.UserLevelData userData = handler.getUserLevel(member.getGuild().getId(), member.getId());
+        DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, member.getId());
 
         message = message
                 .replace("{mention}", member.getAsMention())
@@ -624,15 +655,18 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             long xpForNext = userData.getXpForNextLevel();
             double progress = userData.getProgressPercent();
             String progressBar = buildProgressBar(progress);
+            String guildId = member.getGuild().getId();
 
             Container levelUpContainer = Container.of(
-                    TextDisplay.of("# 🎉 Level Up!"),
+                    TextDisplay.of("# " + t(guildId, "leveling.level_up")),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(message),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(String.format(
-                            "**Level %d** → **Level %d**\n%s\n`%d / %d XP` (%.1f%%)",
-                            newLevel - 1, newLevel, progressBar, userData.xp, xpForNext, progress
+                            "**%s %d** → **%s %d**\n%s\n`%d / %d XP` (%.1f%%)",
+                            t(guildId, "leveling.level"), newLevel - 1,
+                            t(guildId, "leveling.level"), newLevel,
+                            progressBar, userData.xp, xpForNext, progress
                     ))
             ).withAccentColor(0x5865F2);
 
@@ -829,14 +863,15 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
      */
     private String buildLevelUpMessage(DatabaseHandler.LevelSettingsData settings, Member member, int newLevel) {
         String message = settings.levelupMessages;
+        String guildId = member.getGuild().getId();
 
         // Default message if none set
         if (message == null || message.isEmpty()) {
-            message = "🎉 Congratulations {mention}, you reached **Level {level}**!";
+            message = t(guildId, "leveling.level_up_message");
         }
 
         // Get user's total XP
-        DatabaseHandler.UserLevelData userData = handler.getUserLevel(member.getGuild().getId(), member.getId());
+        DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, member.getId());
 
         // Replace placeholders
         message = message
@@ -890,20 +925,22 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
             DatabaseHandler.UserLevelData userData = handler.getUserLevel(member.getGuild().getId(), member.getId());
             long xpForNext = userData.getXpForNextLevel();
             double progress = userData.getProgressPercent();
+            String levelGuildId = member.getGuild().getId();
 
             // Build progress bar
             String progressBar = buildProgressBar(progress);
 
             Container levelUpContainer = Container.of(
-                    TextDisplay.of("# 🎉 Level Up!"),
+                    TextDisplay.of("# " + t(levelGuildId, "leveling.level_up")),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(message),
                     Separator.createDivider(Separator.Spacing.SMALL),
                     TextDisplay.of(String.format(
-                            "**Level %d** → **Level %d**\n" +
+                            "**%s %d** → **%s %d**\n" +
                             "%s\n" +
                             "`%d / %d XP` (%.1f%%)",
-                            newLevel, newLevel + 1,
+                            t(levelGuildId, "leveling.level"), newLevel,
+                            t(levelGuildId, "leveling.level"), newLevel + 1,
                             progressBar,
                             userData.xp, xpForNext, progress
                     ))
@@ -1073,15 +1110,15 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 : event.getMember();
 
         if (targetMember == null) {
-            event.reply("❌ User not found.").setEphemeral(true).queue();
+            event.reply(t(guildId, "general.not_found")).setEphemeral(true).queue();
             return;
         }
 
-        String userId = targetMember.getId();
+        String oderId = targetMember.getId();
 
         // Get user level data
-        DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, userId);
-        int rank = handler.getUserRank(guildId, userId);
+        DatabaseHandler.UserLevelData userData = handler.getUserLevel(guildId, oderId);
+        int rank = handler.getUserRank(guildId, oderId);
         int totalUsers = handler.getTotalLeveledUsers(guildId);
 
         // Calculate progress
@@ -1091,22 +1128,22 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build rank card container
         Container rankContainer = Container.of(
-                TextDisplay.of(String.format("# 📊 %s's Rank", targetMember.getEffectiveName())),
+                TextDisplay.of(String.format("# 📊 %s's %s", targetMember.getEffectiveName(), t(guildId, "leveling.rank"))),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
                 TextDisplay.of(String.format(
-                        "**🏆 Rank:** #%d / %d\n" +
-                        "**⭐ Level:** %d\n" +
-                        "**✨ Total XP:** %,d",
-                        rank, totalUsers,
-                        userData.level,
-                        userData.totalXp
+                        "**🏆 %s:** #%d / %d\n" +
+                        "**⭐ %s:** %d\n" +
+                        "**✨ %s:** %,d",
+                        t(guildId, "leveling.rank"), rank, totalUsers,
+                        t(guildId, "leveling.level"), userData.level,
+                        t(guildId, "leveling.total_xp"), userData.totalXp
                 )),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
-                TextDisplay.of("## Progress to Next Level"),
+                TextDisplay.of("## " + (t(guildId, "leveling.level").equals("Level") ? "Progress to Next Level" : "Fortschritt zum nächsten Level")),
                 TextDisplay.of(String.format(
                         "%s\n" +
                         "`%,d / %,d XP` (%.1f%%)",
@@ -1146,7 +1183,10 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         int totalPages = (int) Math.ceil((double) totalUsers / pageSize);
 
         if (leaderboard.isEmpty()) {
-            event.reply("📭 No leveling data yet! Start chatting to earn XP.").setEphemeral(true).queue();
+            String noDataMsg = t(guildId, "leveling.level").equals("Level")
+                    ? "📭 No leveling data yet! Start chatting to earn XP."
+                    : "📭 Noch keine Level-Daten! Beginne zu chatten um XP zu verdienen.";
+            event.reply(noDataMsg).setEphemeral(true).queue();
             return;
         }
 
@@ -1168,9 +1208,9 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
             entries.append(String.format(
                     "%s %s\n" +
-                    "-# Level %d • %,d XP\n\n",
+                    "-# %s %d • %,d XP\n\n",
                     medal, displayName,
-                    userData.level, userData.totalXp
+                    t(guildId, "leveling.level"), userData.level, userData.totalXp
             ));
             rank++;
         }
@@ -1182,8 +1222,9 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build leaderboard container
         Container leaderboardContainer = Container.of(
-                TextDisplay.of(String.format("# 🏆 %s Leaderboard", event.getGuild().getName())),
-                TextDisplay.of(String.format("-# Page %d of %d • %,d total members", page, Math.max(1, totalPages), totalUsers)),
+                TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
+                TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"),
+                        page, Math.max(1, totalPages), totalUsers)),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
@@ -1192,18 +1233,19 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 Separator.createDivider(Separator.Spacing.SMALL),
 
                 TextDisplay.of(String.format(
-                        "**Your Rank:** #%d (Level %d, %,d XP)",
-                        callerRank, callerData.level, callerData.totalXp
+                        "**%s:** #%d (%s %d, %,d XP)",
+                        t(guildId, "leveling.your_rank"), callerRank,
+                        t(guildId, "leveling.level"), callerData.level, callerData.totalXp
                 )),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
                 // Pagination buttons
                 ActionRow.of(
-                        Button.secondary("level_leaderboard_prev_" + page, "⬅️ Previous")
+                        Button.secondary("level_leaderboard_prev_" + page, "⬅️")
                                 .withDisabled(page <= 1),
-                        Button.secondary("level_leaderboard_refresh_" + page, "🔄 Refresh"),
-                        Button.secondary("level_leaderboard_next_" + page, "➡️ Next")
+                        Button.secondary("level_leaderboard_refresh_" + page, t(guildId, "buttons.refresh")),
+                        Button.secondary("level_leaderboard_next_" + page, "➡️")
                                 .withDisabled(page >= totalPages)
                 )
         ).withAccentColor(0xFEE75C);
@@ -1274,8 +1316,8 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build leaderboard container
         Container leaderboardContainer = Container.of(
-                TextDisplay.of(String.format("# 🏆 %s Leaderboard", event.getGuild().getName())),
-                TextDisplay.of(String.format("-# Page %d of %d • %,d total members", newPage, Math.max(1, totalPages), totalUsers)),
+                TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
+                TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"), newPage, Math.max(1, totalPages), totalUsers)),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
@@ -1284,17 +1326,18 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 Separator.createDivider(Separator.Spacing.SMALL),
 
                 TextDisplay.of(String.format(
-                        "**Your Rank:** #%d (Level %d, %,d XP)",
-                        callerRank, callerData.level, callerData.totalXp
+                        "**%s:** #%d (%s %d, %,d XP)",
+                        t(guildId, "leveling.your_rank"), callerRank,
+                        t(guildId, "leveling.level"), callerData.level, callerData.totalXp
                 )),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
 
                 ActionRow.of(
-                        Button.secondary("level_leaderboard_prev_" + newPage, "⬅️ Previous")
+                        Button.secondary("level_leaderboard_prev_" + newPage, t(guildId, "buttons.previous_page"))
                                 .withDisabled(newPage <= 1),
-                        Button.secondary("level_leaderboard_refresh_" + newPage, "🔄 Refresh"),
-                        Button.secondary("level_leaderboard_next_" + newPage, "➡️ Next")
+                        Button.secondary("level_leaderboard_refresh_" + newPage, t(guildId, "buttons.refresh")),
+                        Button.secondary("level_leaderboard_next_" + newPage, t(guildId, "buttons.next_page"))
                                 .withDisabled(newPage >= totalPages)
                 )
         ).withAccentColor(0xFEE75C);
@@ -1307,7 +1350,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
     public void handleSettings(SlashCommandInteractionEvent event) {
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to view leveling settings.").setEphemeral(true).queue();
+            event.reply(t(event.getGuild().getId(), "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
@@ -1325,77 +1368,88 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     private Container buildMainSettingsContainer(String guildId) {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
-        String enabledStatus = settings.enabled ? "✅ Enabled" : "❌ Disabled";
+        String enabledText = settings.enabled ? t(guildId, "general.enabled") : t(guildId, "general.disabled");
+        String enabledStatus = settings.enabled ? "✅ " + enabledText : "❌ " + enabledText;
         String messageXpStatus = settings.messageXpEnabled ? "✅" : "❌";
         String voiceXpStatus = settings.voiceXpEnabled ? "✅" : "❌";
         String reactionXpStatus = settings.reactionXpEnabled ? "✅" : "❌";
-        String stackRewardsStatus = settings.stackRewards ? "✅ Stack" : "🔄 Replace";
-        String resetOnLeaveStatus = settings.resetOnLeave ? "✅ Reset" : "💾 Keep";
-        String maxLevelText = settings.maxLevel == 0 ? "Unlimited" : String.valueOf(settings.maxLevel);
+        String stackRewardsStatus = settings.stackRewards ? "✅ " + t(guildId, "leveling.stack_roles") : "🔄 " + t(guildId, "leveling.replace_roles");
+        String resetOnLeaveStatus = settings.resetOnLeave ? "✅ " + t(guildId, "leveling.reset_xp") : "💾 " + t(guildId, "leveling.keep_xp");
+        String maxLevelText = settings.maxLevel == 0 ? t(guildId, "leveling.unlimited") : String.valueOf(settings.maxLevel);
         String curveText = settings.xpCurve.substring(0, 1).toUpperCase() + settings.xpCurve.substring(1);
 
         return Container.of(
                 // Header
-                TextDisplay.of("# ⚙️ Leveling System Settings"),
-                TextDisplay.of("Configure how the XP and leveling system works on your server."),
+                TextDisplay.of("# " + t(guildId, "leveling.settings_title")),
+                TextDisplay.of(t(guildId, "leveling.settings_description")),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
                 // Status Overview
-                TextDisplay.of("## 📊 Current Status"),
+                TextDisplay.of("## " + t(guildId, "leveling.current_status")),
                 TextDisplay.of(String.format(
-                        "**System:** %s\n" +
-                        "**Formula:** %s × %.2f | Max Level: %s\n" +
-                        "**Message XP:** %s | **Voice XP:** %s | **Reaction XP:** %s",
-                        enabledStatus,
-                        curveText, settings.xpMultiplier, maxLevelText,
-                        messageXpStatus, voiceXpStatus, reactionXpStatus
+                        "**%s:** %s\n" +
+                        "**%s:** %s × %.2f | Max Level: %s\n" +
+                        "**%s:** %s | **%s:** %s | **%s:** %s",
+                        t(guildId, "leveling.system"), enabledStatus,
+                        t(guildId, "leveling.formula"), curveText, settings.xpMultiplier, maxLevelText,
+                        t(guildId, "leveling.message_xp"), messageXpStatus,
+                        t(guildId, "leveling.voice_xp"), voiceXpStatus,
+                        t(guildId, "leveling.reaction_xp"), reactionXpStatus
                 )),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
                 // Quick Toggles
-                TextDisplay.of("## ⚡ Quick Toggles"),
+                TextDisplay.of("## " + t(guildId, "leveling.quick_toggles")),
                 ActionRow.of(
                         Button.of(settings.enabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
-                                "level_toggle_enabled", settings.enabled ? "✅ System ON" : "❌ System OFF"),
+                                "level_toggle_enabled", settings.enabled ? "✅ " + t(guildId, "general.on") : "❌ " + t(guildId, "general.off")),
                         Button.of(settings.messageXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_message_xp_enabled", "💬 Message XP"),
+                                "level_toggle_message_xp_enabled", "💬 " + t(guildId, "leveling.message_xp")),
                         Button.of(settings.voiceXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_voice_xp_enabled", "🎤 Voice XP"),
+                                "level_toggle_voice_xp_enabled", "🎤 " + t(guildId, "leveling.voice_xp")),
                         Button.of(settings.reactionXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_reaction_xp_enabled", "👍 Reaction XP")
+                                "level_toggle_reaction_xp_enabled", "👍 " + t(guildId, "leveling.reaction_xp"))
                 ),
                 ActionRow.of(
                         Button.of(settings.levelupDm ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_levelup_dm", "📬 DM Notifications"),
+                                "level_toggle_levelup_dm", "📬 " + t(guildId, "leveling.dm_notifications")),
                         Button.of(settings.stackRewards ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_stack_rewards", stackRewardsStatus + " Roles"),
+                                "level_toggle_stack_rewards", stackRewardsStatus),
                         Button.of(settings.resetOnLeave ? net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER : net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS,
-                                "level_toggle_reset_on_leave", resetOnLeaveStatus + " on Leave")
+                                "level_toggle_reset_on_leave", resetOnLeaveStatus)
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
                 // Navigation Buttons
-                TextDisplay.of("## 🔧 Detailed Settings"),
+                TextDisplay.of("## " + t(guildId, "leveling.detailed_settings")),
                 ActionRow.of(
-                        Button.primary("level_settings_formula", "📐 Formula"),
-                        Button.primary("level_settings_message_xp", "💬 Message XP"),
-                        Button.primary("level_settings_voice_xp", "🎤 Voice XP"),
-                        Button.primary("level_settings_reaction_xp", "👍 Reaction XP")
+                        Button.primary("level_settings_formula", "📐 " + t(guildId, "leveling.formula")),
+                        Button.primary("level_settings_message_xp", "💬 " + t(guildId, "leveling.message_xp")),
+                        Button.primary("level_settings_voice_xp", "🎤 " + t(guildId, "leveling.voice_xp")),
+                        Button.primary("level_settings_reaction_xp", "👍 " + t(guildId, "leveling.reaction_xp"))
                 ),
                 ActionRow.of(
-                        Button.primary("level_settings_notifications", "🔔 Notifications"),
-                        Button.primary("level_settings_rewards", "🎁 Role Rewards"),
-                        Button.primary("level_settings_exceptions", "🚫 Exceptions")
+                        Button.primary("level_settings_notifications", "🔔 " + t(guildId, "leveling.notifications")),
+                        Button.primary("level_settings_rewards", "🎁 " + t(guildId, "leveling.role_rewards")),
+                        Button.primary("level_settings_exceptions", "🚫 " + t(guildId, "leveling.exceptions"))
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                // Footer
-                TextDisplay.of("-# Click buttons above to toggle settings or navigate to detailed configuration pages.")
+                // Footer - show different footer text based on language
+                TextDisplay.of("-# " + getFooterHint(guildId))
         ).withAccentColor(settings.enabled ? 0x57F287 : 0xED4245); // Green if enabled, red if disabled
+    }
+
+    private String getFooterHint(String guildId) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null && lang.getGuildLanguage(guildId).equals("de")) {
+            return "Klicke auf die Buttons oben, um Einstellungen zu ändern oder zu detaillierten Konfigurationsseiten zu navigieren.";
+        }
+        return "Click buttons above to toggle settings or navigate to detailed configuration pages.";
     }
 
     // ==================== FORMULA SETTINGS PAGE ====================
@@ -1412,52 +1466,56 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## 📈 XP Curve"),
+                TextDisplay.of("## 📈 " + t(guildId, "leveling.xp_curve")),
                 TextDisplay.of(String.format(
-                        "**Current Curve:** %s\n\n" +
-                        "• **Linear** - Steady XP increase per level\n" +
-                        "• **Exponential** - Rapidly increasing XP requirements\n" +
-                        "• **Logarithmic** - Slower scaling at higher levels",
-                        curveText
+                        "**%s:** %s\n\n" +
+                        "• **%s** - %s\n" +
+                        "• **%s** - %s\n" +
+                        "• **%s** - %s",
+                        t(guildId, "leveling.xp_curve"), curveText,
+                        t(guildId, "leveling.curve_linear"), t(guildId, "leveling.curve_linear_desc"),
+                        t(guildId, "leveling.curve_exponential"), t(guildId, "leveling.curve_exponential_desc"),
+                        t(guildId, "leveling.curve_logarithmic"), t(guildId, "leveling.curve_logarithmic_desc")
                 )),
 
                 ActionRow.of(
                         Button.of(settings.xpCurve.equals("linear") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_set_curve_linear", "Linear"),
+                                "level_set_curve_linear", t(guildId, "leveling.curve_linear")),
                         Button.of(settings.xpCurve.equals("exponential") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_set_curve_exponential", "Exponential"),
+                                "level_set_curve_exponential", t(guildId, "leveling.curve_exponential")),
                         Button.of(settings.xpCurve.equals("logarithmic") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_set_curve_logarithmic", "Logarithmic")
+                                "level_set_curve_logarithmic", t(guildId, "leveling.curve_logarithmic"))
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## ✖️ Multiplier"),
+                TextDisplay.of("## ✖️ " + t(guildId, "leveling.multiplier")),
                 TextDisplay.of(String.format(
-                        "**Current Multiplier:** %.2fx\n\n" +
-                        "-# XP requirements are multiplied by this value.\n" +
-                        "-# Higher = harder to level up. Lower = easier.\n",
-                        settings.xpMultiplier
+                        "**%s:** %.2fx\n\n" +
+                        "-# %s",
+                        t(guildId, "leveling.multiplier"), settings.xpMultiplier,
+                        t(guildId, "leveling.multiplier_desc")
                 )),
 
-                ActionRow.of(Button.primary("level_settings_multiplier_change", "✏️ Change Multiplier")),
+                ActionRow.of(Button.primary("level_settings_multiplier_change", "✏️ " + t(guildId, "general.edit"))),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## 🎯 Max Level"),
+                TextDisplay.of("## 🎯 " + t(guildId, "leveling.max_level")),
                 TextDisplay.of(String.format(
-                        "**Current Max Level:** %s\n\n" +
-                        "-# Set to 0 for unlimited levels.\n",
-                        maxLevelText
+                        "**%s:** %s\n\n" +
+                        "-# %s",
+                        t(guildId, "leveling.max_level"), maxLevelText,
+                        t(guildId, "leveling.max_level_desc")
                 )),
 
-                ActionRow.of(Button.primary("level_settings_max_level_change", "✏️ Change Max Level")),
+                ActionRow.of(Button.primary("level_settings_max_level_change", "✏️ " + t(guildId, "general.edit"))),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
                 ActionRow.of(
-                        Button.secondary("level_settings_back", "⬅️ Back to Overview"),
-                        Button.secondary("level_settings_refresh", "🔄 Refresh")
+                        Button.secondary("level_settings_back", t(guildId, "buttons.back_to_overview")),
+                        Button.secondary("level_settings_refresh", t(guildId, "buttons.refresh"))
                 )
         ).withAccentColor(0x9B59B6); // Purple
     }
@@ -1467,29 +1525,32 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     private Container buildMessageXpSettingsContainer(String guildId) {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
-        String modeText = settings.messageXpMode.equals("random") ? "Random" : "Fixed";
+        String modeText = settings.messageXpMode.equals("random") ? t(guildId, "leveling.mode_random") : t(guildId, "leveling.mode_fixed");
+        String statusText = settings.messageXpEnabled ? "✅ " + t(guildId, "general.enabled") : "❌ " + t(guildId, "general.disabled");
 
         return Container.of(
-                TextDisplay.of("# 💬 Message XP"),
-                TextDisplay.of("Configure XP earned from messages."),
+                TextDisplay.of("# " + t(guildId, "leveling.message_xp_title")),
+                TextDisplay.of(t(guildId, "leveling.message_xp_description")),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
 
-                TextDisplay.of("## 🔘 Status & Mode"),
+                TextDisplay.of("## " + t(guildId, "leveling.status_mode")),
                 TextDisplay.of(String.format(
                         "**Status:** %s\n" +
-                        "**Mode:** %s\n\n" +
-                        "• **Random** - XP between min and max\n" +
-                        "• **Fixed** - Always earns max XP value",
-                        settings.messageXpEnabled ? "✅ Enabled" : "❌ Disabled",
-                        modeText
+                        "**%s:** %s\n\n" +
+                        "• **%s** - %s\n" +
+                        "• **%s** - %s",
+                        statusText,
+                        t(guildId, "leveling.mode"), modeText,
+                        t(guildId, "leveling.mode_random"), t(guildId, "leveling.mode_random_desc"),
+                        t(guildId, "leveling.mode_fixed"), t(guildId, "leveling.mode_fixed_desc")
                 )),
 
                 ActionRow.of(
                         Button.of(settings.messageXpEnabled ? net.dv8tion.jda.api.components.buttons.ButtonStyle.SUCCESS : net.dv8tion.jda.api.components.buttons.ButtonStyle.DANGER,
-                                "level_toggle_message_xp_enabled", settings.messageXpEnabled ? "✅ Enabled" : "❌ Disabled"),
+                                "level_toggle_message_xp_enabled", statusText),
                         Button.of(settings.messageXpMode.equals("random") ? net.dv8tion.jda.api.components.buttons.ButtonStyle.PRIMARY : net.dv8tion.jda.api.components.buttons.ButtonStyle.SECONDARY,
-                                "level_toggle_message_xp_mode", "Mode: " + modeText)
+                                "level_toggle_message_xp_mode", t(guildId, "leveling.mode") + ": " + modeText)
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),

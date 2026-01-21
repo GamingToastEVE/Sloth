@@ -31,6 +31,28 @@ public class TicketCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("ticket")) {
@@ -190,12 +212,12 @@ public class TicketCommandListener extends ListenerAdapter {
                 .setColor(Color.BLUE)
                 .setFooter("Ticket System • Click the button to get started");
 
-        Button createTicketButton = Button.primary("create_ticket", "🎫 Create Ticket");
+        Button createTicketButton = Button.primary("create_ticket", t(guildId, "tickets.create_button"));
 
         event.getChannel().sendMessageEmbeds(embed.build())
                 .setComponents(ActionRow.of(createTicketButton))
                 .queue(message -> {
-                    event.reply("✅ Ticket panel created successfully!").setEphemeral(true).queue();
+                    event.reply(t(guildId, "general.success")).setEphemeral(true).queue();
                     // Sort channels to ensure ticket panel channel stays on top
                     sortTicketChannelsByPriority(event.getGuild(), guildId);
                 });
@@ -308,9 +330,12 @@ public class TicketCommandListener extends ListenerAdapter {
                                 .setColor(getPriorityColor(priority))
                                 .setFooter("Ticket ID: " + ticketId);
 
-                        net.dv8tion.jda.api.components.buttons.Button closeButton = net.dv8tion.jda.api.components.buttons.Button.danger("close_ticket_confirm", "🔒 Close Ticket");
+                        net.dv8tion.jda.api.components.buttons.Button closeButton = net.dv8tion.jda.api.components.buttons.Button.danger("close_ticket_confirm", t(guildId, "tickets.close_button"));
 
-                        channel.sendMessage(event.getUser().getAsMention() + " Welcome to your support ticket!")
+                        String welcomeMsg = t(guildId, "tickets.create_button").contains("erstellen")
+                                ? "Willkommen bei deinem Support-Ticket!"
+                                : "Welcome to your support ticket!";
+                        channel.sendMessage(event.getUser().getAsMention() + " " + welcomeMsg)
                                 .addEmbeds(welcomeEmbed.build())
                                 .setComponents(ActionRow.of(closeButton))
                                 .queue();
@@ -318,7 +343,7 @@ public class TicketCommandListener extends ListenerAdapter {
                         // Sort channels by priority after creating new ticket
                         sortTicketChannelsByPriority(event.getGuild(), guildId);
 
-                        event.reply("✅ Ticket created successfully! " + channel.getAsMention()).setEphemeral(true).queue();
+                        event.reply(t(guildId, "tickets.created", channel.getAsMention())).setEphemeral(true).queue();
                     } else {
                         channel.delete().queue();
                         event.reply("❌ Failed to create ticket in database.").setEphemeral(true).queue();

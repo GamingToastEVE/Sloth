@@ -21,6 +21,66 @@ public class AddGuildSlashCommands {
         this.databaseHandler = databaseHandler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    /**
+     * Get a translated command description based on guild language
+     */
+    private String cmd(String key) {
+        if (guild == null) return getDefaultCommandText(key);
+
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guild.getId(), "commands." + key);
+        }
+        return getDefaultCommandText(key);
+    }
+
+    /**
+     * Default English command descriptions as fallback
+     */
+    private String getDefaultCommandText(String key) {
+        return switch (key) {
+            case "help" -> "Show help and documentation for Sloth bot";
+            case "language" -> "Change the bot's language for this server";
+            case "systems" -> "Enable or disable bot systems";
+            case "level" -> "Leveling system commands";
+            case "level_rank" -> "View your or another user's rank";
+            case "level_leaderboard" -> "View the server leaderboard";
+            case "level_settings" -> "Configure leveling system settings";
+            case "mod" -> "Moderation commands";
+            case "mod_kick" -> "Kick a user from the server";
+            case "mod_ban" -> "Ban a user from the server";
+            case "mod_unban" -> "Unban a user";
+            case "mod_timeout" -> "Timeout a user";
+            case "mod_untimeout" -> "Remove timeout from a user";
+            case "mod_purge" -> "Delete multiple messages";
+            case "mod_slowmode" -> "Set slowmode for a channel";
+            case "warn" -> "Warning system commands";
+            case "warn_user" -> "Warn a user";
+            case "warn_list" -> "List warnings for a user";
+            case "ticket" -> "Ticket system commands";
+            case "ticket_setup" -> "Setup the ticket system";
+            case "ticket_panel" -> "Send a ticket panel";
+            case "ticket_close" -> "Close a ticket";
+            case "stats" -> "View server statistics";
+            case "reminder" -> "Set and manage reminders";
+            case "reminder_set" -> "Set a new reminder";
+            case "reminder_list" -> "List your reminders";
+            case "reminder_remove" -> "Remove a reminder";
+            case "temprole" -> "Manage temporary roles";
+            case "temprole_add" -> "Add a temporary role to a user";
+            case "temprole_remove" -> "Remove a temporary role from a user";
+            case "my_roles" -> "View your temporary roles";
+            case "select_roles" -> "Role selection menu commands";
+            case "verify_button" -> "Verification button commands";
+            case "embed" -> "Create and edit embeds";
+            case "log_channel" -> "Configure the log channel";
+            case "role_event" -> "Configure role events";
+            default -> key;
+        };
+    }
+
     /**
      * Get all commands from all systems - used for global command registration
      */
@@ -46,7 +106,7 @@ public class AddGuildSlashCommands {
      * Get log channel command with subcommands
      */
     private SlashCommandData getLogChannelCommand() {
-        return Commands.slash("log-channel", "Manage the log channel")
+        return Commands.slash("log-channel", cmd("log_channel"))
                 .addSubcommands(
                         new SubcommandData("set", "Set the log channel")
                                 .addOption(OptionType.CHANNEL, "channel", "Channel to use as log channel", true),
@@ -58,7 +118,7 @@ public class AddGuildSlashCommands {
      * Get select roles command with subcommands
      */
     private SlashCommandData getSelectRolesCommand() {
-        return Commands.slash("select-roles", "Manage role selection")
+        return Commands.slash("select-roles", cmd("select_roles"))
                 .addSubcommands(
                         new SubcommandData("send", "Send a select roles message in the current channel"),
                         new SubcommandData("add", "Add a role to the select roles message")
@@ -74,7 +134,7 @@ public class AddGuildSlashCommands {
      * Get verify button command with subcommands
      */
     private SlashCommandData getVerifyButtonCommand() {
-        return Commands.slash("verify-button", "Manage verification buttons")
+        return Commands.slash("verify-button", cmd("verify_button"))
                 .addSubcommands(
                         new SubcommandData("send", "Send a message with a button that gives a role"),
                         new SubcommandData("remove", "Remove the verify button embed from the current channel"),
@@ -113,7 +173,7 @@ public class AddGuildSlashCommands {
 
     // Ersetze die alte getEmbedEditorCommand Methode:
     private SlashCommandData getEmbedEditorCommand() {
-        return Commands.slash("embed", "Erstelle und verwalte Embeds")
+        return Commands.slash("embed", cmd("embed"))
                 .addSubcommands(
                         new SubcommandData("create", "Starts Embed-Editor"),
                         new SubcommandData("list", "Shows all saved Embeds"),
@@ -126,7 +186,7 @@ public class AddGuildSlashCommands {
     }
 
     private SlashCommandData getReminderCommand() {
-        return Commands.slash("reminder", "Manage your reminders")
+        return Commands.slash("reminder", cmd("reminder"))
                 .addSubcommands(
                         new SubcommandData("set", "Create a new reminder")
                                 .addOption(OptionType.STRING, "time", "Time until i remind you (10m, 1h, 2d)", true)
@@ -143,7 +203,7 @@ public class AddGuildSlashCommands {
     // Innerhalb von getWarnCommand() in AddGuildSlashCommands.java
 
     private SlashCommandData getWarnCommand() {
-        return Commands.slash("warn", "Manage warnings")
+        return Commands.slash("warn", cmd("warn"))
                 .addSubcommands(
                         new SubcommandData("user", "Issue a warning to a user")
                                 .addOption(OptionType.USER, "user", "User to warn", true)
@@ -170,7 +230,7 @@ public class AddGuildSlashCommands {
      * Get moderation command with subcommands
      */
     private SlashCommandData getModerationCommand() {
-        return Commands.slash("mod", "Moderation commands")
+        return Commands.slash("mod", cmd("mod"))
                 .addSubcommands(
                         new SubcommandData("kick", "Kick a user from the server")
                                 .addOption(OptionType.USER, "user", "User to kick", true)
@@ -200,7 +260,7 @@ public class AddGuildSlashCommands {
      * Get ticket command with subcommands
      */
     private SlashCommandData getTicketCommand() {
-        return Commands.slash("ticket", "Manage tickets")
+        return Commands.slash("ticket", cmd("ticket"))
                 .addSubcommands(
                         new SubcommandData("setup", "Configure the ticket system for this server")
                                 .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
@@ -233,19 +293,19 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> commands = new ArrayList<>();
 
         // 1. User Command: /my-roles
-        commands.add(Commands.slash("my-roles", "Zeigt an, wie lange deine temporären Rollen noch gültig sind."));
+        commands.add(Commands.slash("my-roles", cmd("my_roles")));
 
         // 2. Admin Command: /temprole (mit Subcommands)
-        SubcommandData addCmd = new SubcommandData("add", "Vergibt eine Rolle für eine bestimmte Zeit")
-                .addOption(OptionType.USER, "user", "Der User", true)
-                .addOption(OptionType.ROLE, "role", "Die Rolle", true)
-                .addOption(OptionType.STRING, "duration", "Dauer (z.B. 30m, 12h, 7d)", true);
+        SubcommandData addCmd = new SubcommandData("add", "Add a temporary role to a user")
+                .addOption(OptionType.USER, "user", "The user", true)
+                .addOption(OptionType.ROLE, "role", "The role", true)
+                .addOption(OptionType.STRING, "duration", "Duration (e.g. 30m, 12h, 7d)", true);
 
-        SubcommandData removeCmd = new SubcommandData("remove", "Entfernt eine temporäre Rolle vorzeitig")
-                .addOption(OptionType.USER, "user", "Der User", true)
-                .addOption(OptionType.ROLE, "role", "Die Rolle", true);
+        SubcommandData removeCmd = new SubcommandData("remove", "Remove a temporary role early")
+                .addOption(OptionType.USER, "user", "The user", true)
+                .addOption(OptionType.ROLE, "role", "The role", true);
 
-        SlashCommandData tempRoleCmd = Commands.slash("temprole", "Verwaltet temporäre Rollen manuell")
+        SlashCommandData tempRoleCmd = Commands.slash("temprole", cmd("temprole"))
                 .addSubcommands(addCmd, removeCmd)
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_ROLES)); // Nur für Mods sichtbar
 
@@ -260,14 +320,14 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> commands = new ArrayList<>();
 
         // Subcommand: Create
-        SubcommandData createCmd = new SubcommandData("create", "Erstellt ein neues Event")
-                .addOption(OptionType.STRING, "name", "Name des Events", true);
+        SubcommandData createCmd = new SubcommandData("create", "Create a new event")
+                .addOption(OptionType.STRING, "name", "Name of the event", true);
 
         // Subcommand: List (und Editieren via UI)
-        SubcommandData listCmd = new SubcommandData("list", "lists all events and opens an editor UI");
+        SubcommandData listCmd = new SubcommandData("list", "Lists all events and opens an editor UI");
 
         // Hauptcommand
-        SlashCommandData eventCmd = Commands.slash("role-event", "Manages automatic role events")
+        SlashCommandData eventCmd = Commands.slash("role-event", cmd("role_event"))
                 .addSubcommands(createCmd, listCmd)
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
 
@@ -282,7 +342,7 @@ public class AddGuildSlashCommands {
      * Get the /systems control command
      */
     private SlashCommandData getSystemsCommand() {
-        return Commands.slash("systems", "Enable or disable bot systems for this server")
+        return Commands.slash("systems", cmd("systems"))
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
@@ -293,7 +353,9 @@ public class AddGuildSlashCommands {
     public List<SlashCommandData> getCoreCommands() {
         List<SlashCommandData> core = new ArrayList<>();
         core.add(getSystemsCommand());
-        core.add(Commands.slash("help", "Show help and documentation for Sloth bot"));
+        core.add(Commands.slash("help", cmd("help")));
+        core.add(Commands.slash("language", cmd("language"))
+                .setDefaultPermissions(net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions.enabledFor(net.dv8tion.jda.api.Permission.MANAGE_SERVER)));
         core.add(getFeedbackCommands().get(0));
         return core;
     }
@@ -361,9 +423,8 @@ public class AddGuildSlashCommands {
      * Get statistics command with subcommands
      */
     private SlashCommandData getStatisticsCommand() {
-        return Commands.slash("stats", "View server statistics")
+        return Commands.slash("stats", cmd("stats"))
                 .addSubcommands(
-                        new SubcommandData("lifetime", "View lifetime server moderation statistics"),
                         new SubcommandData("today", "View today's server moderation statistics"),
                         new SubcommandData("week", "View this week's server moderation statistics"),
                         new SubcommandData("date", "View server statistics for a specific date")
@@ -375,7 +436,7 @@ public class AddGuildSlashCommands {
     }
 
     private SlashCommandData getLevelingCommands() {
-        return Commands.slash("leveling", "Manage the leveling system")
+        return Commands.slash("leveling", cmd("level"))
                 .addSubcommands(
                         new SubcommandData("settings", "View or change leveling settings"),
                         new SubcommandData("leaderboard", "View the server's leveling leaderboard"),

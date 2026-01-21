@@ -1531,6 +1531,20 @@ public class DatabaseHandler {
     }
 
     /**
+     * Alias for getGuildLanguage - used by LanguageManager
+     */
+    public String getGuildLanguageSetting(String guildId) {
+        return getGuildLanguage(guildId);
+    }
+
+    /**
+     * Alias for updateGuildLanguage - used by LanguageManager
+     */
+    public boolean updateGuildLanguageSetting(String guildId, String language) {
+        return updateGuildLanguage(guildId, language);
+    }
+
+    /**
      * Deactivate a guild when the bot leaves it
      */
     public void deactivateGuild(String guildId) {
