@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -17,11 +18,13 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.api.interactions.commands.Command.Choice;
+import org.json.JSONObject;
 
 import java.awt.Color;
 import java.time.Instant;
@@ -67,8 +70,39 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
     }
 
     // Standard Editor-Buttons (ohne Verify Toggle)
-    private List<ActionRow> getEditorActionRows() {
+    private List<ActionRow> getEditorActionRows(EmbedBuilder builder, DataObject obj) {
         List<ActionRow> rows = new ArrayList<>();
+
+        if (obj != null) {
+            if (obj.hasKey("fields")) {
+                DataArray fields = obj.getArray("fields");
+                StringSelectMenu.Builder fieldSelect = StringSelectMenu.create("embed_field_select")
+                        .setPlaceholder("Select a field to edit")
+                        .setMinValues(1)
+                        .setMaxValues(1);
+                for (int i = 0; i < fields.length(); i++) {
+                    DataObject field = fields.getObject(i);
+                    String name = field.getString("name");
+                    fieldSelect.addOption(name, String.valueOf(i));
+                }
+                rows.add(ActionRow.of(fieldSelect.build()));
+            }
+        }
+
+        if (!builder.getFields().isEmpty()) {
+            StringSelectMenu.Builder fieldSelect = StringSelectMenu.create("embed_field_select")
+                    .setPlaceholder("Select a field to edit")
+                    .setMinValues(1)
+                    .setMaxValues(1);
+            List<MessageEmbed.Field> fields = builder.getFields();
+            for (int i = 0; i < fields.size(); i++) {
+                MessageEmbed.Field field = fields.get(i);
+                String name = field.getName();
+                fieldSelect.addOption(name, String.valueOf(i));
+            }
+            rows.add(ActionRow.of(fieldSelect.build()));
+        }
+
 
         // Reihe 1: Texte
         rows.add(ActionRow.of(
@@ -91,6 +125,8 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 Button.success("embed_publish_start", "Send").withEmoji(Emoji.fromUnicode("✅")),
                 Button.primary("embed_save_db", "Save").withEmoji(Emoji.fromUnicode("💾"))
         ));
+
+        System.out.println("Generated " + rows.size() + " action rows for embed editor.");
 
         return rows;
     }
@@ -131,15 +167,13 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         switch (subcommand) {
             case "create":
-                handler.insertOrUpdateGlobalStatistic("embed create");
                 EmbedBuilder eb = new EmbedBuilder();
                 eb.setDescription("This is a preview. Use the buttons to edit the embed.");
                 eb.setColor(Color.GRAY);
-                event.getHook().editOriginalEmbeds(eb.build()).setComponents(getEditorActionRows()).queue();
+                event.getHook().editOriginalEmbeds(eb.build()).setComponents(getEditorActionRows(eb, null)).queue();
                 break;
 
             case "list":
-                handler.insertOrUpdateGlobalStatistic("embed list");
                 List<String> names = handler.getCustomEmbedNames(guildId);
                 if (names.isEmpty()) {
                     event.getHook().editOriginal("📂 No saved Embeds found.").queue();
@@ -149,7 +183,6 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
 
             case "delete":
-                handler.insertOrUpdateGlobalStatistic("embed delete");
                 String delName = event.getOption("name").getAsString();
                 if (handler.deleteCustomEmbed(guildId, delName)) {
                     event.getHook().editOriginal("🗑️ Embed `" + delName + "` got deleted.").queue();
@@ -159,7 +192,6 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
 
             case "load":
-                handler.insertOrUpdateGlobalStatistic("embed load");
                 String loadName = event.getOption("name").getAsString();
                 String json = handler.getCustomEmbedData(guildId, loadName);
                 if (json == null) {
@@ -171,7 +203,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                     EmbedBuilder loadedBuilder = jsonToEmbedBuilder(data);
 
                     event.getHook().editOriginalEmbeds(loadedBuilder.build())
-                            .setComponents(getEditorActionRows())
+                            .setComponents(getEditorActionRows(null, data))
                             .queue();
                 } catch (Exception e) {
                     event.getHook().editOriginal("❌ Error loading Embed: " + e.getMessage()).queue();
@@ -235,7 +267,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // --- Publish Abbrechen ---
         if (id.equals("embed_publish_cancel")) {
-            event.editComponents(getEditorActionRows()).queue();
+            event.editComponents(getEditorActionRows(builder, null)).queue();
             return;
         }
 
@@ -322,6 +354,28 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         MessageEmbed currentEmbed = event.getMessage().getEmbeds().get(0);
         EmbedBuilder builder = getBuilderFromMessage(currentEmbed);
 
+        if (id.startsWith("modal_embed_edit_field_")) {
+            String indexStr = id.replace("modal_embed_edit_field_", "");
+            int fieldIndex;
+            try {
+                fieldIndex = Integer.parseInt(indexStr);
+            } catch (NumberFormatException e) {
+                event.reply("❌ Invalid field index!").setEphemeral(true).queue();
+                return;
+            }
+            if (fieldIndex < 0 || fieldIndex >= builder.getFields().size()) {
+                event.reply("❌ Field index out of bounds!").setEphemeral(true).queue();
+                return;
+            }
+            String fn = event.getValue("input_field_name").getAsString();
+            String fv = processLineBreaks(event.getValue("input_field_value").getAsString());
+            boolean inline = event.getValue("input_field_inline").getAsString().toLowerCase().matches("^(ja|yes|true|y|j)$");
+            builder.getFields().set(fieldIndex, new MessageEmbed.Field(fn, fv, inline));
+            event.editMessageEmbeds(builder.build()).queue();
+            event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
+            return;
+        }
+
         // Editor Handler
         switch (id) {
             case "modal_embed_title":
@@ -361,6 +415,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
         }
         event.editMessageEmbeds(builder.build()).queue();
+        event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
     }
 
     @Override
@@ -371,6 +426,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             boolean withVerify = Boolean.parseBoolean(id.replace("embed_publish_finish_", ""));
 
             MessageEmbed embedToSend = event.getMessage().getEmbeds().get(0);
+            EmbedBuilder builder = getBuilderFromMessage(embedToSend);
             MessageChannel targetChannel = Objects.requireNonNull(event.getGuild()).getTextChannelById(event.getMentions().getChannels().get(0).getId());
 
             // Button erstellen, falls ausgewählt
@@ -400,13 +456,45 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             action.queue(
                     s -> {
                         event.getHook().sendMessage("✅ Sent in " + targetChannel.getAsMention() + (verifyButton != null ? " (with Verify Button)" : "")).queue();
-                        event.getMessage().editMessageComponents(getEditorActionRows()).queue();
+                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null)).queue();
                     },
                     e -> {
                         event.getHook().sendMessage("❌ Error sending embed: " + e.getMessage()).setEphemeral(true).queue();
-                        event.getMessage().editMessageComponents(getEditorActionRows()).queue();
+                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null)).queue();
                     }
             );
+        }
+    }
+
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        String id = event.getComponentId();
+        if (!id.equals("embed_field_select")) return;
+
+        MessageEmbed currentEmbed = event.getMessage().getEmbeds().isEmpty() ? null : event.getMessage().getEmbeds().get(0);
+        EmbedBuilder builder = getBuilderFromMessage(currentEmbed);
+
+        // Feld löschen
+        int fieldIndex = Integer.parseInt(event.getValues().get(0));
+        if (fieldIndex >= 0 && fieldIndex < builder.getFields().size()) {
+            Modal modal = Modal.create("modal_embed_edit_field_" + fieldIndex, "Edit Field")
+                    .addComponents(
+                            Label.of("Field Name:", TextInput.create("input_field_name", TextInputStyle.SHORT)
+                                    .setValue(builder.getFields().get(fieldIndex).getName())
+                                    .setRequired(true)
+                                    .build()),
+                            Label.of("Field Content:", TextInput.create("input_field_value", TextInputStyle.PARAGRAPH)
+                                    .setValue(builder.getFields().get(fieldIndex).getValue())
+                                    .setRequired(true)
+                                    .build()),
+                            Label.of("Inline True/False:", TextInput.create("input_field_inline", TextInputStyle.SHORT)
+                                    .setValue(builder.getFields().get(fieldIndex).isInline() ? "yes" : "no")
+                                    .setRequired(true)
+                                    .build())
+                    ).build();
+            event.replyModal(modal).queue();
+        } else {
+            event.reply("❌ Invalid field selected!").setEphemeral(true).queue();
         }
     }
 
