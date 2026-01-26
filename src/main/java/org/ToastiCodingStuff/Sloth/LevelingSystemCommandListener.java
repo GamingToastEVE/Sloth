@@ -6,6 +6,7 @@ import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.textinput.TextInput;
@@ -20,6 +21,7 @@ import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -31,6 +33,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Text;
 
+import javax.swing.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -981,34 +984,123 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
     }
 
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        if (!event.getComponentId().equals("level_reward_remove_select")) return;
+
+        String guildId = event.getGuild().getId();
+        String roleIdToRemove = event.getValues().get(0);
+
+        // Permission check
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("❌ You need **Manage Server** permission to change these settings.").setEphemeral(true).queue();
+            return;
+        }
+
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+        if (settings.rewards == null || settings.rewards.isEmpty()) {
+            event.reply("❌ No rewards found to remove.").setEphemeral(true).queue();
+            return;
+        }
+
+        try {
+            JSONArray rewards = new JSONArray(settings.rewards);
+            JSONArray newRewards = new JSONArray();
+            boolean found = false;
+
+            for (int i = 0; i < rewards.length(); i++) {
+                JSONObject reward = rewards.getJSONObject(i);
+                // Keep the reward if the role ID doesn't match the one we want to remove
+                if (!reward.getString("role_id").equals(roleIdToRemove)) {
+                    newRewards.put(reward);
+                } else {
+                    found = true;
+                }
+            }
+
+            if (found) {
+                boolean success = handler.updateLevelSetting(guildId, "rewards", newRewards.toString());
+                if (success) {
+                    // Refresh the view
+                    Container container = showRewardEditPage(event.getGuild());
+                    event.editMessage(new MessageEditBuilder().setComponents(container).useComponentsV2().build()).queue();
+                    event.getHook().sendMessage("✅ Reward removed successfully.").setEphemeral(true).queue();
+                } else {
+                    event.reply("❌ Failed to update database.").setEphemeral(true).queue();
+                }
+            } else {
+                event.reply("❌ Reward not found in settings.").setEphemeral(true).queue();
+            }
+
+        } catch (Exception e) {
+            event.reply("❌ Error processing removal: " + e.getMessage()).setEphemeral(true).queue();
+            e.printStackTrace();
+        }
+    }
+
     private void handleRewards(SlashCommandInteractionEvent event) {
         String guildId = event.getGuild().getId();
 
         // Permission check
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to view rewards.").setEphemeral(true).queue();
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
-        Container container = showRewardEditPage(guildId);
+        Container container = showRewardEditPage(event.getGuild());
         event.replyComponents(container).useComponentsV2().queue();
     }
 
-    private Container showRewardEditPage(String guildId) {
-        return Container.of(
-                TextDisplay.of(t(guildId, "help.leveling.rewards_title")),
-                Separator.createDivider(Separator.Spacing.SMALL),
-                TextDisplay.of(t(guildId, "help.leveling.rewards_desc")),
-                Separator.createDivider(Separator.Spacing.SMALL),
-                ActionRow.of(
-                        EntitySelectMenu.create("help.reward_role_select", EntitySelectMenu.SelectTarget.ROLE)
-                                .setPlaceholder(t(guildId, "help.leveling_select_roles_placeholder")) //implement language support here
-                                .setMinValues(1)
-                                .setMaxValues(1)
-                                .build()
-                ),
-                Separator.createDivider(Separator.Spacing.SMALL)
-        ).withAccentColor(0x3498DB);
+    private Container showRewardEditPage(net.dv8tion.jda.api.entities.Guild guild) {
+        String guildId = guild.getId();
+        DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
+
+        // We use a list to build components dynamically
+        TextDisplay title = TextDisplay.of(t(guildId, "leveling_.rewards_title"));
+        Separator sep1 = Separator.createDivider(Separator.Spacing.SMALL);
+        TextDisplay rewardsDesc = TextDisplay.of(t(guildId, "leveling_.rewards_desc"));
+        Separator sep2 = Separator.createDivider(Separator.Spacing.SMALL);
+        ActionRow ac1 = ActionRow.of(
+                EntitySelectMenu.create("help.reward_role_select", EntitySelectMenu.SelectTarget.ROLE)
+                        .setPlaceholder(t(guildId, "leveling_select_roles_placeholder"))
+                        .setMinValues(1)
+                        .setMaxValues(1)
+                        .build());
+        Separator optSep1 = null;
+        TextDisplay optTxt1 = null;
+        ActionRow optAc1 = null;
+        if (settings.rewards != null && !settings.rewards.isEmpty() && !settings.rewards.equals("[]")) {
+            try {
+                JSONArray rewards = new JSONArray(settings.rewards);
+                if (rewards.length() > 0) {
+                    optSep1 = Separator.createDivider(Separator.Spacing.SMALL);
+                    optTxt1 = TextDisplay.of(t(guildId, "leveling_.remove_reward_title", "Remove Reward"));
+
+                    StringSelectMenu.Builder removeMenu = StringSelectMenu.create("level_reward_remove_select")
+                            .setPlaceholder(t(guildId, "leveling_.remove_reward_placeholder", "Select a reward to remove"));
+
+                    for (int i = 0; i < rewards.length(); i++) {
+                        JSONObject reward = rewards.getJSONObject(i);
+                        String roleId = reward.getString("role_id");
+                        int level = reward.getInt("level");
+
+                        Role role = guild.getRoleById(roleId);
+                        String roleName = (role != null) ? role.getName() : "Unknown Role (" + roleId + ")";
+
+                        // Nutze roleId als Value, um sie später identifizieren zu können
+                        removeMenu.addOption("Level " + level + ": " + roleName, roleId, "Role ID: " + roleId);
+                    }
+                    optAc1 = ActionRow.of(removeMenu.build());
+                }
+            } catch (Exception e) {
+                System.err.println("Error parsing rewards for edit page: " + e.getMessage());
+            }
+        }
+        Container container = Container.of(title, sep1, rewardsDesc, sep2, ac1);
+        if (optSep1 != null && optTxt1 != null && optAc1 != null) {
+            container = Container.of(title, sep1, rewardsDesc, sep2, ac1, optSep1, optTxt1, optAc1);
+        }
+        return container;
     }
 
     @Override
@@ -1021,14 +1113,14 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                     .setRequired(true)
                     .build();
             TextInput level = TextInput.create("reward_level_input", TextInputStyle.SHORT)
-                    .setPlaceholder(t(guildId, "help.leveling.reward_level_input_placeholder"))
+                    .setPlaceholder(t(guildId, "leveling_.reward_level_input_placeholder"))
                     .setRequired(true)
                     .build();
-            Modal modal = Modal.create("level_modal_add_reward", t(guildId, "help.leveling.add_reward_modal_title"))
+            Modal modal = Modal.create("level_modal_add_reward", t(guildId, "leveling_.add_reward_modal_title"))
                     .addComponents(
-                            Label.of(t(guildId, "help.leveling.add_reward_modal_label"),
+                            Label.of(t(guildId, "leveling_.add_reward_modal_label"),
                             roleIdInput),
-                            Label.of(t(guildId, "help.leveling.add_reward_level_modal_label"),
+                            Label.of(t(guildId, "leveling_.add_reward_level_modal_label"),
                             level)
                     )
                     .build();
@@ -1122,7 +1214,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Ab hier nutzen wir nur noch die Variable 'event'
         if (event.getMember() == null || !event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to perform this action.").setEphemeral(true).queue();
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 

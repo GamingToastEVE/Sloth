@@ -513,7 +513,7 @@
     "rewards_title": "🎁 Rollen-Belohnungen",
     "rewards_desc": "Konfiguriere Rollen, die bei bestimmten Leveln vergeben werden.",
     "select_roles_placeholder": "Wähle eine Rolle aus",
-    "reward_level_input_placeholder": "Gib das Level für diese Belohnung ein",
+    "reward_level_input_placeholder": "Gib das Level für diese Belohnung ein.",
     "add_reward_modal_title": "🎁 Rolle hinzufügen",
     "add_reward_modal_label": "Ausgewählte Rolle",
     "add_reward_level_modal_label": "Belohnungs-Level",
@@ -521,6 +521,11 @@
     "reward_added_success": "Rollen-Belohnung erfolgreich hinzugefügt!",
     "reward_added_failure": "Fehler beim Hinzufügen der Rollen-Belohnung. Bitte versuche es erneut.",
     "applied_levels_to_members_with_role_success": "Erfolgreich Level zu Rollen hinzugefügt!",
-    "applied_levels_to_members_with_role_failure": "Fehler beim Anwenden der Level."
+    "applied_levels_to_members_with_role_failure": "Fehler beim Anwenden der Level.",
+    "remove_reward_title": "Entferne Rollen-Belohnung",
+    "remove_reward_placeholder": "Wähle eine zu entfernende Belohnung aus",
+    "reward_removed_success": "Rollen-Belohnung erfolgreich entfernt!",
+    "reward_removed_failure": "Fehler beim Entfernen der Rollen-Belohnung. Bitte versuche es erneut.",
+    "apply_level_to_members_with_role": "Synchronisiere Level mit aktuellen Rollen"
   }
 }

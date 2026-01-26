@@ -525,7 +525,12 @@
     "reward_added_success": "Role reward added successfully!",
     "reward_added_failure": "Failed to add role reward. Please try again.",
     "applied_levels_to_members_with_role_success": "Successfully applied levels to members with role.",
-    "applied_levels_to_members_with_role_failure": "Error applying levels to members with role."
+    "applied_levels_to_members_with_role_failure": "Error applying levels to members with role.",
+    "remove_reward_title": "Remove Role Reward",
+    "remove_reward_placeholder": "Select a reward to remove",
+    "reward_removed_success": "Role reward removed successfully!",
+    "reward_removed_failure": "Error removing role reward. Please try again.",
+    "apply_level_to_members_with_role": "Apply level to members with role"
   },
   "formatting": {
     "title": "📝 Embed Formatting Guide",
