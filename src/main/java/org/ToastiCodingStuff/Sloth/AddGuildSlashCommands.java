@@ -439,9 +439,10 @@ public class AddGuildSlashCommands {
         return Commands.slash("leveling", cmd("level"))
                 .addSubcommands(
                         new SubcommandData("settings", "View or change leveling settings"),
-                        new SubcommandData("leaderboard", "View the server's leveling leaderboard"),
                         new SubcommandData("rank", "View your current level and XP")
-                                .addOption(OptionType.USER, "user", "User to view rank for (optional)", false)
-                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
+                                .addOption(OptionType.USER, "user", "User to view rank for (optional)", false),
+                        new SubcommandData("rewards", "View or set level-up rewards"),
+                        new SubcommandData("sync-role-levels", "Sync role levels with current member roles")
+                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER)).addSubcommands(new SubcommandData("leaderboard", "View the server's leveling leaderboard"));
     }
 }

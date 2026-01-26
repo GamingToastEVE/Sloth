@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -367,9 +368,25 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 event.reply("❌ Field index out of bounds!").setEphemeral(true).queue();
                 return;
             }
-            String fn = event.getValue("input_field_name").getAsString();
-            String fv = processLineBreaks(event.getValue("input_field_value").getAsString());
-            boolean inline = event.getValue("input_field_inline").getAsString().toLowerCase().matches("^(ja|yes|true|y|j)$");
+
+            if (event.getValue("input_field_name") == null && event.getValue("input_field_value") == null && event.getValue("input_field_inline") == null) {
+                builder.getFields().remove(fieldIndex);
+                event.editMessageEmbeds(builder.build()).queue();
+                event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
+                return;
+            }
+            String fn = builder.getFields().get(fieldIndex).getName();
+            if (event.getValue("input_field_name") != null) {
+                fn = event.getValue("input_field_name").getAsString();
+            }
+            String fv = builder.getFields().get(fieldIndex).getName();
+            if (event.getValue("input_field_value") != null) {
+                fv = event.getValue("input_field_value").getAsString();
+            }
+            boolean inline = builder.getFields().get(fieldIndex).isInline();
+            if (event.getValue("input_field_inline") != null) {
+                inline = event.getValue("input_field_inline").getAsString().toLowerCase().matches("^(ja|yes|true|y|j)$");
+            }
             builder.getFields().set(fieldIndex, new MessageEmbed.Field(fn, fv, inline));
             event.editMessageEmbeds(builder.build()).queue();
             event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
@@ -477,19 +494,19 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         // Feld löschen
         int fieldIndex = Integer.parseInt(event.getValues().get(0));
         if (fieldIndex >= 0 && fieldIndex < builder.getFields().size()) {
-            Modal modal = Modal.create("modal_embed_edit_field_" + fieldIndex, "Edit Field")
+            Modal modal = Modal.create("modal_embed_edit_field_" + fieldIndex, "Edit Field or leave empty to delete")
                     .addComponents(
                             Label.of("Field Name:", TextInput.create("input_field_name", TextInputStyle.SHORT)
                                     .setValue(builder.getFields().get(fieldIndex).getName())
-                                    .setRequired(true)
+                                    .setRequired(false)
                                     .build()),
                             Label.of("Field Content:", TextInput.create("input_field_value", TextInputStyle.PARAGRAPH)
                                     .setValue(builder.getFields().get(fieldIndex).getValue())
-                                    .setRequired(true)
+                                    .setRequired(false)
                                     .build()),
                             Label.of("Inline True/False:", TextInput.create("input_field_inline", TextInputStyle.SHORT)
                                     .setValue(builder.getFields().get(fieldIndex).isInline() ? "yes" : "no")
-                                    .setRequired(true)
+                                    .setRequired(false)
                                     .build())
                     ).build();
             event.replyModal(modal).queue();

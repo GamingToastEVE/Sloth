@@ -15,6 +15,8 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class DatabaseHandler {
 
@@ -4639,6 +4641,7 @@ public class DatabaseHandler {
 
         // Roles
         public final boolean stackRewards;
+        public final boolean applyRoleRewardsOnAddRoleReward;
         public final String rewards;
 
         // Exceptions
@@ -4647,16 +4650,16 @@ public class DatabaseHandler {
         public final boolean resetOnLeave;
 
         public LevelSettingsData(String guildId, boolean enabled,
-                                  String xpCurve, double xpMultiplier, int maxLevel,
-                                  boolean messageXpEnabled, String messageXpMode,
-                                  int xpMin, int xpMax, int cooldownSeconds, int minMessageLength,
-                                  boolean voiceXpEnabled, int voiceXpMin, int voiceXpMax,
-                                  int voiceXpAmount, int voiceXpCooldown, int voiceXpMinMembers, boolean voiceXpAntiAfk,
-                                  boolean reactionXpEnabled, String reactionXpAwards,
-                                  int reactionXpMin, int reactionXpMax, int reactionXpCooldown,
-                                  String levelupChannelId, String levelupMessages, boolean levelupDm,
-                                  boolean stackRewards, String rewards,
-                                  String ignoredChannels, String ignoredRoles, boolean resetOnLeave) {
+                                 String xpCurve, double xpMultiplier, int maxLevel,
+                                 boolean messageXpEnabled, String messageXpMode,
+                                 int xpMin, int xpMax, int cooldownSeconds, int minMessageLength,
+                                 boolean voiceXpEnabled, int voiceXpMin, int voiceXpMax,
+                                 int voiceXpAmount, int voiceXpCooldown, int voiceXpMinMembers, boolean voiceXpAntiAfk,
+                                 boolean reactionXpEnabled, String reactionXpAwards,
+                                 int reactionXpMin, int reactionXpMax, int reactionXpCooldown,
+                                 String levelupChannelId, String levelupMessages, boolean levelupDm,
+                                 boolean stackRewards, boolean applyRoleRewardsOnAddRoleReward, String rewards,
+                                 String ignoredChannels, String ignoredRoles, boolean resetOnLeave) {
             this.guildId = guildId;
             this.enabled = enabled;
             this.xpCurve = xpCurve != null ? xpCurve : "linear";
@@ -4684,6 +4687,7 @@ public class DatabaseHandler {
             this.levelupMessages = levelupMessages;
             this.levelupDm = levelupDm;
             this.stackRewards = stackRewards;
+            this.applyRoleRewardsOnAddRoleReward = applyRoleRewardsOnAddRoleReward;
             this.rewards = rewards;
             this.ignoredChannels = ignoredChannels;
             this.ignoredRoles = ignoredRoles;
@@ -4735,12 +4739,12 @@ public class DatabaseHandler {
                         rs.getInt("levelup_dm") == 1,
                         // Roles
                         rs.getInt("stack_rewards") == 1,
+                        rs.getInt("apply_role_rewards") == 1,
                         rs.getString("rewards"),
                         // Exceptions
                         rs.getString("ignored_channels"),
                         rs.getString("ignored_roles"),
-                        rs.getInt("reset_on_leave") == 1
-                );
+                        rs.getInt("reset_on_leave") == 1);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -4811,6 +4815,71 @@ public class DatabaseHandler {
             e.printStackTrace();
         }
         return false;
+    }
+
+    public int getHighestLevelInRewards(String guildId) {
+        LevelSettingsData settings = getLevelSettings(guildId);
+        String rewardsStr = settings.rewards;
+        if (rewardsStr == null || rewardsStr.isEmpty()) {
+            return 0;
+        }
+
+        String[] rewardsArray = rewardsStr.split(";");
+        int highestLevel = 0;
+
+        for (String reward : rewardsArray) {
+            String[] parts = reward.split(":");
+            if (parts.length == 2) {
+                try {
+                    int level = Integer.parseInt(parts[0]);
+                    if (level > highestLevel) {
+                        highestLevel = level;
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore invalid entries
+                }
+            }
+        }
+
+        return highestLevel;
+    }
+
+    public int getHighestRoleRewardLevel(String guildId, String userId, List<String> roleIds) {
+        LevelSettingsData settings = getLevelSettings(guildId);
+
+        // 1. Sicherheitscheck: Ist das Feld leer?
+        if (settings.rewards == null || settings.rewards.isEmpty()) {
+            return 0;
+        }
+
+        int highestLevel = 0;
+
+        try {
+            // 2. String aus der DB in ein JSONArray umwandeln
+            JSONArray rewardsJson = new JSONArray(settings.rewards);
+
+            // 3. Klassische Schleife nutzen (Wichtig bei org.json!)
+            for (int i = 0; i < rewardsJson.length(); i++) {
+                JSONObject reward = rewardsJson.getJSONObject(i);
+
+                // Daten aus dem JSON holen (optString verhindert Absturz bei fehlenden Keys)
+                String jsonRoleId = reward.optString("role_id");
+                int level = reward.optInt("level", 0);
+
+                // 4. Prüfen: Hat der User diese Rolle?
+                if (roleIds.contains(jsonRoleId)) {
+                    // Wenn ja, prüfen ob das Level höher ist als das bisher höchste
+                    if (level > highestLevel) {
+                        highestLevel = level;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Fehler fangen, falls das JSON in der DB kaputt ist
+            System.err.println("Error parsing rewards for guild " + guildId + ": " + e.getMessage());
+        }
+
+        return highestLevel;
     }
 
     // ==================== USER LEVELS ====================
@@ -5121,6 +5190,17 @@ public class DatabaseHandler {
      */
     public int addUserXp(String guildId, String userId, long xpToAdd) {
         return addXpToUser(guildId, userId, (int) xpToAdd);
+    }
+
+    public int calculateLevelFromXp(String guildId, long totalXp) {
+        // Calculate level from total XP
+        int level = 0;
+        long remainingXp = totalXp;
+        while (remainingXp >= UserLevelData.getXpForLevel(level + 1)) {
+            remainingXp -= UserLevelData.getXpForLevel(level + 1);
+            level++;
+        }
+        return level;
     }
 
     /**

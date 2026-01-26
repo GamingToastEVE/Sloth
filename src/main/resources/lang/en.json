@@ -215,7 +215,11 @@
     "leaderboard_title": "🏆 %s Leaderboard",
     "your_rank": "Your Rank",
     "page": "Page %d of %d",
-    "total_members": "%d total members"
+    "total_members": "%d total members",
+    "leveling_enter_level": "Enter the level for this reward",
+    "apply_level_to_members_with_role": "Apply level to members with role",
+    "applied_levels_to_members_with_role_success": "Applied levels to members with role successfully.",
+    "applied_levels_to_members_with_role_failure": "Failed to apply levels to members with role."
   },
   "moderation": {
     "warn_title": "⚠️ Warning",
@@ -503,7 +507,53 @@
     "leveling_rewards_title": "🎁 Role Rewards",
     "leveling_rewards_desc": "**Add Rewards:** Assign roles at specific levels\n**Stack Mode:** Keep all earned roles, or replace with highest\n**Manage Rewards:** View and remove configured rewards",
     "leveling_exceptions_title": "🚫 Exceptions",
-    "leveling_exceptions_desc": "**Ignored Channels:** Channels where XP isn't earned\n**Ignored Roles:** Roles that don't earn XP\n**On Leave Behavior:** Keep or reset XP when members leave"
-  }
+    "leveling_exceptions_desc": "**Ignored Channels:** Channels where XP isn't earned\n**Ignored Roles:** Roles that don't earn XP\n**On Leave Behavior:** Keep or reset XP when members leave",
+    "leveling_add_reward": "🎁 Add Role Reward",
+    "leveling_no_rewards": "No reward roles configured yet.",
+    "leveling_select_roles_placeholder": "Choose a role to reward",
+    "leveling_enter_level": "Enter the level for this reward"
+  },
+  "leveling_": {
+    "rewards_title": "🎁 Role Rewards",
+    "rewards_desc": "Configure roles given at specific levels.",
+    "select_roles_placeholder": "Choose a role to reward",
+    "reward_level_input_placeholder": "Enter the level for this reward",
+    "add_reward_modal_title": "🎁 Add Role Reward",
+    "add_reward_modal_label": "Selected Role",
+    "add_reward_level_modal_label": "Reward Level",
+    "invalid_level": "Invalid level. Please enter a positive integer.",
+    "reward_added_success": "Role reward added successfully!",
+    "reward_added_failure": "Failed to add role reward. Please try again.",
+    "applied_levels_to_members_with_role_success": "Successfully applied levels to members with role.",
+    "applied_levels_to_members_with_role_failure": "Error applying levels to members with role."
+  },
+  "formatting": {
+    "title": "📝 Embed Formatting Guide",
+    "description": "Learn how to format your embed descriptions using Discord markdown:",
+    "basic_text": "Basic Text Formatting",
+    "basic_desc": "• `**bold text**` → **bold text**\n• `*italic text*` → *italic text*\n• `__underlined text__` → __underlined text__\n• `~~strikethrough~~` → ~~strikethrough~~\n• `||spoiler text||` → ||spoiler text||",
+    "code_formatting": "Code Formatting",
+    "code_desc": "• `` `inline code` `` → `inline code`\n• ` ```code block``` ` → Multi-line code blocks\n• ` ```language\\ncode``` ` → Syntax highlighted code",
+    "lists_structure": "Lists and Structure",
+    "lists_desc": "• `• Bullet point` → Bullet lists\n• `1. Numbered item` → Numbered lists\n• `> Quote text` → Block quotes\n• `>>> Multi-line quote` → Multi-line quotes",
+    "links_mentions": "Links and Mentions",
+    "links_desc": "• `[Link Text](https://example.com)` → Clickable links\n• `<@userid>` → User mentions\n• `<#channelid>` → Channel mentions\n• `<@&roleid>` → Role mentions",
+    "special_characters": "Special Characters",
+    "special_desc": "• `:emoji_name:` → Discord emojis\n• `<:name:id>` → Custom server emojis\n• `\\n` → Line breaks in descriptions\n• `\\*` → Escape special characters",
+    "tips_for_embeds": "Tips for Embeds",
+    "tips_desc": "• **Titles**: Only support plain text (no formatting)\n• **Descriptions & Footers**: Support all Discord markdown\n• Use **bold** for rule headers\n• Use `code blocks` for examples\n• Keep descriptions under 4096 characters\n• Use line breaks (\\n) for better readability\n• Test formatting before publishing"
+  },
+  "btn_home": "🏠 Home",
+  "btn_overview": "🏠 Overview",
+  "btn_systems": "⚙️ Systems",
+  "btn_setup": "📋 Setup",
+  "btn_commands": "📖 Commands",
+  "btn_formatting": "🎨 Formatting",
+  "btn_support": "💡 Support",
+  "btn_legal": "📜 Legal",
+  "btn_leveling": "📈 Leveling",
+  "btn_language": "🌐 Language",
+  "btn_prev": "⬅️ Previous",
+  "btn_next": "➡️ Next",
+  "btn_donate": "☕ Donate"
 }
-

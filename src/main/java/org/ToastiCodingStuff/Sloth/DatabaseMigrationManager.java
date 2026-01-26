@@ -482,6 +482,7 @@ public class DatabaseMigrationManager {
                 // 5. Rollen
                 .addColumn("stack_rewards", "TINYINT(1) DEFAULT 1") // Standard: Rollen behalten
                 .addColumn("rewards", "TEXT") // JSON Array: [{level:1,role_id:"123"}, {level:5,role_id:"456"}]
+                .addColumn("apply_role_rewards", "TINYINT(1) DEFAULT 1") // Sofort Level geben, wenn User schon Rolle hat
 
                 // 6. Ausnahmen & Reset
                 .addColumn("ignored_channels", "TEXT") // IDs kommagetrennt

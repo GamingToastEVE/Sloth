@@ -503,7 +503,24 @@
     "leveling_rewards_title": "🎁 Rollenbelohnungen",
     "leveling_rewards_desc": "**Belohnungen hinzufügen:** Weise Rollen bei bestimmten Leveln zu\n**Stapelmodus:** Behalte alle verdienten Rollen oder ersetze mit der höchsten\n**Belohnungen verwalten:** Zeige und entferne konfigurierte Belohnungen",
     "leveling_exceptions_title": "🚫 Ausnahmen",
-    "leveling_exceptions_desc": "**Ignorierte Kanäle:** Kanäle, in denen kein XP verdient wird\n**Ignorierte Rollen:** Rollen, die kein XP verdienen\n**Beim Verlassen:** XP behalten oder zurücksetzen, wenn Mitglieder gehen"
+    "leveling_exceptions_desc": "**Ignorierte Kanäle:** Kanäle, in denen kein XP verdient wird\n**Ignorierte Rollen:** Rollen, die kein XP verdienen\n**Beim Verlassen:** XP behalten oder zurücksetzen, wenn Mitglieder gehen",
+    "leveling_add_reward": "🎁 Belohnung hinzufügen",
+    "leveling_no_rewards": "Noch keine Rollenbelohnungen konfiguriert.",
+    "leveling_select_roles_placeholder": "Wähle eine Rolle aus",
+    "leveling_enter_level": "Gib das Level ein, bei dem die Rolle vergeben werden soll",
+  },
+  "leveling_": {
+    "rewards_title": "🎁 Rollen-Belohnungen",
+    "rewards_desc": "Konfiguriere Rollen, die bei bestimmten Leveln vergeben werden.",
+    "select_roles_placeholder": "Wähle eine Rolle aus",
+    "reward_level_input_placeholder": "Gib das Level für diese Belohnung ein",
+    "add_reward_modal_title": "🎁 Rolle hinzufügen",
+    "add_reward_modal_label": "Ausgewählte Rolle",
+    "add_reward_level_modal_label": "Belohnungs-Level",
+    "invalid_level": "Ungültiges Level. Bitte gib eine positive ganze Zahl ein.",
+    "reward_added_success": "Rollen-Belohnung erfolgreich hinzugefügt!",
+    "reward_added_failure": "Fehler beim Hinzufügen der Rollen-Belohnung. Bitte versuche es erneut.",
+    "applied_levels_to_members_with_role_success": "Erfolgreich Level zu Rollen hinzugefügt!",
+    "applied_levels_to_members_with_role_failure": "Fehler beim Anwenden der Level."
   }
 }
-
