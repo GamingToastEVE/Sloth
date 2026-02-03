@@ -46,22 +46,23 @@ public class TimedRolesCommandListener extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String command = event.getName();
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
 
         switch (command) {
             case "my-roles":
+                String guildId = Objects.requireNonNull(event.getGuild()).getId();
                 // Jeder User darf das sehen
                 handler.insertOrUpdateGlobalStatistic("my-roles");
                 handleMyRoles(event, guildId);
                 break;
             case "temprole":
+                String guildId2 = Objects.requireNonNull(event.getGuild()).getId();
                 // Nur Admins/Mods dürfen das
                 if (!event.getMember().hasPermission(Permission.MANAGE_ROLES)) {
-                    event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
+                    event.reply(t(guildId2, "general.permission_denied")).setEphemeral(true).queue();
                     return;
                 }
                 handler.insertOrUpdateGlobalStatistic("temprole");
-                handleTempRoleManage(event, guildId);
+                handleTempRoleManage(event, guildId2);
                 break;
         }
     }

@@ -253,7 +253,7 @@ public class DatabaseHandler {
             // Check for every table if already exist, if so apply migrations instead of full initialization
             String[] tableNames = {
                     "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "active_timers", "role_events", "custom_embeds"
+                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds"
             };
             for (String tableName : tableNames) {
                 if (!tableAlreadyExist(tableName)) {
@@ -297,6 +297,9 @@ public class DatabaseHandler {
                             break;
                         case "role_select_embeds":
                             createSelectRolesEmbedsTable();
+                            break;
+                        case "role_select_groups":
+                            createSelectRolesGroupsTable();
                             break;
                         case "active_timers":
                             createActiveTimersTable();
@@ -357,9 +360,28 @@ public class DatabaseHandler {
             "id INT PRIMARY KEY AUTO_INCREMENT, " +
             "guild_id VARCHAR(32) NOT NULL, " +
             "role_id VARCHAR(32) NOT NULL, " +
+            "group_id INT DEFAULT NULL, " +
+            "position INT DEFAULT 0, " +
             "label VARCHAR(64), " +
             "description VARCHAR(255), " +
             "emoji_id VARCHAR(64), " +
+            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
+        try (Connection connection = getConnection();
+             Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+        }
+    }
+
+    private void createSelectRolesGroupsTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS role_select_groups (" +
+            "id INT PRIMARY KEY AUTO_INCREMENT, " +
+            "guild_id VARCHAR(32) NOT NULL, " +
+            "name VARCHAR(64) NOT NULL, " +
+            "position INT DEFAULT 0, " +
+            "title VARCHAR(255), " +
+            "description TEXT, " +
+            "footer TEXT, " +
+            "color VARCHAR(32) DEFAULT '#3498db', " +
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
         try (Connection connection = getConnection();
              Statement stmt = connection.createStatement()) {
@@ -373,6 +395,7 @@ public class DatabaseHandler {
             "guild_id VARCHAR(32) NOT NULL, " +
             "channel_id VARCHAR(32) NOT NULL, " +
             "message_id VARCHAR(32) NOT NULL, " +
+            "group_id INT DEFAULT NULL, " +
             "display_type VARCHAR(32) NOT NULL DEFAULT 'BUTTON', " +
             "title VARCHAR(255) NOT NULL, " +
             "description TEXT NOT NULL, " +
@@ -1994,6 +2017,1381 @@ public class DatabaseHandler {
         }
     }
 
+    // ==================== TICKET PANELS (MULTIPLE SYSTEMS) ====================
+
+    /**
+     * Data class to hold ticket panel information
+     */
+    public static class TicketPanelData {
+        public final int id;
+        public final String guildId;
+        public final String name;
+        public final String title;
+        public final String description;
+        public final String buttonLabel;
+        public final String buttonEmoji;
+        public final String buttonColor;
+        public final String categoryId;
+        public final String channelId;
+        public final String supportRoleId;
+        public final String pingRoleId;
+        public final String welcomeMessage;
+        public final String embedColor;
+        public final String embedFooter;
+        public final String embedThumbnail;
+        public final int position;
+        public final int maxTicketsPerUser;
+        public final boolean requireSubject;
+        public final boolean requireDescription;
+        public final String panelMessageId;
+
+        public TicketPanelData(int id, String guildId, String name, String title, String description,
+                               String buttonLabel, String buttonEmoji, String buttonColor,
+                               String categoryId, String channelId, String supportRoleId, String pingRoleId,
+                               String welcomeMessage, String embedColor, String embedFooter, String embedThumbnail,
+                               int position, int maxTicketsPerUser, boolean requireSubject, boolean requireDescription,
+                               String panelMessageId) {
+            this.id = id;
+            this.guildId = guildId;
+            this.name = name;
+            this.title = title != null ? title : "🎫 Create a Ticket";
+            this.description = description != null ? description : "Click the button below to create a support ticket.";
+            this.buttonLabel = buttonLabel != null ? buttonLabel : "📩 Create Ticket";
+            this.buttonEmoji = buttonEmoji;
+            this.buttonColor = buttonColor != null ? buttonColor : "PRIMARY";
+            this.categoryId = categoryId;
+            this.channelId = channelId;
+            this.supportRoleId = supportRoleId;
+            this.pingRoleId = pingRoleId;
+            this.welcomeMessage = welcomeMessage != null ? welcomeMessage : "Welcome to your support ticket! A staff member will assist you shortly.";
+            this.embedColor = embedColor != null ? embedColor : "#5865F2";
+            this.embedFooter = embedFooter;
+            this.embedThumbnail = embedThumbnail;
+            this.position = position;
+            this.maxTicketsPerUser = maxTicketsPerUser;
+            this.requireSubject = requireSubject;
+            this.requireDescription = requireDescription;
+            this.panelMessageId = panelMessageId;
+        }
+    }
+
+    /**
+     * Create a new ticket panel for a guild
+     */
+    public int createTicketPanel(String guildId, String name) {
+        try (Connection connection = getConnection()) {
+            // Get next position
+            String posQuery = "SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM ticket_panels WHERE guild_id = ?";
+            PreparedStatement posStmt = connection.prepareStatement(posQuery);
+            posStmt.setString(1, guildId);
+            ResultSet posRs = posStmt.executeQuery();
+            int nextPosition = posRs.next() ? posRs.getInt("next_pos") : 0;
+
+            String insertQuery = "INSERT INTO ticket_panels (guild_id, name, position) VALUES (?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setInt(3, nextPosition);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket panel: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get all ticket panels for a guild
+     */
+    public List<TicketPanelData> getTicketPanels(String guildId) {
+        List<TicketPanelData> panels = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_panels WHERE guild_id = ? ORDER BY position ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                panels.add(mapResultSetToTicketPanel(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket panels: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return panels;
+    }
+
+    /**
+     * Get a specific ticket panel by ID
+     */
+    public TicketPanelData getTicketPanel(int panelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_panels WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, panelId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToTicketPanel(rs);
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket panel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get a ticket panel by guild and name
+     */
+    public TicketPanelData getTicketPanelByName(String guildId, String name) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_panels WHERE guild_id = ? AND name = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToTicketPanel(rs);
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket panel by name: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private TicketPanelData mapResultSetToTicketPanel(ResultSet rs) throws SQLException {
+        return new TicketPanelData(
+            rs.getInt("id"),
+            rs.getString("guild_id"),
+            rs.getString("name"),
+            rs.getString("title"),
+            rs.getString("description"),
+            rs.getString("button_label"),
+            rs.getString("button_emoji"),
+            rs.getString("button_color"),
+            rs.getString("category_id"),
+            rs.getString("channel_id"),
+            rs.getString("support_role_id"),
+            rs.getString("ping_role_id"),
+            rs.getString("welcome_message"),
+            rs.getString("embed_color"),
+            rs.getString("embed_footer"),
+            rs.getString("embed_thumbnail"),
+            rs.getInt("position"),
+            rs.getInt("max_tickets_per_user"),
+            rs.getInt("require_subject") == 1,
+            rs.getInt("require_description") == 1,
+            rs.getString("panel_message_id")
+        );
+    }
+
+    /**
+     * Update a ticket panel's basic settings
+     */
+    public boolean updateTicketPanel(int panelId, String name, String title, String description,
+                                      String buttonLabel, String buttonEmoji, String buttonColor) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET name = ?, title = ?, description = ?, " +
+                    "button_label = ?, button_emoji = ?, button_color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, name);
+            stmt.setString(2, title);
+            stmt.setString(3, description);
+            stmt.setString(4, buttonLabel);
+            stmt.setString(5, buttonEmoji);
+            stmt.setString(6, buttonColor);
+            stmt.setInt(7, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update a ticket panel's channel settings
+     */
+    public boolean updateTicketPanelChannels(int panelId, String categoryId, String channelId,
+                                              String supportRoleId, String pingRoleId) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET category_id = ?, channel_id = ?, " +
+                    "support_role_id = ?, ping_role_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, categoryId);
+            stmt.setString(2, channelId);
+            stmt.setString(3, supportRoleId);
+            stmt.setString(4, pingRoleId);
+            stmt.setInt(5, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel channels: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update a ticket panel's appearance settings
+     */
+    public boolean updateTicketPanelAppearance(int panelId, String embedColor, String embedFooter,
+                                                String embedThumbnail, String welcomeMessage) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET embed_color = ?, embed_footer = ?, " +
+                    "embed_thumbnail = ?, welcome_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, embedColor);
+            stmt.setString(2, embedFooter);
+            stmt.setString(3, embedThumbnail);
+            stmt.setString(4, welcomeMessage);
+            stmt.setInt(5, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel appearance: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update ticket panel settings (max tickets, requirements)
+     */
+    public boolean updateTicketPanelSettings(int panelId, int maxTicketsPerUser,
+                                              boolean requireSubject, boolean requireDescription) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET max_tickets_per_user = ?, require_subject = ?, " +
+                    "require_description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setInt(1, maxTicketsPerUser);
+            stmt.setInt(2, requireSubject ? 1 : 0);
+            stmt.setInt(3, requireDescription ? 1 : 0);
+            stmt.setInt(4, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel settings: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update ticket panel's sent message ID
+     */
+    public boolean updateTicketPanelMessageId(int panelId, String messageId) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET panel_message_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, messageId);
+            stmt.setInt(2, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel message ID: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete a ticket panel
+     */
+    public boolean deleteTicketPanel(int panelId) {
+        try (Connection connection = getConnection()) {
+            // Get panel info first for position reordering
+            TicketPanelData panel = getTicketPanel(panelId);
+            if (panel == null) return false;
+
+            String deleteQuery = "DELETE FROM ticket_panels WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setInt(1, panelId);
+
+            boolean deleted = stmt.executeUpdate() > 0;
+
+            // Reorder remaining panels
+            if (deleted) {
+                String reorderQuery = "UPDATE ticket_panels SET position = position - 1 WHERE guild_id = ? AND position > ?";
+                PreparedStatement reorderStmt = connection.prepareStatement(reorderQuery);
+                reorderStmt.setString(1, panel.guildId);
+                reorderStmt.setInt(2, panel.position);
+                reorderStmt.executeUpdate();
+            }
+
+            return deleted;
+        } catch (SQLException e) {
+            System.err.println("Error deleting ticket panel: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Move a ticket panel up in order
+     */
+    public boolean moveTicketPanelUp(String guildId, int panelId) {
+        return swapTicketPanelPosition(guildId, panelId, -1);
+    }
+
+    /**
+     * Move a ticket panel down in order
+     */
+    public boolean moveTicketPanelDown(String guildId, int panelId) {
+        return swapTicketPanelPosition(guildId, panelId, 1);
+    }
+
+    private boolean swapTicketPanelPosition(String guildId, int panelId, int direction) {
+        try (Connection connection = getConnection()) {
+            TicketPanelData panel = getTicketPanel(panelId);
+            if (panel == null) return false;
+
+            int newPosition = panel.position + direction;
+            if (newPosition < 0) return false;
+
+            // Find panel at target position
+            String findQuery = "SELECT id FROM ticket_panels WHERE guild_id = ? AND position = ?";
+            PreparedStatement findStmt = connection.prepareStatement(findQuery);
+            findStmt.setString(1, guildId);
+            findStmt.setInt(2, newPosition);
+            ResultSet rs = findStmt.executeQuery();
+
+            if (!rs.next()) return false; // No panel at target position
+            int otherPanelId = rs.getInt("id");
+
+            // Swap positions
+            String updateQuery = "UPDATE ticket_panels SET position = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+
+            updateStmt.setInt(1, newPosition);
+            updateStmt.setInt(2, panelId);
+            updateStmt.executeUpdate();
+
+            updateStmt.setInt(1, panel.position);
+            updateStmt.setInt(2, otherPanelId);
+            updateStmt.executeUpdate();
+
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error swapping ticket panel position: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get the count of open tickets for a user in a specific panel
+     */
+    public int getUserOpenTicketCount(String guildId, String userId, int panelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT COUNT(*) FROM tickets WHERE guild_id = ? AND user_id = ? AND panel_id = ? AND status != 'CLOSED'";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setInt(3, panelId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error getting user open ticket count: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Create a new ticket with panel ID
+     */
+    public int createTicketWithPanel(String guildId, String userId, String channelId, int panelId,
+                                      String subject, String priority, String username, String discriminator, String avatarUrl) {
+        try (Connection connection = getConnection()) {
+            insertOrUpdateUser(userId, username, discriminator, avatarUrl);
+
+            String insertTicket = "INSERT INTO tickets (guild_id, user_id, channel_id, panel_id, subject, priority, status) VALUES (?, ?, ?, ?, ?, ?, 'OPEN')";
+            PreparedStatement stmt = connection.prepareStatement(insertTicket, Statement.RETURN_GENERATED_KEYS);
+            stmt.setString(1, guildId);
+            stmt.setString(2, userId);
+            stmt.setString(3, channelId);
+            stmt.setInt(4, panelId);
+            stmt.setString(5, subject);
+            stmt.setString(6, priority != null ? priority : "MEDIUM");
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket with panel: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get ticket panel ID by channel ID (for existing tickets)
+     */
+    public Integer getTicketPanelIdByChannel(String channelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT panel_id FROM tickets WHERE channel_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, channelId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                int panelId = rs.getInt("panel_id");
+                return rs.wasNull() ? null : panelId;
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket panel ID by channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // ==================== END TICKET PANELS ====================
+
+    // ==================== TICKET CATEGORIES ====================
+
+    /**
+     * Data class to hold ticket category information
+     */
+    public static class TicketCategoryData {
+        public final int id;
+        public final int panelId;
+        public final String name;
+        public final String description;
+        public final String buttonLabel;
+        public final String buttonEmoji;
+        public final String buttonColor;
+        public final String categoryId;
+        public final String welcomeMessage;
+        public final int position;
+
+        public TicketCategoryData(int id, int panelId, String name, String description,
+                                   String buttonLabel, String buttonEmoji, String buttonColor,
+                                   String categoryId, String welcomeMessage, int position) {
+            this.id = id;
+            this.panelId = panelId;
+            this.name = name;
+            this.description = description;
+            this.buttonLabel = buttonLabel != null ? buttonLabel : name;
+            this.buttonEmoji = buttonEmoji;
+            this.buttonColor = buttonColor != null ? buttonColor : "PRIMARY";
+            this.categoryId = categoryId;
+            this.welcomeMessage = welcomeMessage;
+            this.position = position;
+        }
+    }
+
+    /**
+     * Create a new ticket category
+     */
+    public int createTicketCategory(int panelId, String name, String buttonLabel) {
+        try (Connection connection = getConnection()) {
+            String posQuery = "SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM ticket_categories WHERE panel_id = ?";
+            PreparedStatement posStmt = connection.prepareStatement(posQuery);
+            posStmt.setInt(1, panelId);
+            ResultSet posRs = posStmt.executeQuery();
+            int nextPosition = posRs.next() ? posRs.getInt("next_pos") : 0;
+
+            String insertQuery = "INSERT INTO ticket_categories (panel_id, name, button_label, position) VALUES (?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);
+            stmt.setInt(1, panelId);
+            stmt.setString(2, name);
+            stmt.setString(3, buttonLabel);
+            stmt.setInt(4, nextPosition);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket category: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get all ticket categories for a panel
+     */
+    public List<TicketCategoryData> getTicketCategories(int panelId) {
+        List<TicketCategoryData> categories = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_categories WHERE panel_id = ? ORDER BY position ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, panelId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                categories.add(mapResultSetToTicketCategory(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket categories: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return categories;
+    }
+
+    /**
+     * Get a specific ticket category
+     */
+    public TicketCategoryData getTicketCategory(int categoryId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_categories WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, categoryId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return mapResultSetToTicketCategory(rs);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket category: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private TicketCategoryData mapResultSetToTicketCategory(ResultSet rs) throws SQLException {
+        return new TicketCategoryData(
+            rs.getInt("id"),
+            rs.getInt("panel_id"),
+            rs.getString("name"),
+            rs.getString("description"),
+            rs.getString("button_label"),
+            rs.getString("button_emoji"),
+            rs.getString("button_color"),
+            rs.getString("category_id"),
+            rs.getString("welcome_message"),
+            rs.getInt("position")
+        );
+    }
+
+    /**
+     * Update ticket category
+     */
+    public boolean updateTicketCategory(int categoryId, String name, String description,
+                                         String buttonLabel, String buttonEmoji, String buttonColor,
+                                         String discordCategoryId, String welcomeMessage) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_categories SET name = ?, description = ?, button_label = ?, " +
+                "button_emoji = ?, button_color = ?, category_id = ?, welcome_message = ? WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, name);
+            stmt.setString(2, description);
+            stmt.setString(3, buttonLabel);
+            stmt.setString(4, buttonEmoji);
+            stmt.setString(5, buttonColor);
+            stmt.setString(6, discordCategoryId);
+            stmt.setString(7, welcomeMessage);
+            stmt.setInt(8, categoryId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket category: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete a ticket category
+     */
+    public boolean deleteTicketCategory(int categoryId) {
+        try (Connection connection = getConnection()) {
+            // First delete associated form fields
+            String deleteFieldsQuery = "DELETE FROM ticket_form_fields WHERE category_id = ?";
+            PreparedStatement deleteFieldsStmt = connection.prepareStatement(deleteFieldsQuery);
+            deleteFieldsStmt.setInt(1, categoryId);
+            deleteFieldsStmt.executeUpdate();
+
+            // Get category info for reordering
+            TicketCategoryData category = getTicketCategory(categoryId);
+
+            // Delete the category
+            String deleteQuery = "DELETE FROM ticket_categories WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setInt(1, categoryId);
+            int result = stmt.executeUpdate();
+
+            // Reorder remaining categories
+            if (result > 0 && category != null) {
+                String reorderQuery = "UPDATE ticket_categories SET position = position - 1 WHERE panel_id = ? AND position > ?";
+                PreparedStatement reorderStmt = connection.prepareStatement(reorderQuery);
+                reorderStmt.setInt(1, category.panelId);
+                reorderStmt.setInt(2, category.position);
+                reorderStmt.executeUpdate();
+            }
+
+            return result > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting ticket category: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Move ticket category up
+     */
+    public boolean moveTicketCategoryUp(int categoryId) {
+        TicketCategoryData category = getTicketCategory(categoryId);
+        if (category == null || category.position == 0) return false;
+        return swapTicketCategoryPositions(category.panelId, category.position, category.position - 1);
+    }
+
+    /**
+     * Move ticket category down
+     */
+    public boolean moveTicketCategoryDown(int categoryId) {
+        TicketCategoryData category = getTicketCategory(categoryId);
+        if (category == null) return false;
+        List<TicketCategoryData> categories = getTicketCategories(category.panelId);
+        if (category.position >= categories.size() - 1) return false;
+        return swapTicketCategoryPositions(category.panelId, category.position, category.position + 1);
+    }
+
+    private boolean swapTicketCategoryPositions(int panelId, int pos1, int pos2) {
+        try (Connection connection = getConnection()) {
+            String findQuery = "SELECT id FROM ticket_categories WHERE panel_id = ? AND position = ?";
+            PreparedStatement findStmt = connection.prepareStatement(findQuery);
+            findStmt.setInt(1, panelId);
+            findStmt.setInt(2, pos2);
+            ResultSet rs = findStmt.executeQuery();
+            if (!rs.next()) return false;
+            int otherId = rs.getInt("id");
+
+            String updateQuery = "UPDATE ticket_categories SET position = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+
+            // Find category with pos1
+            findStmt.setInt(2, pos1);
+            ResultSet rs1 = findStmt.executeQuery();
+            if (!rs1.next()) return false;
+            int id1 = rs1.getInt("id");
+
+            updateStmt.setInt(1, pos2);
+            updateStmt.setInt(2, id1);
+            updateStmt.executeUpdate();
+
+            updateStmt.setInt(1, pos1);
+            updateStmt.setInt(2, otherId);
+            updateStmt.executeUpdate();
+
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error swapping ticket category positions: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ==================== TICKET FORMS ====================
+
+    /**
+     * Data class to hold ticket form information
+     */
+    public static class TicketFormData {
+        public final int id;
+        public final int categoryId;
+        public final String name;
+        public final String description;
+        public final int position;
+
+        public TicketFormData(int id, int categoryId, String name, String description, int position) {
+            this.id = id;
+            this.categoryId = categoryId;
+            this.name = name;
+            this.description = description;
+            this.position = position;
+        }
+    }
+
+    /**
+     * Create a new form for a category
+     */
+    public int createTicketForm(int categoryId, String name, String description) {
+        try (Connection connection = getConnection()) {
+            String posQuery = "SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM ticket_forms WHERE category_id = ?";
+            PreparedStatement posStmt = connection.prepareStatement(posQuery);
+            posStmt.setInt(1, categoryId);
+            ResultSet posRs = posStmt.executeQuery();
+            int nextPosition = posRs.next() ? posRs.getInt("next_pos") : 0;
+
+            String insertQuery = "INSERT INTO ticket_forms (category_id, name, description, position) VALUES (?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);
+            stmt.setInt(1, categoryId);
+            stmt.setString(2, name);
+            stmt.setString(3, description);
+            stmt.setInt(4, nextPosition);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket form: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get all forms for a category
+     */
+    public List<TicketFormData> getTicketForms(int categoryId) {
+        List<TicketFormData> forms = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_forms WHERE category_id = ? ORDER BY position ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, categoryId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                forms.add(new TicketFormData(
+                    rs.getInt("id"),
+                    rs.getInt("category_id"),
+                    rs.getString("name"),
+                    rs.getString("description"),
+                    rs.getInt("position")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket forms: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return forms;
+    }
+
+    /**
+     * Get a specific form
+     */
+    public TicketFormData getTicketForm(int formId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_forms WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, formId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return new TicketFormData(
+                    rs.getInt("id"),
+                    rs.getInt("category_id"),
+                    rs.getString("name"),
+                    rs.getString("description"),
+                    rs.getInt("position")
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket form: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Update a form
+     */
+    public boolean updateTicketForm(int formId, String name, String description) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_forms SET name = ?, description = ? WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, name);
+            stmt.setString(2, description);
+            stmt.setInt(3, formId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket form: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete a form and all its fields
+     */
+    public boolean deleteTicketForm(int formId) {
+        try (Connection connection = getConnection()) {
+            TicketFormData form = getTicketForm(formId);
+
+            // Delete all fields for this form
+            String deleteFieldsQuery = "DELETE FROM ticket_form_fields WHERE form_id = ?";
+            PreparedStatement deleteFieldsStmt = connection.prepareStatement(deleteFieldsQuery);
+            deleteFieldsStmt.setInt(1, formId);
+            deleteFieldsStmt.executeUpdate();
+
+            // Delete the form
+            String deleteQuery = "DELETE FROM ticket_forms WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setInt(1, formId);
+            int result = stmt.executeUpdate();
+
+            if (result > 0 && form != null) {
+                String reorderQuery = "UPDATE ticket_forms SET position = position - 1 WHERE category_id = ? AND position > ?";
+                PreparedStatement reorderStmt = connection.prepareStatement(reorderQuery);
+                reorderStmt.setInt(1, form.categoryId);
+                reorderStmt.setInt(2, form.position);
+                reorderStmt.executeUpdate();
+            }
+
+            return result > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting ticket form: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Move ticket form to a specific position
+     */
+    public boolean moveTicketFormToPosition(int formId, int newPosition) {
+        TicketFormData form = getTicketForm(formId);
+        if (form == null) return false;
+
+        int currentPosition = form.position;
+        if (currentPosition == newPosition) return true;
+
+        try (Connection connection = getConnection()) {
+            if (newPosition < currentPosition) {
+                String shiftQuery = "UPDATE ticket_forms SET position = position + 1 WHERE category_id = ? AND position >= ? AND position < ?";
+                PreparedStatement shiftStmt = connection.prepareStatement(shiftQuery);
+                shiftStmt.setInt(1, form.categoryId);
+                shiftStmt.setInt(2, newPosition);
+                shiftStmt.setInt(3, currentPosition);
+                shiftStmt.executeUpdate();
+            } else {
+                String shiftQuery = "UPDATE ticket_forms SET position = position - 1 WHERE category_id = ? AND position > ? AND position <= ?";
+                PreparedStatement shiftStmt = connection.prepareStatement(shiftQuery);
+                shiftStmt.setInt(1, form.categoryId);
+                shiftStmt.setInt(2, currentPosition);
+                shiftStmt.setInt(3, newPosition);
+                shiftStmt.executeUpdate();
+            }
+
+            String updateQuery = "UPDATE ticket_forms SET position = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setInt(1, newPosition);
+            updateStmt.setInt(2, formId);
+            return updateStmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error moving ticket form to position: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get form fields by form ID
+     */
+    public List<TicketFormFieldData> getTicketFormFieldsByFormId(int formId) {
+        List<TicketFormFieldData> fields = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_form_fields WHERE form_id = ? ORDER BY position ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, formId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                fields.add(new TicketFormFieldData(
+                    rs.getInt("id"),
+                    rs.getInt("category_id"),
+                    rs.getInt("form_id"),
+                    rs.getString("label"),
+                    rs.getString("placeholder"),
+                    rs.getString("field_type"),
+                    rs.getInt("min_length"),
+                    rs.getInt("max_length"),
+                    rs.getInt("required") == 1,
+                    rs.getInt("position")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket form fields by form ID: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return fields;
+    }
+
+    /**
+     * Create a new form field for a form
+     */
+    public int createTicketFormFieldForForm(int categoryId, int formId, String label, String placeholder,
+                                             String fieldType, int minLength, int maxLength, boolean required) {
+        try (Connection connection = getConnection()) {
+            String posQuery = "SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM ticket_form_fields WHERE form_id = ?";
+            PreparedStatement posStmt = connection.prepareStatement(posQuery);
+            posStmt.setInt(1, formId);
+            ResultSet posRs = posStmt.executeQuery();
+            int nextPosition = posRs.next() ? posRs.getInt("next_pos") : 0;
+
+            String insertQuery = "INSERT INTO ticket_form_fields (category_id, form_id, label, placeholder, field_type, min_length, max_length, required, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);
+            stmt.setInt(1, categoryId);
+            stmt.setInt(2, formId);
+            stmt.setString(3, label);
+            stmt.setString(4, placeholder);
+            stmt.setString(5, fieldType);
+            stmt.setInt(6, minLength);
+            stmt.setInt(7, maxLength);
+            stmt.setInt(8, required ? 1 : 0);
+            stmt.setInt(9, nextPosition);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket form field for form: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    // ==================== TICKET FORM FIELDS ====================
+
+    /**
+     * Data class to hold ticket form field information
+     */
+    public static class TicketFormFieldData {
+        public final int id;
+        public final int categoryId;
+        public final int formId;
+        public final String label;
+        public final String placeholder;
+        public final String fieldType; // SHORT or PARAGRAPH
+        public final int minLength;
+        public final int maxLength;
+        public final boolean required;
+        public final int position;
+
+        public TicketFormFieldData(int id, int categoryId, String label, String placeholder,
+                                    String fieldType, int minLength, int maxLength,
+                                    boolean required, int position) {
+            this(id, categoryId, 0, label, placeholder, fieldType, minLength, maxLength, required, position);
+        }
+
+        public TicketFormFieldData(int id, int categoryId, int formId, String label, String placeholder,
+                                    String fieldType, int minLength, int maxLength,
+                                    boolean required, int position) {
+            this.id = id;
+            this.categoryId = categoryId;
+            this.formId = formId;
+            this.label = label;
+            this.placeholder = placeholder;
+            this.fieldType = fieldType != null ? fieldType : "SHORT";
+            this.minLength = minLength;
+            this.maxLength = maxLength;
+            this.required = required;
+            this.position = position;
+        }
+    }
+
+    /**
+     * Create a new form field for a category
+     */
+    public int createTicketFormField(int categoryId, String label, String placeholder,
+                                      String fieldType, int minLength, int maxLength, boolean required) {
+        try (Connection connection = getConnection()) {
+            String posQuery = "SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM ticket_form_fields WHERE category_id = ?";
+            PreparedStatement posStmt = connection.prepareStatement(posQuery);
+            posStmt.setInt(1, categoryId);
+            ResultSet posRs = posStmt.executeQuery();
+            int nextPosition = posRs.next() ? posRs.getInt("next_pos") : 0;
+
+            String insertQuery = "INSERT INTO ticket_form_fields (category_id, label, placeholder, field_type, min_length, max_length, required, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);
+            stmt.setInt(1, categoryId);
+            stmt.setString(2, label);
+            stmt.setString(3, placeholder);
+            stmt.setString(4, fieldType);
+            stmt.setInt(5, minLength);
+            stmt.setInt(6, maxLength);
+            stmt.setInt(7, required ? 1 : 0);
+            stmt.setInt(8, nextPosition);
+
+            int rowsAffected = stmt.executeUpdate();
+            if (rowsAffected > 0) {
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                if (generatedKeys.next()) {
+                    return generatedKeys.getInt(1);
+                }
+            }
+            return 0;
+        } catch (SQLException e) {
+            System.err.println("Error creating ticket form field: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Get all form fields for a category
+     */
+    public List<TicketFormFieldData> getTicketFormFields(int categoryId) {
+        List<TicketFormFieldData> fields = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_form_fields WHERE category_id = ? ORDER BY position ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, categoryId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                int formId = 0;
+                try { formId = rs.getInt("form_id"); } catch (SQLException ignored) {}
+                fields.add(new TicketFormFieldData(
+                    rs.getInt("id"),
+                    rs.getInt("category_id"),
+                    formId,
+                    rs.getString("label"),
+                    rs.getString("placeholder"),
+                    rs.getString("field_type"),
+                    rs.getInt("min_length"),
+                    rs.getInt("max_length"),
+                    rs.getInt("required") == 1,
+                    rs.getInt("position")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket form fields: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return fields;
+    }
+
+    /**
+     * Get a specific form field
+     */
+    public TicketFormFieldData getTicketFormField(int fieldId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_form_fields WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, fieldId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                int formId = 0;
+                try { formId = rs.getInt("form_id"); } catch (SQLException ignored) {}
+                return new TicketFormFieldData(
+                    rs.getInt("id"),
+                    rs.getInt("category_id"),
+                    formId,
+                    rs.getString("label"),
+                    rs.getString("placeholder"),
+                    rs.getString("field_type"),
+                    rs.getInt("min_length"),
+                    rs.getInt("max_length"),
+                    rs.getInt("required") == 1,
+                    rs.getInt("position")
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket form field: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Update a form field
+     */
+    public boolean updateTicketFormField(int fieldId, String label, String placeholder,
+                                          String fieldType, int minLength, int maxLength, boolean required) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_form_fields SET label = ?, placeholder = ?, field_type = ?, " +
+                "min_length = ?, max_length = ?, required = ? WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setString(1, label);
+            stmt.setString(2, placeholder);
+            stmt.setString(3, fieldType);
+            stmt.setInt(4, minLength);
+            stmt.setInt(5, maxLength);
+            stmt.setInt(6, required ? 1 : 0);
+            stmt.setInt(7, fieldId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket form field: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete a form field
+     */
+    public boolean deleteTicketFormField(int fieldId) {
+        try (Connection connection = getConnection()) {
+            TicketFormFieldData field = getTicketFormField(fieldId);
+
+            String deleteQuery = "DELETE FROM ticket_form_fields WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setInt(1, fieldId);
+            int result = stmt.executeUpdate();
+
+            if (result > 0 && field != null) {
+                String reorderQuery = "UPDATE ticket_form_fields SET position = position - 1 WHERE category_id = ? AND position > ?";
+                PreparedStatement reorderStmt = connection.prepareStatement(reorderQuery);
+                reorderStmt.setInt(1, field.categoryId);
+                reorderStmt.setInt(2, field.position);
+                reorderStmt.executeUpdate();
+            }
+
+            return result > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting ticket form field: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Move ticket form field up
+     */
+    public boolean moveTicketFormFieldUp(int fieldId) {
+        TicketFormFieldData field = getTicketFormField(fieldId);
+        if (field == null || field.position == 0) return false;
+        return swapTicketFormFieldPositions(field.categoryId, field.position, field.position - 1);
+    }
+
+    /**
+     * Move ticket form field down
+     */
+    public boolean moveTicketFormFieldDown(int fieldId) {
+        TicketFormFieldData field = getTicketFormField(fieldId);
+        if (field == null) return false;
+        List<TicketFormFieldData> fields = getTicketFormFields(field.categoryId);
+        if (field.position >= fields.size() - 1) return false;
+        return swapTicketFormFieldPositions(field.categoryId, field.position, field.position + 1);
+    }
+
+    /**
+     * Move ticket form field to a specific position
+     */
+    public boolean moveTicketFormFieldToPosition(int fieldId, int newPosition) {
+        TicketFormFieldData field = getTicketFormField(fieldId);
+        if (field == null) return false;
+
+        int currentPosition = field.position;
+        if (currentPosition == newPosition) return true;
+
+        try (Connection connection = getConnection()) {
+            if (newPosition < currentPosition) {
+                // Moving up - shift others down
+                String shiftQuery = "UPDATE ticket_form_fields SET position = position + 1 WHERE category_id = ? AND position >= ? AND position < ?";
+                PreparedStatement shiftStmt = connection.prepareStatement(shiftQuery);
+                shiftStmt.setInt(1, field.categoryId);
+                shiftStmt.setInt(2, newPosition);
+                shiftStmt.setInt(3, currentPosition);
+                shiftStmt.executeUpdate();
+            } else {
+                // Moving down - shift others up
+                String shiftQuery = "UPDATE ticket_form_fields SET position = position - 1 WHERE category_id = ? AND position > ? AND position <= ?";
+                PreparedStatement shiftStmt = connection.prepareStatement(shiftQuery);
+                shiftStmt.setInt(1, field.categoryId);
+                shiftStmt.setInt(2, currentPosition);
+                shiftStmt.setInt(3, newPosition);
+                shiftStmt.executeUpdate();
+            }
+
+            // Update the field's position
+            String updateQuery = "UPDATE ticket_form_fields SET position = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+            updateStmt.setInt(1, newPosition);
+            updateStmt.setInt(2, fieldId);
+            return updateStmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error moving ticket form field to position: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean swapTicketFormFieldPositions(int categoryId, int pos1, int pos2) {
+        try (Connection connection = getConnection()) {
+            String findQuery = "SELECT id FROM ticket_form_fields WHERE category_id = ? AND position = ?";
+            PreparedStatement findStmt = connection.prepareStatement(findQuery);
+            findStmt.setInt(1, categoryId);
+            findStmt.setInt(2, pos2);
+            ResultSet rs = findStmt.executeQuery();
+            if (!rs.next()) return false;
+            int otherId = rs.getInt("id");
+
+            String updateQuery = "UPDATE ticket_form_fields SET position = ? WHERE id = ?";
+            PreparedStatement updateStmt = connection.prepareStatement(updateQuery);
+
+            findStmt.setInt(2, pos1);
+            ResultSet rs1 = findStmt.executeQuery();
+            if (!rs1.next()) return false;
+            int id1 = rs1.getInt("id");
+
+            updateStmt.setInt(1, pos2);
+            updateStmt.setInt(2, id1);
+            updateStmt.executeUpdate();
+
+            updateStmt.setInt(1, pos1);
+            updateStmt.setInt(2, otherId);
+            updateStmt.executeUpdate();
+
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error swapping ticket form field positions: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ==================== TICKET FORM RESPONSES ====================
+
+    /**
+     * Data class to hold ticket form response information
+     */
+    public static class TicketFormResponseData {
+        public final int id;
+        public final int ticketId;
+        public final int fieldId;
+        public final String fieldLabel;
+        public final String response;
+        public final String createdAt;
+
+        public TicketFormResponseData(int id, int ticketId, int fieldId, String fieldLabel, String response, String createdAt) {
+            this.id = id;
+            this.ticketId = ticketId;
+            this.fieldId = fieldId;
+            this.fieldLabel = fieldLabel;
+            this.response = response;
+            this.createdAt = createdAt;
+        }
+    }
+
+    /**
+     * Save a form response for a ticket
+     */
+    public boolean saveTicketFormResponse(int ticketId, int fieldId, String fieldLabel, String response) {
+        try (Connection connection = getConnection()) {
+            String insertQuery = "INSERT INTO ticket_form_responses (ticket_id, field_id, field_label, response) VALUES (?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery);
+            stmt.setInt(1, ticketId);
+            stmt.setInt(2, fieldId);
+            stmt.setString(3, fieldLabel);
+            stmt.setString(4, response);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error saving ticket form response: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Save multiple form responses for a ticket
+     */
+    public boolean saveTicketFormResponses(int ticketId, List<TicketFormFieldData> fields, java.util.Map<Integer, String> responses) {
+        try (Connection connection = getConnection()) {
+            String insertQuery = "INSERT INTO ticket_form_responses (ticket_id, field_id, field_label, response) VALUES (?, ?, ?, ?)";
+            PreparedStatement stmt = connection.prepareStatement(insertQuery);
+
+            for (TicketFormFieldData field : fields) {
+                String response = responses.get(field.id);
+                if (response != null && !response.isBlank()) {
+                    stmt.setInt(1, ticketId);
+                    stmt.setInt(2, field.id);
+                    stmt.setString(3, field.label);
+                    stmt.setString(4, response);
+                    stmt.addBatch();
+                }
+            }
+
+            stmt.executeBatch();
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error saving ticket form responses: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get all form responses for a ticket
+     */
+    public List<TicketFormResponseData> getTicketFormResponses(int ticketId) {
+        List<TicketFormResponseData> responses = new ArrayList<>();
+        try (Connection connection = getConnection()) {
+            String query = "SELECT * FROM ticket_form_responses WHERE ticket_id = ? ORDER BY id ASC";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setInt(1, ticketId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                responses.add(new TicketFormResponseData(
+                    rs.getInt("id"),
+                    rs.getInt("ticket_id"),
+                    rs.getInt("field_id"),
+                    rs.getString("field_label"),
+                    rs.getString("response"),
+                    rs.getString("created_at")
+                ));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket form responses: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return responses;
+    }
+
+    /**
+     * Delete all form responses for a ticket (when ticket is deleted)
+     */
+    public boolean deleteTicketFormResponses(int ticketId) {
+        try (Connection connection = getConnection()) {
+            String deleteQuery = "DELETE FROM ticket_form_responses WHERE ticket_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(deleteQuery);
+            stmt.setInt(1, ticketId);
+            return stmt.executeUpdate() >= 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting ticket form responses: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // ==================== END TICKET CATEGORIES ====================
+
     /**
      * Ticket-Priorität aktualisieren (MariaDB-Syntax)
      */
@@ -2796,6 +4194,7 @@ public class DatabaseHandler {
 
         try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
+            pstmt.setString(2, userId);
             ResultSet rs = pstmt.executeQuery();
 
             if (rs.next()) {
@@ -3012,14 +4411,28 @@ public class DatabaseHandler {
                             }
                             break;
                     }
+
+                    EmbedBuilder embed;
+
+                    if (moderatorName == null) {
+                        embed = new EmbedBuilder()
+                                .setTitle(emoji + " " + actionType)
+                                .setDescription(emoji + " " + (!Objects.equals(targetName, null) ? targetName : "Unknown User"))
+                                .addField("Moderator", "No User found", true)
+                                .addField("Reason", reason, true)
+                                .setColor(embedColor)
+                                .setTimestamp(java.time.Instant.now());
+                    } else {
+                        embed = new EmbedBuilder()
+                                .setTitle(emoji + " " + actionType)
+                                .setDescription(emoji + " " + (!Objects.equals(targetName, null) ? targetName : "Unknown User"))
+                                .addField("Moderator", moderatorName.getAsMention(), true)
+                                .addField("Reason", reason, true)
+                                .setColor(embedColor)
+                                .setTimestamp(java.time.Instant.now());
+                    }
                     
-                    EmbedBuilder embed = new EmbedBuilder()
-                            .setTitle(emoji + " " + actionType)
-                            .setDescription(emoji + " " + (!Objects.equals(targetName, "") ? targetName : targetMember.getEffectiveName()))
-                            .addField("Moderator", moderatorName.getAsMention(), true)
-                            .addField("Reason", reason, true)
-                            .setColor(embedColor)
-                            .setTimestamp(java.time.Instant.now());
+
 
                     if (actionType.equals("WARN")) {
                         List<DatabaseHandler.WarningData> warningDataList = getUserActiveWarnings(guildId, targetMember.getId());
@@ -3388,6 +4801,10 @@ public class DatabaseHandler {
     }
 
     public boolean addEmbedToDatabase (String guildId, String channelId, String messageId, String displayType, String title, String description, String footer, String color) {
+        return addEmbedToDatabase(guildId, channelId, messageId, null, displayType, title, description, footer, color);
+    }
+
+    public boolean addEmbedToDatabase (String guildId, String channelId, String messageId, Integer groupId, String displayType, String title, String description, String footer, String color) {
         if (displayType.equalsIgnoreCase("BUTTON")) {
             displayType = "REACTION";
         } else if (displayType.equalsIgnoreCase("SELECT_MENU")) {
@@ -3395,18 +4812,23 @@ public class DatabaseHandler {
         } else {
             displayType = "BUTTON"; // Default to BUTTON if invalid
         }
-        String query = "INSERT INTO role_select_embeds (guild_id, channel_id, message_id, display_type, title, description, footer, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String query = "INSERT INTO role_select_embeds (guild_id, channel_id, message_id, group_id, display_type, title, description, footer, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection connection = getConnection(); PreparedStatement pstmt = connection.prepareStatement(query)) {
             pstmt.setString(1, guildId);
             pstmt.setString(2, channelId);
             pstmt.setString(3, messageId);
-            pstmt.setString(4, displayType);
-            pstmt.setString(5, title);
-            pstmt.setString(6, description);
-            pstmt.setString(7, footer);
-            pstmt.setString(8, color);
+            if (groupId != null) {
+                pstmt.setInt(4, groupId);
+            } else {
+                pstmt.setNull(4, java.sql.Types.INTEGER);
+            }
+            pstmt.setString(5, displayType);
+            pstmt.setString(6, title);
+            pstmt.setString(7, description);
+            pstmt.setString(8, footer);
+            pstmt.setString(9, color);
             pstmt.executeUpdate();
-            System.out.println("Role Select Embed added for guild " + guildId);
+            System.out.println("Role Select Embed added for guild " + guildId + (groupId != null ? " (group: " + groupId + ")" : ""));
             return true;
         } catch (SQLException e) {
             System.err.println("Error adding Role Select Embed: " + e.getMessage());
@@ -3703,6 +5125,664 @@ public class DatabaseHandler {
             e.printStackTrace();
             return null;
         }
+    }
+
+    // ==================== ROLE SELECT GROUPS ====================
+
+    /**
+     * Data class to hold role select group information
+     */
+    public static class RoleSelectGroupData {
+        public final int id;
+        public final String guildId;
+        public final String name;
+        public final int position;
+        public final String title;
+        public final String description;
+        public final String footer;
+        public final String color;
+
+        public RoleSelectGroupData(int id, String guildId, String name, int position, String title, String description, String footer, String color) {
+            this.id = id;
+            this.guildId = guildId;
+            this.name = name;
+            this.position = position;
+            this.title = title != null ? title : "Select Your Roles";
+            this.description = description != null ? description : "Choose from the roles below:";
+            this.footer = footer;
+            this.color = color != null ? color : "#3498db";
+        }
+    }
+
+    /**
+     * Create a new role select group
+     */
+    public int createRoleSelectGroup(String guildId, String name) {
+        // Get next position
+        int nextPosition = getNextGroupPosition(guildId);
+
+        String query = "INSERT INTO role_select_groups (guild_id, name, position) VALUES (?, ?, ?)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            stmt.setInt(3, nextPosition);
+            stmt.executeUpdate();
+
+            ResultSet rs = stmt.getGeneratedKeys();
+            if (rs.next()) {
+                int groupId = rs.getInt(1);
+                System.out.println("Created role select group '" + name + "' with ID " + groupId + " for guild " + guildId);
+                return groupId;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error creating role select group: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    /**
+     * Get next available position for a group
+     */
+    private int getNextGroupPosition(String guildId) {
+        String query = "SELECT MAX(position) as max_pos FROM role_select_groups WHERE guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("max_pos") + 1;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Get all role select groups for a guild
+     */
+    public List<RoleSelectGroupData> getRoleSelectGroups(String guildId) {
+        List<RoleSelectGroupData> groups = new ArrayList<>();
+        String query = "SELECT * FROM role_select_groups WHERE guild_id = ? ORDER BY position ASC";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                groups.add(new RoleSelectGroupData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("name"),
+                    rs.getInt("position"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return groups;
+    }
+
+    /**
+     * Get a specific role select group by ID
+     */
+    public RoleSelectGroupData getRoleSelectGroup(String guildId, int groupId) {
+        String query = "SELECT * FROM role_select_groups WHERE guild_id = ? AND id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, groupId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new RoleSelectGroupData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("name"),
+                    rs.getInt("position"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Get a role select group by name
+     */
+    public RoleSelectGroupData getRoleSelectGroupByName(String guildId, String name) {
+        String query = "SELECT * FROM role_select_groups WHERE guild_id = ? AND name = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, name);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new RoleSelectGroupData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("name"),
+                    rs.getInt("position"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Update role select group settings
+     */
+    public boolean updateRoleSelectGroup(int groupId, String guildId, String title, String description, String footer, String color) {
+        String query = "UPDATE role_select_groups SET title = ?, description = ?, footer = ?, color = ? WHERE id = ? AND guild_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, title);
+            stmt.setString(2, description);
+            stmt.setString(3, footer);
+            stmt.setString(4, color);
+            stmt.setInt(5, groupId);
+            stmt.setString(6, guildId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Delete a role select group and all its roles
+     */
+    public boolean deleteRoleSelectGroup(String guildId, int groupId) {
+        try (Connection connection = getConnection()) {
+            // First, remove group_id from all roles in this group
+            String updateRoles = "UPDATE role_select SET group_id = NULL WHERE guild_id = ? AND group_id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(updateRoles)) {
+                stmt.setString(1, guildId);
+                stmt.setInt(2, groupId);
+                stmt.executeUpdate();
+            }
+
+            // Then delete the group
+            String deleteGroup = "DELETE FROM role_select_groups WHERE id = ? AND guild_id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(deleteGroup)) {
+                stmt.setInt(1, groupId);
+                stmt.setString(2, guildId);
+                return stmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Swap positions of two groups
+     */
+    public boolean swapGroupPositions(String guildId, int groupId1, int groupId2) {
+        try (Connection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                // Get current positions
+                int pos1 = -1, pos2 = -1;
+                String query = "SELECT id, position FROM role_select_groups WHERE guild_id = ? AND id IN (?, ?)";
+                try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                    stmt.setString(1, guildId);
+                    stmt.setInt(2, groupId1);
+                    stmt.setInt(3, groupId2);
+                    ResultSet rs = stmt.executeQuery();
+                    while (rs.next()) {
+                        if (rs.getInt("id") == groupId1) {
+                            pos1 = rs.getInt("position");
+                        } else {
+                            pos2 = rs.getInt("position");
+                        }
+                    }
+                }
+
+                if (pos1 == -1 || pos2 == -1) {
+                    connection.rollback();
+                    return false;
+                }
+
+                // Swap positions
+                String update = "UPDATE role_select_groups SET position = ? WHERE id = ? AND guild_id = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(update)) {
+                    stmt.setInt(1, pos2);
+                    stmt.setInt(2, groupId1);
+                    stmt.setString(3, guildId);
+                    stmt.executeUpdate();
+
+                    stmt.setInt(1, pos1);
+                    stmt.setInt(2, groupId2);
+                    stmt.setString(3, guildId);
+                    stmt.executeUpdate();
+                }
+
+                connection.commit();
+                return true;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Move a group up in position
+     */
+    public boolean moveGroupUp(String guildId, int groupId) {
+        RoleSelectGroupData group = getRoleSelectGroup(guildId, groupId);
+        if (group == null || group.position <= 0) return false;
+
+        // Find the group with position - 1
+        String query = "SELECT id FROM role_select_groups WHERE guild_id = ? AND position = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, group.position - 1);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return swapGroupPositions(guildId, groupId, rs.getInt("id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Move a group down in position
+     */
+    public boolean moveGroupDown(String guildId, int groupId) {
+        RoleSelectGroupData group = getRoleSelectGroup(guildId, groupId);
+        if (group == null) return false;
+
+        // Find the group with position + 1
+        String query = "SELECT id FROM role_select_groups WHERE guild_id = ? AND position = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, group.position + 1);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return swapGroupPositions(guildId, groupId, rs.getInt("id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // ==================== ROLE SELECT WITH GROUPS ====================
+
+    /**
+     * Add a role to a specific group
+     */
+    public boolean addRoleSelectToGroup(String guildId, String roleId, int groupId, String description, String emojiId) {
+        if (isRoleAlreadyAdded(guildId, roleId)) {
+            // Update existing role to assign to group
+            String query = "UPDATE role_select SET group_id = ?, description = ?, emoji_id = ? WHERE guild_id = ? AND role_id = ?";
+            try (Connection connection = getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setInt(1, groupId);
+                stmt.setString(2, description);
+                stmt.setString(3, emojiId);
+                stmt.setString(4, guildId);
+                stmt.setString(5, roleId);
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        } else {
+            // Get next position in group
+            int nextPosition = getNextRolePositionInGroup(guildId, groupId);
+
+            String query = "INSERT INTO role_select (guild_id, role_id, group_id, position, description, emoji_id) VALUES (?, ?, ?, ?, ?, ?)";
+            try (Connection connection = getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, guildId);
+                stmt.setString(2, roleId);
+                stmt.setInt(3, groupId);
+                stmt.setInt(4, nextPosition);
+                stmt.setString(5, description);
+                stmt.setString(6, emojiId);
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Get next available position for a role in a group
+     */
+    private int getNextRolePositionInGroup(String guildId, int groupId) {
+        String query = "SELECT MAX(position) as max_pos FROM role_select WHERE guild_id = ? AND group_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, groupId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("max_pos") + 1;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Get all roles in a specific group
+     */
+    public List<String> getRolesInGroup(String guildId, int groupId) {
+        List<String> roleIds = new ArrayList<>();
+        String query = "SELECT role_id FROM role_select WHERE guild_id = ? AND group_id = ? ORDER BY position ASC";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setInt(2, groupId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                roleIds.add(rs.getString("role_id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return roleIds;
+    }
+
+    /**
+     * Move a role up in position within a group
+     */
+    public boolean moveRoleUpInGroup(String guildId, int groupId, String roleId) {
+        List<String> roles = getRolesInGroup(guildId, groupId);
+        int currentIndex = roles.indexOf(roleId);
+        if (currentIndex <= 0) {
+            return false; // Already at top or not found
+        }
+        String roleAbove = roles.get(currentIndex - 1);
+        return swapRolePositionsInGroup(guildId, groupId, roleId, roleAbove);
+    }
+
+    /**
+     * Move a role down in position within a group
+     */
+    public boolean moveRoleDownInGroup(String guildId, int groupId, String roleId) {
+        List<String> roles = getRolesInGroup(guildId, groupId);
+        int currentIndex = roles.indexOf(roleId);
+        if (currentIndex < 0 || currentIndex >= roles.size() - 1) {
+            return false; // Already at bottom or not found
+        }
+        String roleBelow = roles.get(currentIndex + 1);
+        return swapRolePositionsInGroup(guildId, groupId, roleId, roleBelow);
+    }
+
+    /**
+     * Get all ungrouped roles (roles without a group)
+     */
+    public List<String> getUngroupedRoles(String guildId) {
+        List<String> roleIds = new ArrayList<>();
+        String query = "SELECT role_id FROM role_select WHERE guild_id = ? AND (group_id IS NULL OR group_id = 0) ORDER BY position ASC";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                roleIds.add(rs.getString("role_id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return roleIds;
+    }
+
+    /**
+     * Remove a role from its group (set group_id to NULL)
+     */
+    public boolean removeRoleFromGroup(String guildId, String roleId) {
+        String query = "UPDATE role_select SET group_id = NULL WHERE guild_id = ? AND role_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, roleId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Swap positions of two roles within a group
+     */
+    public boolean swapRolePositionsInGroup(String guildId, int groupId, String roleId1, String roleId2) {
+        try (Connection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                // Get current positions
+                int pos1 = -1, pos2 = -1;
+                String query = "SELECT role_id, position FROM role_select WHERE guild_id = ? AND group_id = ? AND role_id IN (?, ?)";
+                try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                    stmt.setString(1, guildId);
+                    stmt.setInt(2, groupId);
+                    stmt.setString(3, roleId1);
+                    stmt.setString(4, roleId2);
+                    ResultSet rs = stmt.executeQuery();
+                    while (rs.next()) {
+                        if (rs.getString("role_id").equals(roleId1)) {
+                            pos1 = rs.getInt("position");
+                        } else {
+                            pos2 = rs.getInt("position");
+                        }
+                    }
+                }
+
+                if (pos1 == -1 || pos2 == -1) {
+                    connection.rollback();
+                    return false;
+                }
+
+                // Swap positions
+                String update = "UPDATE role_select SET position = ? WHERE guild_id = ? AND role_id = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(update)) {
+                    stmt.setInt(1, pos2);
+                    stmt.setString(2, guildId);
+                    stmt.setString(3, roleId1);
+                    stmt.executeUpdate();
+
+                    stmt.setInt(1, pos1);
+                    stmt.setString(2, guildId);
+                    stmt.setString(3, roleId2);
+                    stmt.executeUpdate();
+                }
+
+                connection.commit();
+                return true;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get the group ID for a role
+     */
+    public int getRoleGroupId(String guildId, String roleId) {
+        String query = "SELECT group_id FROM role_select WHERE guild_id = ? AND role_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, roleId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("group_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    // ==================== ROLE SELECT EMBEDS DATA ====================
+
+    /**
+     * Data class to hold role select embed information
+     */
+    public static class RoleSelectEmbedData {
+        public final int id;
+        public final String guildId;
+        public final String channelId;
+        public final String messageId;
+        public final Integer groupId;
+        public final String displayType;
+        public final String title;
+        public final String description;
+        public final String footer;
+        public final String color;
+
+        public RoleSelectEmbedData(int id, String guildId, String channelId, String messageId, Integer groupId,
+                                   String displayType, String title, String description, String footer, String color) {
+            this.id = id;
+            this.guildId = guildId;
+            this.channelId = channelId;
+            this.messageId = messageId;
+            this.groupId = groupId;
+            this.displayType = displayType;
+            this.title = title;
+            this.description = description;
+            this.footer = footer;
+            this.color = color;
+        }
+    }
+
+    /**
+     * Get all role select embeds for a guild
+     */
+    public List<RoleSelectEmbedData> getRoleSelectEmbeds(String guildId) {
+        List<RoleSelectEmbedData> embeds = new ArrayList<>();
+        String query = "SELECT * FROM role_select_embeds WHERE guild_id = ? ORDER BY id ASC";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Integer groupId = rs.getObject("group_id") != null ? rs.getInt("group_id") : null;
+                embeds.add(new RoleSelectEmbedData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("channel_id"),
+                    rs.getString("message_id"),
+                    groupId,
+                    rs.getString("display_type"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return embeds;
+    }
+
+    /**
+     * Get role select embeds by group ID
+     */
+    public List<RoleSelectEmbedData> getRoleSelectEmbedsByGroup(String guildId, Integer groupId) {
+        List<RoleSelectEmbedData> embeds = new ArrayList<>();
+        String query;
+        if (groupId == null || groupId == 0) {
+            query = "SELECT * FROM role_select_embeds WHERE guild_id = ? AND (group_id IS NULL OR group_id = 0) ORDER BY id ASC";
+        } else {
+            query = "SELECT * FROM role_select_embeds WHERE guild_id = ? AND group_id = ? ORDER BY id ASC";
+        }
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            if (groupId != null && groupId != 0) {
+                stmt.setInt(2, groupId);
+            }
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Integer grpId = rs.getObject("group_id") != null ? rs.getInt("group_id") : null;
+                embeds.add(new RoleSelectEmbedData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("channel_id"),
+                    rs.getString("message_id"),
+                    grpId,
+                    rs.getString("display_type"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return embeds;
+    }
+
+    /**
+     * Get a role select embed by message ID
+     */
+    public RoleSelectEmbedData getRoleSelectEmbedByMessageId(String guildId, String messageId) {
+        String query = "SELECT * FROM role_select_embeds WHERE guild_id = ? AND message_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            stmt.setString(2, messageId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                Integer groupId = rs.getObject("group_id") != null ? rs.getInt("group_id") : null;
+                return new RoleSelectEmbedData(
+                    rs.getInt("id"),
+                    rs.getString("guild_id"),
+                    rs.getString("channel_id"),
+                    rs.getString("message_id"),
+                    groupId,
+                    rs.getString("display_type"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("footer"),
+                    rs.getString("color")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**
@@ -4031,7 +6111,6 @@ public class DatabaseHandler {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error fetching user timers: " + e.getMessage());
             e.printStackTrace();
         }
         return userTimers;
@@ -5236,7 +7315,7 @@ public class DatabaseHandler {
     }
 
     /**
-     * Reset user level data
+     * Reset user level data (for admin commands)
      */
     public boolean resetUserLevel(String guildId, String userId) {
         String query = "UPDATE user_levels SET xp = 0, level = 0, total_xp = 0, messages_count = 0, " +

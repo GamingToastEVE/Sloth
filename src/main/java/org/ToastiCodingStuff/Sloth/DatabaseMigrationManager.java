@@ -126,6 +126,11 @@ public class DatabaseMigrationManager {
         schemas.put("warnings", createWarningsSchema());
         schemas.put("moderation_actions", createModerationActionsSchema());
         schemas.put("tickets", createTicketsSchema());
+        schemas.put("ticket_panels", createTicketPanelsSchema());
+        schemas.put("ticket_categories", createTicketCategoriesSchema());
+        schemas.put("ticket_forms", createTicketFormsSchema());
+        schemas.put("ticket_form_fields", createTicketFormFieldsSchema());
+        schemas.put("ticket_form_responses", createTicketFormResponsesSchema());
         schemas.put("ticket_messages", createTicketMessagesSchema());
         schemas.put("guild_settings", createGuildSettingsSchema());
         schemas.put("statistics", createStatisticsSchema());
@@ -142,6 +147,9 @@ public class DatabaseMigrationManager {
         schemas.put("reminders", createRemindersSchema());
         schemas.put("level_settings", createLevelSettingsSchema());
         schemas.put("user_levels", createUserLevelsSchema());
+        schemas.put("role_select", createRoleSelectSchema());
+        schemas.put("role_select_groups", createRoleSelectGroupsSchema());
+        schemas.put("role_select_embeds", createRoleSelectEmbedsSchema());
 
         return schemas;
     }
@@ -228,6 +236,7 @@ public class DatabaseMigrationManager {
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("channel_id", "INTEGER UNIQUE")
+            .addColumn("panel_id", "INTEGER")
             .addColumn("category", "TEXT DEFAULT 'general'")
             .addColumn("subject", "TEXT")
             .addColumn("status", "TEXT DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'IN_PROGRESS', 'WAITING', 'CLOSED'))")
@@ -240,6 +249,98 @@ public class DatabaseMigrationManager {
             .addColumn("closed_at", "TEXT");
     }
     
+    /**
+     * Define the ticket_panels table schema for multiple ticket systems per guild
+     */
+    private TableSchema createTicketPanelsSchema() {
+        return new TableSchema("ticket_panels")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("title", "VARCHAR(256) DEFAULT '🎫 Create a Ticket'")
+            .addColumn("description", "TEXT DEFAULT 'Click the button below to create a support ticket.'")
+            .addColumn("button_label", "VARCHAR(80) DEFAULT '📩 Create Ticket'")
+            .addColumn("button_emoji", "VARCHAR(50)")
+            .addColumn("button_color", "VARCHAR(20) DEFAULT 'PRIMARY'")
+            .addColumn("category_id", "VARCHAR(32)")
+            .addColumn("channel_id", "VARCHAR(32)")
+            .addColumn("support_role_id", "VARCHAR(32)")
+            .addColumn("ping_role_id", "VARCHAR(32)")
+            .addColumn("welcome_message", "TEXT DEFAULT 'Welcome to your support ticket! A staff member will assist you shortly.'")
+            .addColumn("embed_color", "VARCHAR(10) DEFAULT '#5865F2'")
+            .addColumn("embed_footer", "VARCHAR(256)")
+            .addColumn("embed_thumbnail", "TEXT")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("max_tickets_per_user", "INTEGER DEFAULT 1")
+            .addColumn("require_subject", "INTEGER DEFAULT 1")
+            .addColumn("require_description", "INTEGER DEFAULT 1")
+            .addColumn("panel_message_id", "VARCHAR(32)")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_categories table schema for multiple buttons/categories per panel
+     */
+    private TableSchema createTicketCategoriesSchema() {
+        return new TableSchema("ticket_categories")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("panel_id", "INTEGER NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("description", "VARCHAR(256)")
+            .addColumn("button_label", "VARCHAR(80) NOT NULL")
+            .addColumn("button_emoji", "VARCHAR(50)")
+            .addColumn("button_color", "VARCHAR(20) DEFAULT 'PRIMARY'")
+            .addColumn("category_id", "VARCHAR(32)")
+            .addColumn("welcome_message", "TEXT")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_forms table schema for multiple forms per category
+     */
+    private TableSchema createTicketFormsSchema() {
+        return new TableSchema("ticket_forms")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("category_id", "INTEGER NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("description", "VARCHAR(256)")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_form_fields table schema for custom forms per category
+     */
+    private TableSchema createTicketFormFieldsSchema() {
+        return new TableSchema("ticket_form_fields")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("category_id", "INTEGER")
+            .addColumn("form_id", "INTEGER")
+            .addColumn("label", "VARCHAR(45) NOT NULL")
+            .addColumn("placeholder", "VARCHAR(100)")
+            .addColumn("field_type", "VARCHAR(20) DEFAULT 'SHORT'")
+            .addColumn("min_length", "INTEGER DEFAULT 0")
+            .addColumn("max_length", "INTEGER DEFAULT 1000")
+            .addColumn("required", "INTEGER DEFAULT 1")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_form_responses table schema for storing form answers per ticket
+     */
+    private TableSchema createTicketFormResponsesSchema() {
+        return new TableSchema("ticket_form_responses")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("ticket_id", "INTEGER NOT NULL")
+            .addColumn("field_id", "INTEGER NOT NULL")
+            .addColumn("field_label", "VARCHAR(45) NOT NULL")
+            .addColumn("response", "TEXT")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
     /**
      * Define the ticket_messages table schema
      */
@@ -512,6 +613,61 @@ public class DatabaseMigrationManager {
                 .addIndex("CREATE UNIQUE INDEX idx_user_levels_guild_user ON user_levels(guild_id, user_id)")
                 .addIndex("CREATE INDEX idx_user_levels_guild_level ON user_levels(guild_id, level DESC)")
                 .addIndex("CREATE INDEX idx_user_levels_guild_xp ON user_levels(guild_id, total_xp DESC)");
+    }
+
+    /**
+     * Define the role_select table schema for role selection entries
+     */
+    private TableSchema createRoleSelectSchema() {
+        return new TableSchema("role_select")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("group_id", "INT DEFAULT NULL")
+                .addColumn("position", "INT DEFAULT 0")
+                .addColumn("label", "VARCHAR(64)")
+                .addColumn("description", "VARCHAR(255)")
+                .addColumn("emoji_id", "VARCHAR(64)")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_guild ON role_select(guild_id)")
+                .addIndex("CREATE INDEX idx_role_select_group ON role_select(guild_id, group_id)");
+    }
+
+    /**
+     * Define the role_select_groups table schema for grouping roles
+     */
+    private TableSchema createRoleSelectGroupsSchema() {
+        return new TableSchema("role_select_groups")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(64) NOT NULL")
+                .addColumn("position", "INT DEFAULT 0")
+                .addColumn("title", "VARCHAR(255)")
+                .addColumn("description", "TEXT")
+                .addColumn("footer", "TEXT")
+                .addColumn("color", "VARCHAR(32) DEFAULT '#3498db'")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_groups_guild ON role_select_groups(guild_id)");
+    }
+
+    /**
+     * Define the role_select_embeds table schema for sent role selection messages
+     */
+    private TableSchema createRoleSelectEmbedsSchema() {
+        return new TableSchema("role_select_embeds")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("channel_id", "VARCHAR(32) NOT NULL")
+                .addColumn("message_id", "VARCHAR(32) NOT NULL")
+                .addColumn("group_id", "INT DEFAULT NULL")
+                .addColumn("display_type", "VARCHAR(32) NOT NULL DEFAULT 'BUTTON'")
+                .addColumn("title", "VARCHAR(255) NOT NULL")
+                .addColumn("description", "TEXT NOT NULL")
+                .addColumn("footer", "TEXT")
+                .addColumn("color", "VARCHAR(32) DEFAULT 'blue'")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_embeds_guild ON role_select_embeds(guild_id)")
+                .addIndex("CREATE INDEX idx_role_select_embeds_message ON role_select_embeds(message_id)");
     }
 
     public void detectAndApplyMissingTables() throws SQLException {

@@ -8,8 +8,12 @@ import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.interactions.IntegrationType;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.util.*;
@@ -36,6 +40,8 @@ public class Sloth {
         api.addEventListener(new LogChannelSlashCommandListener(handler));
         api.addEventListener(new WarnCommandListener(handler));
         api.addEventListener(new TicketCommandListener(handler));
+        api.addEventListener(new TicketPanelCommandListener(handler));
+        api.addEventListener(new TicketCreationListener(handler));
         api.addEventListener(new StatisticsCommandListener(handler));
         api.addEventListener(new ModerationCommandListener(handler));
         api.addEventListener(new JustVerifyButtonCommandListener(handler));
@@ -51,7 +57,6 @@ public class Sloth {
         api.addEventListener(new ReminderCommandListener(handler));
         api.addEventListener(new LevelingSystemCommandListener(handler));
         api.addEventListener(new LanguageCommandListener(languageManager));
-        api.addEventListener(new BotListener());
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));
@@ -141,8 +146,9 @@ public class Sloth {
 
                 for (DatabaseHandler.ReminderData rem : dueReminders) {
                     EmbedBuilder embed = new EmbedBuilder();
-                    embed.setTitle("⏰ Reminder");
+                    embed.setTitle("⏰ Reminder " + rem.title);
                     embed.setColor(0x3498db);
+                    embed.setDescription(rem.message != null && !rem.message.isBlank() ? rem.message : "You set a reminder!");
                     embed.setFooter("This is a reminder you set earlier.");
 
                     if (rem.dm) {
@@ -191,6 +197,15 @@ public class Sloth {
 
         // Get all commands and register them globally
         List<SlashCommandData> allCommands = new java.util.ArrayList<>(commandProvider.getCoreCommands());
+
+        allCommands.add(Commands.slash("reminder", "Manage your reminders")
+                        .addSubcommands(
+                                new SubcommandData("set", "Create a new reminder")
+                                        .addOption(OptionType.STRING, "time", "Time until i remind you (10m, 1h, 2d)", true)
+                                        .addOption(OptionType.STRING, "title", "Title of the reminder", true)
+                                        .addOption(OptionType.STRING, "message", "What should I remind you of?", false)
+                                        .addOption(OptionType.BOOLEAN, "dm", "DM? Standard: YES", false),
+                                new SubcommandData("list", "Shows all active reminders")).setContexts(InteractionContextType.BOT_DM));
 
         Guild testServer = api.getGuildById("1169699077986988112");
 

@@ -176,12 +176,21 @@ public class ReminderCommandListener extends ListenerAdapter {
         long secondsToAdd = 0;
 
         // check if timeStr is date or duration
-        String regex = "^(\\d+[dmhDMH]|\\d{4}-\\d{2}-\\d{2}|\\d{2}\\.\\d{2}\\.\\d{4})$";
-        if (timeStr.matches(regex)) {
-            secondsToAdd = parseDuration(timeStr);
-            if (secondsToAdd <= 0) {
+        String regex = "(?i)^((\\d+\\s*[dhms]\\s*)+|\\d{4}-\\d{2}-\\d{2}|\\d{2}\\.\\d{2}\\.\\d{4})$";
+
+        if (timeStr.trim().matches(regex)) {
+            // Unterscheidung: Ist es ein Datum oder eine Dauer?
+            if (timeStr.contains("-") || timeStr.contains(".")) {
+                // Es ist ein Datum (z.B. 2024-01-01)
+                // Hier musst du berechnen: Datum - Jetzt = Sekunden
                 secondsToAdd = parseDate(timeStr);
+            } else {
+                // Es ist eine Dauer (z.B. 1h30m)
+                secondsToAdd = parseDuration(timeStr);
             }
+        } else {
+            // Fehlerbehandlung: Format nicht erkannt
+            System.out.println("Ungültiges Format: " + timeStr);
         }
 
         if (secondsToAdd <= 0) {
@@ -210,14 +219,23 @@ public class ReminderCommandListener extends ListenerAdapter {
         List<DatabaseHandler.ReminderData> reminders = handler.getUserReminders(oderId);
         String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
 
-        if (reminders.isEmpty()) {
-            event.reply(t(guildId, "reminders.no_reminders")).setEphemeral(true).queue();
-            return;
-        }
-
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle(t(guildId, "reminders.list_title"));
-        embed.setColor(Color.CYAN);
+
+        if (guildId == null) {
+            if (reminders.isEmpty()) {
+                event.reply("Reminders are empty").setEphemeral(true).queue();
+                return;
+            }
+            embed.setTitle("⏰ Your active reminders");
+            embed.setColor(Color.CYAN);
+        } else {
+            if (reminders.isEmpty()) {
+                event.reply(t(guildId, "reminders.no_reminders")).setEphemeral(true).queue();
+                return;
+            }
+            embed.setTitle(t(guildId, "reminders.list_title"));
+            embed.setColor(Color.CYAN);
+        }
 
         StringBuilder desc = new StringBuilder();
         for (DatabaseHandler.ReminderData rem : reminders) {
@@ -300,8 +318,14 @@ public class ReminderCommandListener extends ListenerAdapter {
     }
 
     // Simple Regex Parser für "10m", "1h" etc.
+    // update to support multiple units like "1h30m"
     private long parseDuration(String input) {
-        Pattern p = Pattern.compile("(\\d+)([smhd])");
+        if (input == null || input.trim().isEmpty()) {
+            return 0;
+        }
+
+        // Update: Added \\s* to allow spaces between digits and unit (e.g., "1 h")
+        Pattern p = Pattern.compile("(\\d+)\\s*([smhd])");
         Matcher m = p.matcher(input.toLowerCase());
 
         long totalSeconds = 0;
@@ -309,8 +333,10 @@ public class ReminderCommandListener extends ListenerAdapter {
 
         while (m.find()) {
             found = true;
-            int amount = Integer.parseInt(m.group(1));
+            // Update: Use parseLong to prevent overflow on large inputs
+            long amount = Long.parseLong(m.group(1));
             String unit = m.group(2);
+
             switch (unit) {
                 case "s": totalSeconds += amount; break;
                 case "m": totalSeconds += amount * 60L; break;
@@ -318,6 +344,7 @@ public class ReminderCommandListener extends ListenerAdapter {
                 case "d": totalSeconds += amount * 86400L; break;
             }
         }
+        System.out.println("Parsed duration: " + totalSeconds + " seconds from input: " + input);
         return found ? totalSeconds : 0;
     }
 

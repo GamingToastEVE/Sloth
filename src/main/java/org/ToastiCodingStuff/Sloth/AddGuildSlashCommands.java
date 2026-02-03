@@ -59,10 +59,11 @@ public class AddGuildSlashCommands {
             case "warn" -> "Warning system commands";
             case "warn_user" -> "Warn a user";
             case "warn_list" -> "List warnings for a user";
-            case "ticket" -> "Ticket system commands";
-            case "ticket_setup" -> "Setup the ticket system";
-            case "ticket_panel" -> "Send a ticket panel";
+            case "ticket" -> "Ticket management commands";
             case "ticket_close" -> "Close a ticket";
+            case "ticket_assign" -> "Assign a ticket to a staff member";
+            case "ticket_priority" -> "Change ticket priority";
+            case "ticket_info" -> "View ticket information";
             case "stats" -> "View server statistics";
             case "reminder" -> "Set and manage reminders";
             case "reminder_set" -> "Set a new reminder";
@@ -115,19 +116,11 @@ public class AddGuildSlashCommands {
     }
 
     /**
-     * Get select roles command with subcommands
+     * Get select roles command - opens the interactive UI
      */
     private SlashCommandData getSelectRolesCommand() {
         return Commands.slash("select-roles", cmd("select_roles"))
-                .addSubcommands(
-                        new SubcommandData("send", "Send a select roles message in the current channel"),
-                        new SubcommandData("add", "Add a role to the select roles message")
-                                .addOption(OptionType.ROLE, "role", "Role to add to the select roles message", true)
-                                .addOption(OptionType.STRING, "description", "Description for the role in the select menu", false)
-                                .addOption(OptionType.STRING, "emoji", "Emoji for the role in the select menu", false),
-                        new SubcommandData("remove", "Remove a role from the select roles message")
-                                .addOption(OptionType.ROLE, "role", "Role to remove from the select roles message", true)
-                ).setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
     /**
@@ -257,19 +250,11 @@ public class AddGuildSlashCommands {
     }
 
     /**
-     * Get ticket command with subcommands
+     * Get ticket command with subcommands (management commands for existing tickets)
      */
     private SlashCommandData getTicketCommand() {
         return Commands.slash("ticket", cmd("ticket"))
                 .addSubcommands(
-                        new SubcommandData("setup", "Configure the ticket system for this server")
-                                .addOption(OptionType.CHANNEL, "category", "Category for ticket channels", true)
-                                .addOption(OptionType.CHANNEL, "channel", "Channel for ticket creation panel", true)
-                                .addOption(OptionType.ROLE, "support-role", "Role that can manage tickets", false),
-                        new SubcommandData("panel", "Create a ticket creation panel in current channel"),
-                        new SubcommandData("config", "Set custom title and description for the ticket panel")
-                                .addOption(OptionType.STRING, "title", "Title for the ticket panel embed", true)
-                                .addOption(OptionType.STRING, "description", "Description for the ticket panel embed", true),
                         new SubcommandData("close", "Close the current ticket")
                                 .addOption(OptionType.STRING, "reason", "Reason for closing the ticket", false),
                         new SubcommandData("assign", "Assign current ticket to a staff member")
@@ -368,7 +353,7 @@ public class AddGuildSlashCommands {
         switch (systemName.toLowerCase()) {
             case "log-channel": cmds.add(getLogChannelCommand()); break;
             case "warn": cmds.add(getWarnCommand()); break;
-            case "ticket": cmds.add(getTicketCommand()); break;
+            case "ticket": cmds.add(getTicketCommand()); cmds.add(getTicketPanelsCommand()); break;
             case "mod": cmds.add(getModerationCommand()); break;
             case "stats": cmds.add(getStatisticsCommand()); break;
             case "verify-button": cmds.add(getVerifyButtonCommand()); break;
@@ -417,6 +402,14 @@ public class AddGuildSlashCommands {
                 success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
                 error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
         );
+    }
+
+    /**
+     * Get ticket panels command for managing multiple ticket systems
+     */
+    private SlashCommandData getTicketPanelsCommand() {
+        return Commands.slash("ticket-panels", "Manage multiple ticket systems for your server")
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
     /**

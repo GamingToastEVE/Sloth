@@ -2,21 +2,15 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.components.ModalTopLevelComponent;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
-import net.dv8tion.jda.api.components.label.Label;
-import net.dv8tion.jda.api.components.textinput.TextInput;
-import net.dv8tion.jda.api.components.textinput.TextInputStyle;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.modals.Modal;
 
 import java.awt.*;
 import java.util.Comparator;
@@ -29,28 +23,6 @@ public class TicketCommandListener extends ListenerAdapter {
 
     public TicketCommandListener(DatabaseHandler handler) {
         this.handler = handler;
-    }
-
-    // ==================== LANGUAGE HELPER METHODS ====================
-
-    private String t(String guildId, String key) {
-        LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null) {
-            return lang.get(guildId, key);
-        }
-        return key;
-    }
-
-    private String t(String guildId, String key, Object... args) {
-        LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null) {
-            return lang.get(guildId, key, args);
-        }
-        try {
-            return String.format(key, args);
-        } catch (Exception e) {
-            return key;
-        }
     }
 
     @Override
@@ -67,21 +39,6 @@ public class TicketCommandListener extends ListenerAdapter {
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
 
         switch (subcommand) {
-            case "setup":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("ticket-setup");
-                handleTicketSetup(event, guildId);
-                break;
-            case "panel":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("ticket-panel");
-                handleTicketPanel(event, guildId);
-                break;
-            case "config":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
-                handler.insertOrUpdateGlobalStatistic("ticket-config");
-                handleSetTicketConfig(event, guildId);
-                break;
             case "close":
                 if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-close");
@@ -108,249 +65,13 @@ public class TicketCommandListener extends ListenerAdapter {
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
         
-        if (customId.equals("create_ticket")) {
-            handleCreateTicketButton(event);
-        } else if (customId.equals("close_ticket_confirm")) {
+        if (customId.equals("close_ticket_confirm")) {
             handleCloseTicketConfirm(event);
         } else if (customId.equals("delete_channel")) {
             handleDeleteChannel(event);
         }
     }
 
-    @Override
-    public void onModalInteraction(ModalInteractionEvent event) {
-        String modalId = event.getModalId();
-        
-        if (modalId.equals("ticket_creation_modal")) {
-            handleTicketCreationModal(event);
-        }
-    }
-
-    private void handleTicketSetup(SlashCommandInteractionEvent event, String guildId) {
-        // Check if user has admin permissions
-        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Administrator permissions to set up the ticket system.").setEphemeral(true).queue();
-            return;
-        }
-
-        Category category = event.getOption("category").getAsChannel().asCategory();
-        TextChannel channel = event.getOption("channel").getAsChannel().asTextChannel();
-        Role supportRole = null;
-        if (event.getOption("support-role") != null) {
-            supportRole = event.getOption("support-role").getAsRole();
-        }
-        //boolean transcriptEnabled = event.getOption("transcript_enabled") == null || Objects.requireNonNull(event.getOption("transcript_enabled")).getAsBoolean();
-        boolean transcriptEnabled = false; // Default to false for now
-
-        String supportRoleId = supportRole != null ? supportRole.getId() : null;
-        
-        boolean success = handler.setTicketSettings(guildId, category.getId(), channel.getId(), supportRoleId, transcriptEnabled);
-        
-        if (success) {
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("✅ Ticket System Configured")
-                    .setDescription("The ticket system has been successfully configured!")
-                    .addField("Ticket Category", category.getAsMention(), true)
-                    .addField("Ticket Panel Channel", channel.getAsMention(), true)
-                    .addField("Support Role", supportRole != null ? supportRole.getAsMention() : "None", true)
-                    //.addField("Transcripts Enabled", transcriptEnabled ? "Yes" : "No", true)
-                    .setColor(Color.GREEN);
-            
-            event.replyEmbeds(embed.build()).queue();
-        } else {
-            event.reply("❌ Failed to configure ticket system. Please try again.").setEphemeral(true).queue();
-        }
-    }
-
-    private void handleSetTicketConfig(SlashCommandInteractionEvent event, String guildId) {
-        // Check if user has manage server permissions
-        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need Manage Server permissions to configure ticket settings.").setEphemeral(true).queue();
-            return;
-        }
-
-        String title = Objects.requireNonNull(event.getOption("title")).getAsString();
-        String description = Objects.requireNonNull(event.getOption("description")).getAsString();
-
-        boolean success = handler.setTicketConfig(guildId, title, description);
-        
-        if (success) {
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("✅ Ticket Configuration Updated")
-                    .setDescription("The ticket panel title and description have been successfully updated!")
-                    .addField("New Title", title, false)
-                    .addField("New Description", description, false)
-                    .setColor(Color.GREEN)
-                    .setFooter("Use /ticket-panel to create a new panel with these settings");
-            
-            event.replyEmbeds(embed.build()).setEphemeral(true).queue();
-        } else {
-            event.reply("❌ Failed to update ticket configuration. Please try again.").setEphemeral(true).queue();
-        }
-    }
-
-    private void handleTicketPanel(SlashCommandInteractionEvent event, String guildId) {
-        // Check if user has manage channels permission
-        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            event.reply("❌ You need Manage Channels permission to create a ticket panel.").setEphemeral(true).queue();
-            return;
-        }
-
-        if (!handler.isTicketSystem(guildId)) {
-            event.reply("❌ Ticket system is not configured for this server. Use `/ticket-setup` first.").setEphemeral(true).queue();
-            return;
-        }
-
-        // Get customizable title and description from database
-        String title = handler.getTicketTitle(guildId);
-        String description = handler.getTicketDescription(guildId);
-        description = handler.processLinebreaks(description);
-
-        EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(title)
-                .setDescription(description)
-                .setColor(Color.BLUE)
-                .setFooter("Ticket System • Click the button to get started");
-
-        Button createTicketButton = Button.primary("create_ticket", t(guildId, "tickets.create_button"));
-
-        event.getChannel().sendMessageEmbeds(embed.build())
-                .setComponents(ActionRow.of(createTicketButton))
-                .queue(message -> {
-                    event.reply(t(guildId, "general.success")).setEphemeral(true).queue();
-                    // Sort channels to ensure ticket panel channel stays on top
-                    sortTicketChannelsByPriority(event.getGuild(), guildId);
-                });
-    }
-
-    private void handleCreateTicketButton(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getCustomId(), "create_ticket")) {
-            return;
-        }
-
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
-        
-        if (!handler.isTicketSystem(guildId)) {
-            event.reply("❌ Ticket system is not configured for this server.").setEphemeral(true).queue();
-            return;
-        }
-
-        TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
-                .setPlaceholder("Brief description of your issue...")
-                .setRequiredRange(5, 100)
-                .build();
-
-        TextInput descriptionInput = TextInput.create("description", TextInputStyle.PARAGRAPH)
-                .setPlaceholder("Please provide as much detail as possible...")
-                .setRequiredRange(10, 1000)
-                .build();
-
-        /*TextInput priorityInput = TextInput.create("priority", "Priority Level", TextInputStyle.SHORT)
-                .setPlaceholder("LOW, MEDIUM, HIGH, or URGENT")
-                .setValue("MEDIUM")
-                .setRequiredRange(3, 6)
-                .build();
-        */
-        Modal modal = Modal.create("ticket_creation_modal", "Create New Ticket")
-                .addComponents(Label.of("Subject", subjectInput), Label.of("Detailed Description", descriptionInput))
-                //.addActionRow(priorityInput)
-                .build();
-
-        event.replyModal(modal).queue();
-    }
-
-    private void handleTicketCreationModal(ModalInteractionEvent event) {
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
-        String userId = event.getUser().getId();
-        String subject = Objects.requireNonNull(event.getValue("subject")).getAsString();
-        String description = Objects.requireNonNull(event.getValue("description")).getAsString();
-        String priorityInput = "MEDIUM";     //event.getValue("priority").getAsString().toUpperCase();
-
-        // Validate priority
-        final String priority = priorityInput.matches("LOW|MEDIUM|HIGH|URGENT") ? priorityInput : "MEDIUM";
-
-        String categoryId = handler.getTicketCategory(guildId);
-        if (categoryId == null) {
-            event.reply("❌ Ticket system is not properly configured.").setEphemeral(true).queue();
-            return;
-        }
-
-        Category ticketCategory = event.getGuild().getCategoryById(categoryId);
-        if (ticketCategory == null) {
-            event.reply("❌ Ticket category not found.").setEphemeral(true).queue();
-            return;
-        }
-
-        // Create ticket channel
-        String channelName = "ticket-" + event.getUser().getName().toLowerCase().replaceAll("[^a-z0-9]", "");
-        
-        ticketCategory.createTextChannel(channelName)
-                .addPermissionOverride(event.getGuild().getPublicRole(), null, EnumSet.of(Permission.VIEW_CHANNEL))
-                .addPermissionOverride(Objects.requireNonNull(event.getMember()), EnumSet.of(Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_HISTORY), null)
-                .addPermissionOverride(Objects.requireNonNull(event.getGuild().getMemberById("1179144350119239831")), EnumSet.of(Permission.VIEW_CHANNEL, Permission.MESSAGE_HISTORY, Permission.MESSAGE_MANAGE, Permission.MANAGE_CHANNEL), null)
-                .queue(channel -> {
-                    // Add support role permissions if configured
-                    String supportRoleId = handler.getTicketRole(guildId);
-                    if (supportRoleId != null) {
-                        Role supportRole = event.getGuild().getRoleById(supportRoleId);
-                        if (supportRole != null) {
-                            channel.getManager().putPermissionOverride(supportRole, 
-                                    EnumSet.of(Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_HISTORY, Permission.MANAGE_CHANNEL), 
-                                    null).queue();
-                        }
-                    }
-
-                    // Create ticket in database
-                    int ticketId = handler.createTicket(guildId, userId, channel.getId(), "general", subject, priority, 
-                            event.getUser().getEffectiveName(), event.getUser().getDiscriminator(), event.getUser().getAvatarUrl());
-                    
-                    if (ticketId > 0) {
-                        // Update channel name to include ticket ID
-                        String newChannelName = "ticket-" + ticketId + "-" + event.getUser().getName().toLowerCase().replaceAll("[^a-z0-9]", "");
-                        channel.getManager().setName(newChannelName).queue();
-                        
-                        // Update statistics for tickets created
-                        handler.incrementTicketsCreated(guildId);
-                        
-                        // Update user statistics for ticket creation
-                        handler.incrementUserTicketsCreated(guildId, userId);
-                        
-                        // Send audit log entry for ticket creation
-                        handler.sendAuditLogEntry(event.getGuild(), "TICKET_CREATED", 
-                                "Ticket #" + ticketId + " - " + subject, 
-                                event.getMember(), null, "Priority: " + priority);
-                        
-                        // Send welcome message in ticket channel
-                        EmbedBuilder welcomeEmbed = new EmbedBuilder()
-                                .setTitle("🎫 Ticket #" + ticketId + " - " + subject)
-                                .setDescription("**Description:**\n" + handler.processLinebreaks(description))
-                                .addField("👤 Created by", event.getUser().getAsMention(), true)
-                                //.addField("📈 Priority", priority, true)
-                                .addField("📅 Created", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
-                                .setColor(getPriorityColor(priority))
-                                .setFooter("Ticket ID: " + ticketId);
-
-                        net.dv8tion.jda.api.components.buttons.Button closeButton = net.dv8tion.jda.api.components.buttons.Button.danger("close_ticket_confirm", t(guildId, "tickets.close_button"));
-
-                        String welcomeMsg = t(guildId, "tickets.create_button").contains("erstellen")
-                                ? "Willkommen bei deinem Support-Ticket!"
-                                : "Welcome to your support ticket!";
-                        channel.sendMessage(event.getUser().getAsMention() + " " + welcomeMsg)
-                                .addEmbeds(welcomeEmbed.build())
-                                .setComponents(ActionRow.of(closeButton))
-                                .queue();
-
-                        // Sort channels by priority after creating new ticket
-                        sortTicketChannelsByPriority(event.getGuild(), guildId);
-
-                        event.reply(t(guildId, "tickets.created", channel.getAsMention())).setEphemeral(true).queue();
-                    } else {
-                        channel.delete().queue();
-                        event.reply("❌ Failed to create ticket in database.").setEphemeral(true).queue();
-                    }
-                }, 
-                error -> event.reply("❌ Failed to create ticket channel.").setEphemeral(true).queue());
-    }
 
     private void handleCloseTicket(SlashCommandInteractionEvent event, String guildId) {
         TextChannel channel = event.getChannel().asTextChannel();
