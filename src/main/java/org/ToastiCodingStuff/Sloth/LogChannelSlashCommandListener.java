@@ -66,7 +66,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("log-channel-get");
                 if (handler.hasLogChannel(guildId)) {
                     Channel logChannel = event.getGuild().getTextChannelById(handler.getLogChannelID(guildId));
-                    event.getHook().sendMessage("Log Channel: " + logChannel.getAsMention()).queue();
+                    event.getHook().sendMessage(t(guildId, "general.channel") + ": " + logChannel.getAsMention()).queue();
                     return;
                 }
                 event.getHook().sendMessage(t(guildId, "general.not_found")).queue();

@@ -1182,6 +1182,17 @@ public class DatabaseHandler {
         }
     }
 
+    public void removeInactiveWarnings() {
+        String query = "UPDATE warnings SET active = 0 WHERE expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP AND (active = 1 OR active IS NULL)";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            int rowsDeleted = stmt.executeUpdate();
+            System.out.println("Removed " + rowsDeleted + " inactive warnings from the database.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     // 2. Methode zum Abrufen der aktiven Warns eines Users
     public List<WarningData> getUserActiveWarnings(String guildId, String userId) {
         List<WarningData> warnings = new ArrayList<>();

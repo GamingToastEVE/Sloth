@@ -577,7 +577,7 @@ public class DatabaseMigrationManager {
 
                 // 4. Benachrichtigungen
                 .addColumn("levelup_channel_id", "VARCHAR(32) DEFAULT 'current'") // '0', 'current' oder ID
-                .addColumn("levelup_messages", "TEXT DEFAULT 'Herzlichen Glückwunsch {mention}, du bist nun Level {level}!'") // JSON Array (Sollen auch Embeds unterstützen)
+                .addColumn("levelup_messages", "TEXT DEFAULT 'Congratulations {mention}, you are now level {level}!'") // JSON Array (Sollen auch Embeds unterstützen)
                 .addColumn("levelup_dm", "TINYINT(1) DEFAULT 0") // Default: keine DMs
 
                 // 5. Rollen

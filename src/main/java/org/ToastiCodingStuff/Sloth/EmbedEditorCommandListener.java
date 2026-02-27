@@ -71,14 +71,14 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
     }
 
     // Standard Editor-Buttons (ohne Verify Toggle)
-    private List<ActionRow> getEditorActionRows(EmbedBuilder builder, DataObject obj) {
+    private List<ActionRow> getEditorActionRows(EmbedBuilder builder, DataObject obj, String guildId) {
         List<ActionRow> rows = new ArrayList<>();
 
         if (obj != null) {
             if (obj.hasKey("fields")) {
                 DataArray fields = obj.getArray("fields");
                 StringSelectMenu.Builder fieldSelect = StringSelectMenu.create("embed_field_select")
-                        .setPlaceholder("Select a field to edit")
+                        .setPlaceholder(t(guildId, "embed_editor.field_select_placeholder"))
                         .setMinValues(1)
                         .setMaxValues(1);
                 for (int i = 0; i < fields.length(); i++) {
@@ -92,7 +92,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         if (!builder.getFields().isEmpty()) {
             StringSelectMenu.Builder fieldSelect = StringSelectMenu.create("embed_field_select")
-                    .setPlaceholder("Select a field to edit")
+                    .setPlaceholder(t(guildId, "embed_editor.field_select_placeholder"))
                     .setMinValues(1)
                     .setMaxValues(1);
             List<MessageEmbed.Field> fields = builder.getFields();
@@ -107,24 +107,24 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // Reihe 1: Texte
         rows.add(ActionRow.of(
-                Button.primary("embed_edit_title", "Title").withEmoji(Emoji.fromUnicode("📝")),
-                Button.primary("embed_edit_desc", "Text").withEmoji(Emoji.fromUnicode("📄")),
-                Button.secondary("embed_edit_footer", "Footer").withEmoji(Emoji.fromUnicode("🔻")),
-                Button.secondary("embed_edit_author", "Author").withEmoji(Emoji.fromUnicode("👤"))
+                Button.primary("embed_edit_title", t(guildId, "embed_editor.btn_title")).withEmoji(Emoji.fromUnicode("📝")),
+                Button.primary("embed_edit_desc", t(guildId, "embed_editor.btn_text")).withEmoji(Emoji.fromUnicode("📄")),
+                Button.secondary("embed_edit_footer", t(guildId, "embed_editor.btn_footer")).withEmoji(Emoji.fromUnicode("🔻")),
+                Button.secondary("embed_edit_author", t(guildId, "embed_editor.btn_author")).withEmoji(Emoji.fromUnicode("👤"))
         ));
 
         // Reihe 2: Design
         rows.add(ActionRow.of(
-                Button.secondary("embed_edit_color", "colour").withEmoji(Emoji.fromUnicode("🎨")),
-                Button.secondary("embed_edit_image", "images").withEmoji(Emoji.fromUnicode("🖼️")),
-                Button.primary("embed_add_field", "add field").withEmoji(Emoji.fromUnicode("➕")),
-                Button.danger("embed_clear_fields", "delete field").withEmoji(Emoji.fromUnicode("🗑️"))
+                Button.secondary("embed_edit_color", t(guildId, "embed_editor.btn_colour")).withEmoji(Emoji.fromUnicode("🎨")),
+                Button.secondary("embed_edit_image", t(guildId, "embed_editor.btn_images")).withEmoji(Emoji.fromUnicode("🖼️")),
+                Button.primary("embed_add_field", t(guildId, "embed_editor.btn_add_field")).withEmoji(Emoji.fromUnicode("➕")),
+                Button.danger("embed_clear_fields", t(guildId, "embed_editor.btn_delete_field")).withEmoji(Emoji.fromUnicode("🗑️"))
         ));
 
         // Reihe 3: Aktionen
         rows.add(ActionRow.of(
-                Button.success("embed_publish_start", "Send").withEmoji(Emoji.fromUnicode("✅")),
-                Button.primary("embed_save_db", "Save").withEmoji(Emoji.fromUnicode("💾"))
+                Button.success("embed_publish_start", t(guildId, "embed_editor.btn_send")).withEmoji(Emoji.fromUnicode("✅")),
+                Button.primary("embed_save_db", t(guildId, "embed_editor.btn_save")).withEmoji(Emoji.fromUnicode("💾"))
         ));
 
         System.out.println("Generated " + rows.size() + " action rows for embed editor.");
@@ -158,7 +158,8 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("embed")) return;
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ No permissions.").setEphemeral(true).queue();
+            String gid = event.getGuild().getId();
+            event.reply(t(gid, "embed_editor.no_permission")).setEphemeral(true).queue();
             return;
         }
         event.deferReply().setEphemeral(true).queue();
@@ -169,26 +170,26 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         switch (subcommand) {
             case "create":
                 EmbedBuilder eb = new EmbedBuilder();
-                eb.setDescription("This is a preview. Use the buttons to edit the embed.");
+                eb.setDescription(t(guildId, "embed_editor.preview_description"));
                 eb.setColor(Color.GRAY);
-                event.getHook().editOriginalEmbeds(eb.build()).setComponents(getEditorActionRows(eb, null)).queue();
+                event.getHook().editOriginalEmbeds(eb.build()).setComponents(getEditorActionRows(eb, null, guildId)).queue();
                 break;
 
             case "list":
                 List<String> names = handler.getCustomEmbedNames(guildId);
                 if (names.isEmpty()) {
-                    event.getHook().editOriginal("📂 No saved Embeds found.").queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.no_saved_embeds")).queue();
                 } else {
-                    event.getHook().editOriginal("📂 **Saved Embeds:**\n`" + String.join("`, `", names) + "`").queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.saved_embeds_list", String.join("`, `", names))).queue();
                 }
                 break;
 
             case "delete":
                 String delName = event.getOption("name").getAsString();
                 if (handler.deleteCustomEmbed(guildId, delName)) {
-                    event.getHook().editOriginal("🗑️ Embed `" + delName + "` got deleted.").queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.embed_deleted", delName)).queue();
                 } else {
-                    event.getHook().editOriginal("❌ Embed `" + delName + "` not found.").queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.embed_not_found", delName)).queue();
                 }
                 break;
 
@@ -196,7 +197,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 String loadName = event.getOption("name").getAsString();
                 String json = handler.getCustomEmbedData(guildId, loadName);
                 if (json == null) {
-                    event.getHook().editOriginal("❌ Embed `" + loadName + "` not found.").queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.embed_not_found", loadName)).queue();
                     return;
                 }
                 try {
@@ -204,10 +205,10 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                     EmbedBuilder loadedBuilder = jsonToEmbedBuilder(data);
 
                     event.getHook().editOriginalEmbeds(loadedBuilder.build())
-                            .setComponents(getEditorActionRows(null, data))
+                            .setComponents(getEditorActionRows(null, data, guildId))
                             .queue();
                 } catch (Exception e) {
-                    event.getHook().editOriginal("❌ Error loading Embed: " + e.getMessage()).queue();
+                    event.getHook().editOriginal(t(guildId, "embed_editor.error_loading", e.getMessage())).queue();
                 }
                 break;
         }
@@ -221,15 +222,17 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         MessageEmbed currentEmbed = event.getMessage().getEmbeds().isEmpty() ? null : event.getMessage().getEmbeds().get(0);
         EmbedBuilder builder = getBuilderFromMessage(currentEmbed);
 
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
+
         // --- Speichern Logik ---
         if (id.equals("embed_save_db")) {
             TextInput nameInput = TextInput.create("input_save_name", TextInputStyle.SHORT)
-                    .setPlaceholder("z.B. welcome_message")
+                    .setPlaceholder(t(guildId, "embed_editor.modal_save_placeholder"))
                     .setRequired(true)
                     .setMaxLength(100)
                     .build();
 
-            event.replyModal(Modal.create("modal_embed_save", "Save embed").addComponents(Label.of("Embed Name:", nameInput)).build()).queue();
+            event.replyModal(Modal.create("modal_embed_save", t(guildId, "embed_editor.modal_save_title")).addComponents(Label.of(t(guildId, "embed_editor.modal_save_label"), nameInput)).build()).queue();
             return;
         }
 
@@ -241,10 +244,10 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             List<Button> buttons = new ArrayList<>();
 
             if (hasVerifyConfig) {
-                buttons.add(Button.success("embed_publish_choose_true", "With Verify Button").withEmoji(Emoji.fromUnicode("🔘")));
+                buttons.add(Button.success("embed_publish_choose_true", t(guildId, "embed_editor.btn_with_verify")).withEmoji(Emoji.fromUnicode("🔘")));
             }
-            buttons.add(Button.primary("embed_publish_choose_false", hasVerifyConfig ? "Without Verify Button" : "Weiter (Kanal wählen)"));
-            buttons.add(Button.secondary("embed_publish_cancel", "Cancel"));
+            buttons.add(Button.primary("embed_publish_choose_false", hasVerifyConfig ? t(guildId, "embed_editor.btn_without_verify") : t(guildId, "embed_editor.btn_continue_channel")));
+            buttons.add(Button.secondary("embed_publish_cancel", t(guildId, "embed_editor.btn_cancel")));
 
             event.editComponents(ActionRow.of(buttons)).queue();
             return;
@@ -256,11 +259,11 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
             // Jetzt Kanal Auswahl anzeigen (Status in ID speichern)
             EntitySelectMenu channelSelect = EntitySelectMenu.create("embed_publish_finish_" + withVerify, EntitySelectMenu.SelectTarget.CHANNEL)
-                    .setPlaceholder("choose a channel to send the embed to")
+                    .setPlaceholder(t(guildId, "embed_editor.channel_select_placeholder"))
                     .setChannelTypes(net.dv8tion.jda.api.entities.channel.ChannelType.TEXT, net.dv8tion.jda.api.entities.channel.ChannelType.NEWS)
                     .setMinValues(1).setMaxValues(1).build();
 
-            Button cancelBtn = Button.secondary("embed_publish_cancel", "cancel");
+            Button cancelBtn = Button.secondary("embed_publish_cancel", t(guildId, "embed_editor.btn_cancel"));
 
             event.editComponents(ActionRow.of(channelSelect), ActionRow.of(cancelBtn)).queue();
             return;
@@ -268,7 +271,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         // --- Publish Abbrechen ---
         if (id.equals("embed_publish_cancel")) {
-            event.editComponents(getEditorActionRows(builder, null)).queue();
+            event.editComponents(getEditorActionRows(builder, null, guildId)).queue();
             return;
         }
 
@@ -279,31 +282,31 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                         .setValue(currentEmbed != null ? currentEmbed.getTitle() : "").setRequired(false).build();
                 TextInput urlInput = TextInput.create("input_url", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null ? currentEmbed.getUrl() : "").setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_title", "Title").addComponents(Label.of("Title: ", titleInput), Label.of("URL Input: ", urlInput)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_title", t(guildId, "embed_editor.modal_title")).addComponents(Label.of(t(guildId, "embed_editor.label_title"), titleInput), Label.of(t(guildId, "embed_editor.label_url"), urlInput)).build()).queue();
                 break;
 
             case "embed_edit_desc":
                 TextInput descInput = TextInput.create("input_desc", TextInputStyle.PARAGRAPH)
                         .setValue(currentEmbed != null ? currentEmbed.getDescription() : "").setMaxLength(4000).setRequired(true).build();
 
-                event.replyModal(Modal.create("modal_embed_desc", "Description").addComponents(Label.of("Description: ", descInput)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_desc", t(guildId, "embed_editor.modal_description")).addComponents(Label.of(t(guildId, "embed_editor.label_description"), descInput)).build()).queue();
                 break;
 
             case "embed_edit_footer":
                 TextInput footerInput = TextInput.create("input_footer", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getFooter() != null ? currentEmbed.getFooter().getText() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_footer", "Footer").addComponents(Label.of("Footer: ", footerInput)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_footer", t(guildId, "embed_editor.modal_footer")).addComponents(Label.of(t(guildId, "embed_editor.label_footer"), footerInput)).build()).queue();
                 break;
 
             case "embed_edit_author":
                 TextInput authorName = TextInput.create("input_author_name", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getAuthor() != null ? currentEmbed.getAuthor().getName() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_author", "Author").addComponents(Label.of("Author: ", authorName)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_author", t(guildId, "embed_editor.modal_author")).addComponents(Label.of(t(guildId, "embed_editor.label_author"), authorName)).build()).queue();
                 break;
 
             case "embed_edit_color":
                 TextInput colorInput = TextInput.create("input_color", TextInputStyle.SHORT).setRequired(true).build();
-                event.replyModal(Modal.create("modal_embed_color", "Colour").addComponents(Label.of("Colour: ", colorInput)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_color", t(guildId, "embed_editor.modal_colour")).addComponents(Label.of(t(guildId, "embed_editor.label_colour"), colorInput)).build()).queue();
                 break;
 
             case "embed_edit_image":
@@ -311,19 +314,19 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                         .setValue(currentEmbed != null && currentEmbed.getImage() != null ? currentEmbed.getImage().getUrl() : null).setRequired(false).build();
                 TextInput thumbInput = TextInput.create("input_thumb", TextInputStyle.SHORT)
                         .setValue(currentEmbed != null && currentEmbed.getThumbnail() != null ? currentEmbed.getThumbnail().getUrl() : null).setRequired(false).build();
-                event.replyModal(Modal.create("modal_embed_image", "Image").addComponents(Label.of("Image: ", imgInput), Label.of("Thumbnail: ", thumbInput)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_image", t(guildId, "embed_editor.modal_image")).addComponents(Label.of(t(guildId, "embed_editor.label_image"), imgInput), Label.of(t(guildId, "embed_editor.label_thumbnail"), thumbInput)).build()).queue();
                 break;
 
             case "embed_add_field":
                 TextInput fName = TextInput.create("input_field_name", TextInputStyle.SHORT).setRequired(true).build();
                 TextInput fValue = TextInput.create("input_field_value", TextInputStyle.PARAGRAPH).setRequired(true).build();
                 TextInput fInline = TextInput.create("input_field_inline", TextInputStyle.SHORT).setValue("no").setRequired(true).build();
-                event.replyModal(Modal.create("modal_embed_add_field", "field").addComponents(Label.of("Field Name: ", fName), Label.of("Field Content: ", fValue), Label.of("Inline True/False: ", fInline)).build()).queue();
+                event.replyModal(Modal.create("modal_embed_add_field", t(guildId, "embed_editor.modal_field")).addComponents(Label.of(t(guildId, "embed_editor.label_field_name"), fName), Label.of(t(guildId, "embed_editor.label_field_content"), fValue), Label.of(t(guildId, "embed_editor.label_field_inline"), fInline)).build()).queue();
                 break;
 
             case "embed_clear_fields":
                 if (builder.getFields().isEmpty()) {
-                    event.reply("❌ No fields to remove!").setEphemeral(true).queue();
+                    event.reply(t(guildId, "embed_editor.no_fields_to_remove")).setEphemeral(true).queue();
                     return;
                 }
                 builder.getFields().remove(builder.getFields().size() - 1);
@@ -341,12 +344,13 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             event.deferReply().setEphemeral(true).queue();
             String name = event.getValue("input_save_name").getAsString();
             MessageEmbed embed = event.getMessage().getEmbeds().get(0);
+            String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
 
             // Embed zu JSON
             DataObject json = embed.toData();
 
             handler.saveCustomEmbed(event.getGuild().getId(), name, json.toString());
-            event.getHook().sendMessage("💾 Embed successfully saved as `" + name + "`!").queue();
+            event.getHook().sendMessage(t(guildId, "embed_editor.save_success", name)).queue();
             return;
         }
 
@@ -354,6 +358,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         MessageEmbed currentEmbed = event.getMessage().getEmbeds().get(0);
         EmbedBuilder builder = getBuilderFromMessage(currentEmbed);
+        String guildId2 = event.getGuild() != null ? event.getGuild().getId() : null;
 
         if (id.startsWith("modal_embed_edit_field_")) {
             String indexStr = id.replace("modal_embed_edit_field_", "");
@@ -361,18 +366,18 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             try {
                 fieldIndex = Integer.parseInt(indexStr);
             } catch (NumberFormatException e) {
-                event.reply("❌ Invalid field index!").setEphemeral(true).queue();
+                event.reply(t(guildId2, "embed_editor.invalid_field_index")).setEphemeral(true).queue();
                 return;
             }
             if (fieldIndex < 0 || fieldIndex >= builder.getFields().size()) {
-                event.reply("❌ Field index out of bounds!").setEphemeral(true).queue();
+                event.reply(t(guildId2, "embed_editor.field_index_out_of_bounds")).setEphemeral(true).queue();
                 return;
             }
 
             if (event.getValue("input_field_name") == null && event.getValue("input_field_value") == null && event.getValue("input_field_inline") == null) {
                 builder.getFields().remove(fieldIndex);
                 event.editMessageEmbeds(builder.build()).queue();
-                event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
+                event.getHook().editOriginalComponents(getEditorActionRows(builder, null, guildId2)).queue();
                 return;
             }
             String fn = builder.getFields().get(fieldIndex).getName();
@@ -389,7 +394,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             }
             builder.getFields().set(fieldIndex, new MessageEmbed.Field(fn, fv, inline));
             event.editMessageEmbeds(builder.build()).queue();
-            event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
+            event.getHook().editOriginalComponents(getEditorActionRows(builder, null, guildId2)).queue();
             return;
         }
 
@@ -432,7 +437,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                 break;
         }
         event.editMessageEmbeds(builder.build()).queue();
-        event.getHook().editOriginalComponents(getEditorActionRows(builder, null)).queue();
+        event.getHook().editOriginalComponents(getEditorActionRows(builder, null, guildId2)).queue();
     }
 
     @Override
@@ -445,11 +450,11 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
             MessageEmbed embedToSend = event.getMessage().getEmbeds().get(0);
             EmbedBuilder builder = getBuilderFromMessage(embedToSend);
             MessageChannel targetChannel = Objects.requireNonNull(event.getGuild()).getTextChannelById(event.getMentions().getChannels().get(0).getId());
+            String guildId = event.getGuild().getId();
 
             // Button erstellen, falls ausgewählt
             Button verifyButton;
             if (withVerify) {
-                String guildId = event.getGuild().getId();
                 if (handler.isJustVerifyButton(guildId)) {
                     String r1 = handler.getJustVerifyButtonRoleToGiveID(guildId);
                     String r2 = handler.getJustVerifyButtonRoleToRemoveID(guildId);
@@ -458,7 +463,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
                     verifyButton = handler.createJustVerifyButton(r1, r2, label, emoji);
                 } else {
                     verifyButton = null;
-                    event.getHook().sendMessage("⚠️ Warning: No verify button found.").setEphemeral(true).queue();
+                    event.getHook().sendMessage(t(guildId, "embed_editor.no_verify_button_warning")).setEphemeral(true).queue();
                 }
             } else {
                 verifyButton = null;
@@ -472,12 +477,15 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
             action.queue(
                     s -> {
-                        event.getHook().sendMessage("✅ Sent in " + targetChannel.getAsMention() + (verifyButton != null ? " (with Verify Button)" : "")).queue();
-                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null)).queue();
+                        String msg = verifyButton != null ?
+                                t(guildId, "embed_editor.sent_success_with_verify", targetChannel.getAsMention()) :
+                                t(guildId, "embed_editor.sent_success", targetChannel.getAsMention());
+                        event.getHook().sendMessage(msg).queue();
+                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null, guildId)).queue();
                     },
                     e -> {
-                        event.getHook().sendMessage("❌ Error sending embed: " + e.getMessage()).setEphemeral(true).queue();
-                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null)).queue();
+                        event.getHook().sendMessage(t(guildId, "embed_editor.error_sending", e.getMessage())).setEphemeral(true).queue();
+                        event.getMessage().editMessageComponents(getEditorActionRows(builder, null, guildId)).queue();
                     }
             );
         }
@@ -490,28 +498,29 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
 
         MessageEmbed currentEmbed = event.getMessage().getEmbeds().isEmpty() ? null : event.getMessage().getEmbeds().get(0);
         EmbedBuilder builder = getBuilderFromMessage(currentEmbed);
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
 
         // Feld löschen
         int fieldIndex = Integer.parseInt(event.getValues().get(0));
         if (fieldIndex >= 0 && fieldIndex < builder.getFields().size()) {
-            Modal modal = Modal.create("modal_embed_edit_field_" + fieldIndex, "Edit Field or leave empty to delete")
+            Modal modal = Modal.create("modal_embed_edit_field_" + fieldIndex, t(guildId, "embed_editor.modal_edit_field_title"))
                     .addComponents(
-                            Label.of("Field Name:", TextInput.create("input_field_name", TextInputStyle.SHORT)
+                            Label.of(t(guildId, "embed_editor.label_field_name"), TextInput.create("input_field_name", TextInputStyle.SHORT)
                                     .setValue(builder.getFields().get(fieldIndex).getName())
                                     .setRequired(false)
                                     .build()),
-                            Label.of("Field Content:", TextInput.create("input_field_value", TextInputStyle.PARAGRAPH)
+                            Label.of(t(guildId, "embed_editor.label_field_content"), TextInput.create("input_field_value", TextInputStyle.PARAGRAPH)
                                     .setValue(builder.getFields().get(fieldIndex).getValue())
                                     .setRequired(false)
                                     .build()),
-                            Label.of("Inline True/False:", TextInput.create("input_field_inline", TextInputStyle.SHORT)
+                            Label.of(t(guildId, "embed_editor.label_field_inline"), TextInput.create("input_field_inline", TextInputStyle.SHORT)
                                     .setValue(builder.getFields().get(fieldIndex).isInline() ? "yes" : "no")
                                     .setRequired(false)
                                     .build())
                     ).build();
             event.replyModal(modal).queue();
         } else {
-            event.reply("❌ Invalid field selected!").setEphemeral(true).queue();
+            event.reply(t(guildId, "embed_editor.invalid_field_selected")).setEphemeral(true).queue();
         }
     }
 

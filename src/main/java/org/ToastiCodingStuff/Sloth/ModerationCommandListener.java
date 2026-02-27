@@ -227,7 +227,7 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "BAN", targetName, moderatorName, reason);
             },
             error -> {
-                event.getHook().sendMessage("❌ Failed to ban " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.getHook().sendMessage(t(guildId, "moderation.ban_failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
@@ -282,24 +282,24 @@ public class ModerationCommandListener extends ListenerAdapter {
                 event.getOption("reason").getAsString() : t(guildId, "moderation.no_reason");
 
         if (targetMember == null) {
-            event.reply("❌ User not found in this server.").setEphemeral(true).queue();
+            event.reply(t(guildId, "moderation.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Validate timeout duration (max 28 days = 40320 minutes)
         if (minutes < 1 || minutes > 40320) {
-            event.getHook().sendMessage("❌ Timeout duration must be between 1 and 40320 minutes (28 days).").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "moderation.timeout_invalid_duration")).setEphemeral(true).queue();
             return;
         }
 
         // Check if the target can be timed out
         if (!event.getGuild().getSelfMember().canInteract(targetMember)) {
-            event.getHook().sendMessage("❌ I cannot timeout this user due to role hierarchy.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "moderation.cannot_interact")).setEphemeral(true).queue();
             return;
         }
 
         if (!event.getMember().canInteract(targetMember)) {
-            event.getHook().sendMessage("❌ You cannot timeout this user due to role hierarchy.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "moderation.you_cannot_interact")).setEphemeral(true).queue();
             return;
         }
 
@@ -387,7 +387,7 @@ public class ModerationCommandListener extends ListenerAdapter {
                 sendToLogChannel(event, guildId, "UNTIMEOUT", targetName, moderatorName, reason);
             },
             error -> {
-                event.getHook().sendMessage("❌ Failed to remove timeout from " + targetName + ". Please try again.").setEphemeral(true).queue();
+                event.getHook().sendMessage(t(guildId, "moderation.untimeout_failed", targetName)).setEphemeral(true).queue();
             }
         );
     }
@@ -395,7 +395,7 @@ public class ModerationCommandListener extends ListenerAdapter {
     private void handlePurgeCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has manage messages permission
         if (!event.getMember().hasPermission(Permission.MESSAGE_MANAGE)) {
-            event.getHook().sendMessage("❌ You do not have permission to manage messages.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "moderation.no_message_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -403,7 +403,7 @@ public class ModerationCommandListener extends ListenerAdapter {
         Member targetUser = event.getOption("user") != null ? event.getOption("user").getAsMember() : null;
 
         if (amount < 1 || amount > 100) {
-            event.getHook().sendMessage("❌ Amount must be between 1 and 100 messages.").setEphemeral(true).queue();
+            event.getHook().sendMessage(t(guildId, "moderation.purge_invalid_amount")).setEphemeral(true).queue();
             return;
         }
 
@@ -428,7 +428,7 @@ public class ModerationCommandListener extends ListenerAdapter {
             }
 
             if (messagesToDelete.isEmpty()) {
-                event.getHook().sendMessage("❌ No messages found to delete.").queue();
+                event.getHook().sendMessage(t(guildId, "moderation.purge_no_messages")).queue();
                 return;
             }
 
@@ -533,8 +533,8 @@ public class ModerationCommandListener extends ListenerAdapter {
                     EmbedBuilder embed = new EmbedBuilder()
                             .setTitle(emoji + " " + actionType)
                             .setDescription(emoji + " " + targetName)
-                            .addField("Moderator", moderatorName, true)
-                            .addField("Reason", reason, true)
+                            .addField(t(guildId, "moderation.log_moderator"), moderatorName, true)
+                            .addField(t(guildId, "moderation.log_reason"), reason, true)
                             .setColor(embedColor)
                             .setTimestamp(java.time.Instant.now());
                     

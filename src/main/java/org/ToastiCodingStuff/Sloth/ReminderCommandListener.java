@@ -34,16 +34,27 @@ public class ReminderCommandListener extends ListenerAdapter {
 
     private String t(String guildId, String key) {
         LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null && guildId != null) {
-            return lang.get(guildId, key);
+        if (lang != null) {
+            if (guildId != null) {
+                return lang.get(guildId, key);
+            }
+            return lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
         }
         return key;
     }
 
     private String t(String guildId, String key, Object... args) {
         LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null && guildId != null) {
-            return lang.get(guildId, key, args);
+        if (lang != null) {
+            if (guildId != null) {
+                return lang.get(guildId, key, args);
+            }
+            String translation = lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
+            try {
+                return String.format(translation, args);
+            } catch (Exception e) {
+                return translation;
+            }
         }
         try {
             return String.format(key, args);
@@ -93,39 +104,40 @@ public class ReminderCommandListener extends ListenerAdapter {
 
         String selectedValue = event.getValues().get(0); // Die ID des Reminders
         int reminderId;
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
         try {
             reminderId = Integer.parseInt(selectedValue);
         } catch (NumberFormatException e) {
-            event.reply("❌ ID Error.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.id_error")).setEphemeral(true).queue();
             return;
         }
 
         DatabaseHandler.ReminderData reminder = handler.getReminder(reminderId);
 
         if (reminder == null) {
-            event.reply("❌ This reminder does not exist anymore.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.not_found")).setEphemeral(true).queue();
             return;
         }
 
         // Sicherheitscheck: Gehört der Reminder dem User?
         if (!reminder.userId.equals(event.getUser().getId())) {
-            event.reply("❌ This is not your reminder.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.not_yours")).setEphemeral(true).queue();
             return;
         }
 
         long unixSec = reminder.remindAt.getTime() / 1000;
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("🔔 Reminder Details");
+        embed.setTitle(t(guildId, "reminders.details_title"));
         embed.setColor(Color.ORANGE);
-        embed.addField("Title", reminder.title.isEmpty() ? "(No title)" : reminder.title, false);
-        embed.addField("Message", reminder.message, false);
-        embed.addField("In", "<t:" + unixSec + ":R> (" + "<t:" + unixSec + ":F>)", false);
-        embed.addField("Type", reminder.dm ? "Per DM" : "In Server-Channel", true);
+        embed.addField(t(guildId, "reminders.field_title"), reminder.title.isEmpty() ? t(guildId, "reminders.no_title") : reminder.title, false);
+        embed.addField(t(guildId, "reminders.field_message"), reminder.message, false);
+        embed.addField(t(guildId, "reminders.field_time"), "<t:" + unixSec + ":R> (" + "<t:" + unixSec + ":F>)", false);
+        embed.addField(t(guildId, "reminders.field_type"), reminder.dm ? t(guildId, "reminders.type_dm") : t(guildId, "reminders.type_channel"), true);
         embed.setFooter("ID: " + reminderId);
 
         // Delete Button hinzufügen
-        Button deleteBtn = Button.danger("reminder_delete:" + reminderId, "Delete").withEmoji(net.dv8tion.jda.api.entities.emoji.Emoji.fromUnicode("🗑️"));
+        Button deleteBtn = Button.danger("reminder_delete:" + reminderId, t(guildId, "reminders.btn_delete")).withEmoji(net.dv8tion.jda.api.entities.emoji.Emoji.fromUnicode("🗑️"));
 
         event.replyEmbeds(embed.build())
                 .setComponents(ActionRow.of(deleteBtn))
@@ -138,8 +150,9 @@ public class ReminderCommandListener extends ListenerAdapter {
         if (!event.getComponentId().startsWith("reminder_delete:")) return;
 
         String[] parts = event.getComponentId().split(":");
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
         if (parts.length != 2) {
-            event.reply("❌ ID Error.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.id_error")).setEphemeral(true).queue();
             return;
         }
 
@@ -147,7 +160,7 @@ public class ReminderCommandListener extends ListenerAdapter {
         try {
             reminderId = Integer.parseInt(parts[1]);
         } catch (NumberFormatException e) {
-            event.reply("❌ ID Error.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.id_error")).setEphemeral(true).queue();
             return;
         }
 
@@ -155,9 +168,9 @@ public class ReminderCommandListener extends ListenerAdapter {
         boolean success = handler.deleteReminder(reminderId, event.getUser().getId());
 
         if (success) {
-            event.reply("🗑️ Reminder with ID " + reminderId + " got deleted.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.deleted_success", reminderId)).setEphemeral(true).queue();
         } else {
-            event.reply("❌ Could not find reminder.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.delete_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -194,7 +207,7 @@ public class ReminderCommandListener extends ListenerAdapter {
         }
 
         if (secondsToAdd <= 0) {
-            event.reply("❌ Couldn't convert time, please use: `10m`, `1h`, `2d`.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.invalid_time")).setEphemeral(true).queue();
             return;
         }
 
@@ -223,10 +236,10 @@ public class ReminderCommandListener extends ListenerAdapter {
 
         if (guildId == null) {
             if (reminders.isEmpty()) {
-                event.reply("Reminders are empty").setEphemeral(true).queue();
+                event.reply(t(guildId, "reminders.empty")).setEphemeral(true).queue();
                 return;
             }
-            embed.setTitle("⏰ Your active reminders");
+            embed.setTitle(t(guildId, "reminders.active_title"));
             embed.setColor(Color.CYAN);
         } else {
             if (reminders.isEmpty()) {
@@ -249,12 +262,12 @@ public class ReminderCommandListener extends ListenerAdapter {
         embed.setDescription(desc.toString());
 
         StringSelectMenu.Builder selectMenu = StringSelectMenu.create("reminder_list_select")
-                .setPlaceholder("Select a reminder to view details")
+                .setPlaceholder(t(guildId, "reminders.select_placeholder"))
                 .setMinValues(1)
                 .setMaxValues(1);
 
         for (DatabaseHandler.ReminderData rem : reminders) {
-            String label = "ID " + rem.id + " | " + (rem.title.isEmpty() ? "(No title)" : rem.title);
+            String label = "ID " + rem.id + " | " + (rem.title.isEmpty() ? t(guildId, "reminders.no_title") : rem.title);
             if (label.length() > 100) {
                 label = label.substring(0, 50) + "...";
             }
@@ -266,11 +279,12 @@ public class ReminderCommandListener extends ListenerAdapter {
     private void handleRemoveReminder(SlashCommandInteractionEvent event, String userId) {
         int id = event.getOption("id").getAsInt();
         boolean success = handler.deleteReminder(id, userId);
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
 
         if (success) {
-            event.reply("🗑️ Reminder with ID " + id + " got deleted.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.deleted_success", id)).setEphemeral(true).queue();
         } else {
-            event.reply("❌ Could not find reminder.").setEphemeral(true).queue();
+            event.reply(t(guildId, "reminders.delete_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -279,11 +293,11 @@ public class ReminderCommandListener extends ListenerAdapter {
         List<DatabaseHandler.ReminderData> reminders = handler.getUserReminders(userId);
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⏰ Your active reminders");
+        embed.setTitle(t(null, "reminders.active_title"));
         embed.setColor(Color.CYAN);
 
         if (reminders.isEmpty()) {
-            embed.setDescription("You do not have any active reminders.");
+            embed.setDescription(t(null, "reminders.no_active_reminders"));
         } else {
             StringBuilder desc = new StringBuilder();
             for (DatabaseHandler.ReminderData rem : reminders) {
@@ -293,16 +307,16 @@ public class ReminderCommandListener extends ListenerAdapter {
                         .append("📝 `").append(rem.message).append("`\n\n");
             }
             embed.setDescription(desc.toString());
-            embed.setFooter("Delete Reminders by going into the details via the /reminder list command.");
+            embed.setFooter(t(null, "reminders.delete_footer"));
         }
 
         StringSelectMenu.Builder selectMenu = StringSelectMenu.create("reminder_list_select")
-                .setPlaceholder("Select a reminder to view details")
+                .setPlaceholder(t(null, "reminders.select_placeholder"))
                 .setMinValues(1)
                 .setMaxValues(1);
 
         for (DatabaseHandler.ReminderData rem : reminders) {
-            String label = "ID " + rem.id + " | " + (rem.title.isEmpty() ? "(No title)" : rem.title);
+            String label = "ID " + rem.id + " | " + (rem.title.isEmpty() ? t(null, "reminders.no_title") : rem.title);
             if (label.length() > 100) {
                 label = label.substring(0, 50) + "...";
             }

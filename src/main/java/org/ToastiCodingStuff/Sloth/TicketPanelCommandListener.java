@@ -1211,7 +1211,8 @@ public class TicketPanelCommandListener extends ListenerAdapter {
             List<Button> currentRowButtons = new ArrayList<>();
             for (DatabaseHandler.TicketCategoryData category : categories) {
                 Button catButton;
-                if (category.buttonEmoji != null && !category.buttonEmoji.isBlank()) {
+                System.out.println("Category Button Emoji: " + category.buttonEmoji);
+                if (!category.buttonEmoji.equals("No emoji selected") && isValidEmoji(category.buttonEmoji)) {
                     try {
                         catButton = Button.of(getButtonStyle(category.buttonColor), "ticket_cat_" + category.id,
                             category.buttonLabel, Emoji.fromFormatted(category.buttonEmoji));
@@ -1242,7 +1243,8 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         } else {
             // No categories - use single button
             Button ticketButton;
-            if (panel.buttonEmoji != null && !panel.buttonEmoji.isBlank()) {
+            System.out.println("Panel Button Emoji: " + panel.buttonEmoji);
+            if (!panel.buttonEmoji.equals("No emoji selected") && isValidEmoji(panel.buttonEmoji)) {
                 try {
                     ticketButton = Button.of(getButtonStyle(panel.buttonColor), "create_ticket_" + panelId,
                         panel.buttonLabel, Emoji.fromFormatted(panel.buttonEmoji));
@@ -1261,6 +1263,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
                 handler.updateTicketPanelMessageId(panelId, message.getId());
                 event.reply(t(guildId, "ticket_panels.sent", targetChannel.getAsMention())).setEphemeral(true).queue();
             }, error -> {
+                System.out.println("Error sending ticket panel message: " + error.getMessage());
                 event.reply(t(guildId, "general.error")).setEphemeral(true).queue();
             });
     }
@@ -2683,6 +2686,33 @@ public class TicketPanelCommandListener extends ListenerAdapter {
             case "SECONDARY", "GRAY", "GREY" -> ButtonStyle.SECONDARY;
             default -> ButtonStyle.PRIMARY;
         };
+    }
+
+    /**
+     * Validates if a string is a valid emoji format for Discord buttons.
+     * Accepts Unicode emojis and custom Discord emojis in format <:name:id> or <a:name:id>
+     */
+    private boolean isValidEmoji(String emoji) {
+        if (emoji == null || emoji.isBlank()) {
+            return false;
+        }
+
+        String trimmed = emoji.trim();
+
+        // Check for custom Discord emoji format: <:name:id> or <a:name:id>
+        if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+            // Must match pattern <:name:123456789> or <a:name:123456789>
+            return trimmed.matches("<a?:[a-zA-Z0-9_]+:\\d+>");
+        }
+
+        // For Unicode emojis, try to create the emoji object and validate
+        try {
+            Emoji testEmoji = Emoji.fromFormatted(trimmed);
+            // If we get here without exception and emoji is not null, it's valid
+            return testEmoji != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
 

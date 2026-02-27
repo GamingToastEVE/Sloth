@@ -27,7 +27,7 @@ public class LanguageCommandListener extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("language")) return;
         if (!event.isFromGuild()) {
-            event.reply("❌ This command can only be used in a server.").setEphemeral(true).queue();
+            event.reply(langManager.getTranslation(LanguageManager.DEFAULT_LANGUAGE, "language.server_only")).setEphemeral(true).queue();
             return;
         }
 
@@ -71,7 +71,7 @@ public class LanguageCommandListener extends ListenerAdapter {
 
     private void handleLanguageChange(ButtonInteractionEvent event, String guildId, String newLang) {
         if (!langManager.isValidLanguage(newLang)) {
-            event.reply("❌ Invalid language.").setEphemeral(true).queue();
+            event.reply(langManager.get(guildId, "language.invalid")).setEphemeral(true).queue();
             return;
         }
 
@@ -83,7 +83,7 @@ public class LanguageCommandListener extends ListenerAdapter {
             MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
             event.editMessage(editBuilder.useComponentsV2().build()).queue();
         } else {
-            event.reply("❌ Failed to change language.").setEphemeral(true).queue();
+            event.reply(langManager.get(guildId, "language.change_failed")).setEphemeral(true).queue();
         }
     }
 

@@ -25,6 +25,28 @@ public class TicketCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("ticket")) {
@@ -40,17 +62,17 @@ public class TicketCommandListener extends ListenerAdapter {
 
         switch (subcommand) {
             case "close":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-close");
                 handleCloseTicket(event, guildId);
                 break;
             case "assign":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-assign");
                 handleAssignTicket(event, guildId);
                 break;
             case "priority":
-                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply("No permission.").setEphemeral(true).queue(); return;}
+                if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue(); return;}
                 handler.insertOrUpdateGlobalStatistic("ticket-priority");
                 handleSetTicketPriority(event, guildId);
                 break;
@@ -78,12 +100,12 @@ public class TicketCommandListener extends ListenerAdapter {
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
-        String reason = event.getOption("reason") != null ? Objects.requireNonNull(event.getOption("reason")).getAsString() : "No reason provided";
-        
+        String reason = event.getOption("reason") != null ? Objects.requireNonNull(event.getOption("reason")).getAsString() : t(guildId, "moderation.no_reason");
+
         // Close ticket in database (extract ticket ID from ticketInfo)
         String[] parts = ticketInfo.split(" \\| ");
         int ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
@@ -99,23 +121,23 @@ public class TicketCommandListener extends ListenerAdapter {
             
             // Send audit log entry for ticket closure
             handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
-                    "Ticket #" + ticketId, 
+                    t(guildId, "tickets.audit_log_target", ticketId),
                     event.getMember(), null, reason);
             
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("🔒 Ticket Closed")
-                    .setDescription("This ticket has been closed by " + event.getUser().getAsMention())
-                    .addField("Reason", reason, false)
-                    .addField("Closed at", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
+                    .setTitle(t(guildId, "tickets.close_title"))
+                    .setDescription(t(guildId, "tickets.close_description", event.getUser().getAsMention()))
+                    .addField(t(guildId, "general.reason"), reason, false)
+                    .addField(t(guildId, "tickets.closed_at"), "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
                     .setColor(Color.RED);
 
             event.replyEmbeds(embed.build()).queue();
             
             // Archive channel after 5 seconds
-            channel.delete().reason("Ticket closed").queue();
-            
+            channel.delete().reason(t(guildId, "tickets.channel_delete_reason_closed")).queue();
+
         } else {
-            event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.close_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -126,9 +148,10 @@ public class TicketCommandListener extends ListenerAdapter {
 
         TextChannel channel = event.getChannel().asTextChannel();
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
-        
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
+
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
@@ -136,33 +159,27 @@ public class TicketCommandListener extends ListenerAdapter {
         String[] parts = ticketInfo.split(" \\| ");
         int ticketId = Integer.parseInt(parts[0].substring(4));
         
-        boolean success = handler.closeTicket(ticketId, event.getUser().getId(), "Closed via button");
-        
+        boolean success = handler.closeTicket(ticketId, event.getUser().getId(), t(guildId, "tickets.closed_via_button"));
+
         if (success) {
-            // Update statistics for tickets closed
-            String guildId = Objects.requireNonNull(event.getGuild()).getId();
             handler.incrementTicketsClosed(guildId);
-            
-            // Update user statistics for ticket closure
             handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
-            
-            // Send audit log entry for ticket closure via button
-            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED", 
-                    "Ticket #" + ticketId, 
-                    event.getMember(), null, "Closed via button");
-            
+            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED",
+                    t(guildId, "tickets.audit_log_target", ticketId),
+                    event.getMember(), null, t(guildId, "tickets.closed_via_button"));
+
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("🔒 Ticket Closed")
-                    .setDescription("This ticket has been closed by " + event.getUser().getAsMention())
-                    .addField("Closed at", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
+                    .setTitle(t(guildId, "tickets.close_title"))
+                    .setDescription(t(guildId, "tickets.close_description", event.getUser().getAsMention()))
+                    .addField(t(guildId, "tickets.closed_at"), "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
                     .setColor(Color.RED);
 
-            Button deleteChannelButton = Button.danger("delete_channel", "🗑️ Delete Channel");
+            Button deleteChannelButton = Button.danger("delete_channel", t(guildId, "tickets.delete_channel_btn"));
 
             event.replyEmbeds(embed.build()).setComponents(ActionRow.of(deleteChannelButton)).queue();
             channel.getManager().setName("closed-" + channel.getName()).queue();
         } else {
-            event.reply("❌ Failed to close ticket.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.close_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -176,7 +193,7 @@ public class TicketCommandListener extends ListenerAdapter {
         
         // Check if this is a closed ticket channel (should start with "closed-")
         if (!channel.getName().startsWith("closed-")) {
-            event.reply("❌ This channel cannot be deleted. Only closed ticket channels can be deleted.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.delete_only_closed")).setEphemeral(true).queue();
             return;
         }
         
@@ -193,14 +210,14 @@ public class TicketCommandListener extends ListenerAdapter {
         }
 
         if (!hasPermission) {
-            event.reply("❌ You don't have permission to delete this channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.delete_no_permission")).setEphemeral(true).queue();
             return;
         }
 
         // Acknowledge the interaction and delete the channel
-        event.reply("🗑️ Deleting channel...").setEphemeral(true).queue(
-            success -> channel.delete().reason("Ticket channel deleted by " + event.getUser().getEffectiveName()).queue(),
-            error -> event.reply("❌ Failed to delete channel.").setEphemeral(true).queue()
+        event.reply(t(guildId, "tickets.deleting_channel")).setEphemeral(true).queue(
+            success -> channel.delete().reason(t(guildId, "tickets.channel_delete_reason_by_user", event.getUser().getEffectiveName())).queue(),
+            error -> event.reply(t(guildId, "tickets.delete_failed")).setEphemeral(true).queue()
         );
     }
 
@@ -209,13 +226,13 @@ public class TicketCommandListener extends ListenerAdapter {
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
         Member staffMember = Objects.requireNonNull(event.getOption("staff")).getAsMember();
         if (staffMember == null) {
-            event.reply("❌ Staff member not found.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.staff_not_found")).setEphemeral(true).queue();
             return;
         }
 
@@ -227,10 +244,10 @@ public class TicketCommandListener extends ListenerAdapter {
         
         if (success) {
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("👨‍💼 Ticket Assigned")
-                    .setDescription("This ticket has been assigned to " + staffMember.getAsMention())
-                    .addField("Assigned by", event.getUser().getAsMention(), true)
-                    .addField("Status", "IN_PROGRESS", true)
+                    .setTitle(t(guildId, "tickets.assign_title"))
+                    .setDescription(t(guildId, "tickets.assign_description", staffMember.getAsMention()))
+                    .addField(t(guildId, "tickets.assigned_by"), event.getUser().getAsMention(), true)
+                    .addField(t(guildId, "tickets.status"), t(guildId, "tickets.in_progress"), true)
                     .setColor(Color.ORANGE);
 
             try {
@@ -240,7 +257,7 @@ public class TicketCommandListener extends ListenerAdapter {
             }
             event.replyEmbeds(embed.build()).queue();
         } else {
-            event.reply("❌ Failed to assign ticket.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.assign_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -249,7 +266,7 @@ public class TicketCommandListener extends ListenerAdapter {
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
@@ -265,7 +282,7 @@ public class TicketCommandListener extends ListenerAdapter {
         }
 
         if (!hasPermission) {
-            event.reply("❌ You don't have permission to change ticket priorities.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.priority_no_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -279,10 +296,10 @@ public class TicketCommandListener extends ListenerAdapter {
         
         if (success) {
             EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle("🔄 Priority Updated")
-                    .setDescription("Ticket priority has been changed to **" + newPriority + "**")
-                    .addField("Updated by", event.getUser().getAsMention(), true)
-                    .addField("New Priority", newPriority, true)
+                    .setTitle(t(guildId, "tickets.priority_title"))
+                    .setDescription(t(guildId, "tickets.priority_description", newPriority))
+                    .addField(t(guildId, "tickets.updated_by"), event.getUser().getAsMention(), true)
+                    .addField(t(guildId, "tickets.new_priority"), newPriority, true)
                     .setColor(getPriorityColor(newPriority))
                     .setTimestamp(java.time.Instant.now());
 
@@ -291,7 +308,7 @@ public class TicketCommandListener extends ListenerAdapter {
             // Sort channels by priority after updating
             sortTicketChannelsByPriority(event.getGuild(), guildId);
         } else {
-            event.reply("❌ Failed to update ticket priority.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.priority_failed")).setEphemeral(true).queue();
         }
     }
 
@@ -384,12 +401,12 @@ public class TicketCommandListener extends ListenerAdapter {
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🎫 Ticket Information")
+                .setTitle(t(guildId, "tickets.info_embed_title"))
                 .setDescription(ticketInfo)
                 .setColor(Color.BLUE)
                 .setTimestamp(java.time.Instant.now());
@@ -400,20 +417,20 @@ public class TicketCommandListener extends ListenerAdapter {
     private void handleTicketTranscript(SlashCommandInteractionEvent event, String guildId) {
         //check if bot has message content intent
         if (!event.getJDA().getGatewayIntents().contains(net.dv8tion.jda.api.requests.GatewayIntent.MESSAGE_CONTENT)) {
-            event.reply("❌ Bot does not have Message Content Intent enabled. Cannot generate transcripts.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.transcript_no_intent")).setEphemeral(true).queue();
             return;
         }
         TextChannel channel = event.getChannel().asTextChannel();
         String ticketInfo = handler.getTicketByChannelId(channel.getId());
         
         if (ticketInfo == null) {
-            event.reply("❌ This is not a ticket channel.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
         // Check if transcripts are enabled for this guild
         if (!handler.areTranscriptsEnabled(guildId)) {
-            event.reply("❌ Transcripts are disabled for this server.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.transcript_disabled")).setEphemeral(true).queue();
             return;
         }
 
@@ -441,7 +458,7 @@ public class TicketCommandListener extends ListenerAdapter {
         }
 
         if (!hasPermission) {
-            event.reply("❌ You don't have permission to generate transcripts for this ticket.").setEphemeral(true).queue();
+            event.reply(t(guildId, "tickets.transcript_no_permission")).setEphemeral(true).queue();
             return;
         }
 
@@ -450,12 +467,12 @@ public class TicketCommandListener extends ListenerAdapter {
         // Generate transcript from channel history
         channel.getHistory().retrievePast(100).queue(messages -> {
             StringBuilder transcript = new StringBuilder();
-            transcript.append("=== TICKET TRANSCRIPT ===\n");
-            transcript.append("Ticket ID: ").append(ticketIdStr).append("\n");
-            transcript.append("Channel: #").append(channel.getName()).append("\n");
-            transcript.append("Generated: ").append(new java.util.Date()).append("\n");
-            transcript.append("=========================\n\n");
-            
+            transcript.append(t(guildId, "tickets.transcript_header")).append("\n");
+            transcript.append(t(guildId, "tickets.transcript_ticket_id", ticketIdStr)).append("\n");
+            transcript.append(t(guildId, "tickets.transcript_channel", channel.getName())).append("\n");
+            transcript.append(t(guildId, "tickets.transcript_generated_at", new java.util.Date())).append("\n");
+            transcript.append(t(guildId, "tickets.transcript_separator")).append("\n\n");
+
             // Sort messages chronologically (oldest first)
             messages.sort(Comparator.comparing(ISnowflake::getTimeCreated));
             
@@ -467,8 +484,7 @@ public class TicketCommandListener extends ListenerAdapter {
                 // Add attachment info if present
                 if (!msg.getAttachments().isEmpty()) {
                     for (Message.Attachment attachment : msg.getAttachments()) {
-                        transcript.append("    [Attachment: ").append(attachment.getFileName())
-                                 .append(" (").append(attachment.getUrl()).append(")]\n");
+                        transcript.append(t(guildId, "tickets.transcript_attachment", attachment.getFileName(), attachment.getUrl())).append("\n");
                     }
                 }
                 transcript.append("\n");
@@ -482,23 +498,23 @@ public class TicketCommandListener extends ListenerAdapter {
                     java.io.File tempFile = java.io.File.createTempFile("ticket-transcript-" + ticketIdStr, ".txt");
                     java.nio.file.Files.write(tempFile.toPath(), transcriptText.getBytes());
                     
-                    event.getHook().sendMessage("📄 Ticket transcript generated:")
+                    event.getHook().sendMessage(t(guildId, "tickets.transcript_generated"))
                             .addFiles(net.dv8tion.jda.api.utils.FileUpload.fromData(tempFile, "ticket-" + ticketIdStr + "-transcript.txt"))
                             .queue(success -> tempFile.delete()); // Clean up temp file
                 } catch (Exception e) {
-                    event.getHook().sendMessage("❌ Failed to generate transcript file.").queue();
+                    event.getHook().sendMessage(t(guildId, "tickets.transcript_failed")).queue();
                 }
             } else {
                 // Send as embed if short enough
                 EmbedBuilder embed = new EmbedBuilder()
-                        .setTitle("📄 Ticket Transcript #" + ticketIdStr)
+                        .setTitle(t(guildId, "tickets.transcript_embed_title", ticketIdStr))
                         .setDescription("```\n" + transcriptText + "```")
                         .setColor(Color.BLUE)
                         .setTimestamp(java.time.Instant.now());
                 
                 event.getHook().sendMessageEmbeds(embed.build()).queue();
             }
-        }, error -> event.getHook().sendMessage("❌ Failed to retrieve channel history for transcript.").queue());
+        }, error -> event.getHook().sendMessage(t(guildId, "tickets.transcript_history_failed")).queue());
     }
 
     private Color getPriorityColor(String priority) {
@@ -511,3 +527,4 @@ public class TicketCommandListener extends ListenerAdapter {
         }
     }
 }
+

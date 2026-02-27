@@ -4,10 +4,7 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
-import net.dv8tion.jda.api.interactions.commands.build.OptionData;
-import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
-import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
+import net.dv8tion.jda.api.interactions.commands.build.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -210,12 +207,13 @@ public class AddGuildSlashCommands {
                                 .addOption(OptionType.INTEGER, "max_warns", "Maximum warnings before timeout", true)
                                 .addOption(OptionType.INTEGER, "timeout_minutes", "Minutes to timeout user when reaching max warns", true)
                                 .addOption(OptionType.INTEGER, "warn_time_hours", "Hours after which warnings expire", false),
-                        new SubcommandData("settings-get", "View current warning system settings")/*,
-                        new SubcommandData("note", "Track a user without issuing a warning")
-                                .addOption(OptionType.USER, "user", "User to note", true)
-                                .addOption(OptionType.STRING, "note", "Note content", true)
-                                .addOption(OptionType.ATTACHMENT, "evidence", "Evidence attachment (optional)", false)*/
+                        new SubcommandData("settings-get", "View current warning system settings")
                 )
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
+    }
+
+    private CommandData getUserWarnCommands() {
+        return Commands.user("warning")
                 .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MODERATE_MEMBERS));
     }
 
@@ -352,7 +350,9 @@ public class AddGuildSlashCommands {
         List<SlashCommandData> cmds = new ArrayList<>();
         switch (systemName.toLowerCase()) {
             case "log-channel": cmds.add(getLogChannelCommand()); break;
-            case "warn": cmds.add(getWarnCommand()); break;
+            case "warn":
+                cmds.add(getWarnCommand());
+                break;
             case "ticket": cmds.add(getTicketCommand()); cmds.add(getTicketPanelsCommand()); break;
             case "mod": cmds.add(getModerationCommand()); break;
             case "stats": cmds.add(getStatisticsCommand()); break;
@@ -364,6 +364,15 @@ public class AddGuildSlashCommands {
             case "reminders": cmds.add(getReminderCommand()); break;
             case "leveling": cmds.add(getLevelingCommands()); break;
         }
+        return cmds;
+    }
+
+    public List<CommandData> getUserCommandsForSystem(String systemName) {
+        List<CommandData> cmds = new ArrayList<>();
+        if (systemName.equalsIgnoreCase("warn")) {
+            cmds.add(getUserWarnCommands());
+        }
+        // Hier können weitere User Commands für andere Systeme hinzugefügt werden
         return cmds;
     }
 

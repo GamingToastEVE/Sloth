@@ -25,7 +25,10 @@ public class HelpCommandListener extends ListenerAdapter {
     private String t(String guildId, String key) {
         LanguageManager lang = LanguageManager.getInstance();
         if (lang != null) {
-            return lang.get(guildId, key);
+            if (guildId != null) {
+                return lang.get(guildId, key);
+            }
+            return lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
         }
         return key;
     }
@@ -33,7 +36,15 @@ public class HelpCommandListener extends ListenerAdapter {
     private String t(String guildId, String key, Object... args) {
         LanguageManager lang = LanguageManager.getInstance();
         if (lang != null) {
-            return lang.get(guildId, key, args);
+            if (guildId != null) {
+                return lang.get(guildId, key, args);
+            }
+            String translation = lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
+            try {
+                return String.format(translation, args);
+            } catch (Exception e) {
+                return translation;
+            }
         }
         try {
             return String.format(key, args);
@@ -47,7 +58,7 @@ public class HelpCommandListener extends ListenerAdapter {
         if (event.getName().equals("help")) {
 
             if (!event.isFromGuild() || event.getGuild() == null) {
-                event.reply("This command can only be used in a server.").setEphemeral(true).queue();
+                event.reply(t(null, "language.server_only")).setEphemeral(true).queue();
                 return;
             }
 
