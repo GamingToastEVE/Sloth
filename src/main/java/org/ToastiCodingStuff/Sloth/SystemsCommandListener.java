@@ -163,6 +163,21 @@ public class SystemsCommandListener extends ListenerAdapter {
         return rows;
     }
 
+    public void sendSystemMessage(ButtonInteractionEvent event) {
+        String guildId = event.getGuild().getId();
+
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.getHook().sendMessage(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
+        }
+
+        Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
+
+        event.getHook().sendMessageEmbeds(buildEmbed(guildId, statuses).build())
+                .setComponents(buildButtons(statuses))
+                .setEphemeral(true)
+                .queue();
+    }
+
     private String formatSystemName(String key) {
         return switch (key) {
             case "log-channel" -> "Logging";

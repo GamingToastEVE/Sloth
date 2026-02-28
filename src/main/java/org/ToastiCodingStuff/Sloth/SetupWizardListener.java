@@ -14,11 +14,15 @@ import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionE
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 
+import java.util.Map;
+
 public class SetupWizardListener extends ListenerAdapter {
     private final DatabaseHandler handler;
+    private final SystemsCommandListener systemsListener;
 
-    public SetupWizardListener(DatabaseHandler handler) {
+    public SetupWizardListener(DatabaseHandler handler, SystemsCommandListener systemsListener) {
         this.handler = handler;
+        this.systemsListener = systemsListener;
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -54,6 +58,18 @@ public class SetupWizardListener extends ListenerAdapter {
             // Step 1: Language
             String guildId = event.getGuild().getId();
             event.editMessage(new MessageEditBuilder().setComponents(buildLanguageStep(guildId)).useComponentsV2().build()).queue();
+        } else if (event.getComponentId().equals("setup_finish_log")) {
+            // Next Step
+            String guildId = event.getGuild().getId();
+            event.editMessage(new MessageEditBuilder().setComponents(buildFinalStep(guildId)).useComponentsV2().build()).queue();
+        } else if (event.getComponentId().equals("manage_systems")) {
+            // Open system menu
+            String guildId = event.getGuild().getId();
+            event.editMessage(new MessageEditBuilder().setComponents(Container.of(
+                    TextDisplay.of(t(guildId, "setup_wizard.complete_title")),
+                    TextDisplay.of(t(guildId, "setup_wizard.complete_description"))
+            )).useComponentsV2().build()).queue();
+            systemsListener.sendSystemMessage(event);
         }
     }
 
@@ -75,6 +91,7 @@ public class SetupWizardListener extends ListenerAdapter {
             String channelId = event.getMentions().getChannels().get(0).getId();
             String guildId = event.getGuild().getId();
             handler.setLogChannel(guildId, channelId);
+            handler.toggleSystem(event.getGuild().getId(), "log-channel");
 
             // Step 3: Finalize
             event.editMessage(new MessageEditBuilder().setComponents(buildFinalStep(guildId)).useComponentsV2().build()).queue();
@@ -103,7 +120,7 @@ public class SetupWizardListener extends ListenerAdapter {
                                 .setPlaceholder(t(guildId, "setup_wizard.select_channel_placeholder"))
                                 .build()
                 ),
-                ActionRow.of(Button.secondary("setup_finish", t(guildId, "setup_wizard.btn_skip_finalize")))
+                ActionRow.of(Button.secondary("setup_finish_log", t(guildId, "setup_wizard.btn_skip_finalize")))
         ).withAccentColor(0xE67E22);
     }
 
@@ -111,7 +128,7 @@ public class SetupWizardListener extends ListenerAdapter {
         return Container.of(
                 TextDisplay.of(t(guildId, "setup_wizard.complete_title")),
                 TextDisplay.of(t(guildId, "setup_wizard.complete_description")),
-                ActionRow.of(Button.primary("help_systems", t(guildId, "setup_wizard.btn_manage_systems")))
+                ActionRow.of(Button.primary("manage_systems", t(guildId, "setup_wizard.btn_manage_systems")))
         ).withAccentColor(0x2ECC71);
     }
 }

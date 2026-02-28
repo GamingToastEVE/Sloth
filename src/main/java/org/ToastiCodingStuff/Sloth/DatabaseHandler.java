@@ -4394,7 +4394,7 @@ public class DatabaseHandler {
      */
     public void sendAuditLogEntry(Guild guild, String actionType, String targetName, Member targetMember, Member moderatorName, String reason) {
         String guildId = guild.getId();
-        
+
         if (hasLogChannel(guildId)) {
             String logChannelId = getLogChannelID(guildId);
             if (!logChannelId.equals("Couldnt find a Log Channel") && !logChannelId.equals("Error")) {

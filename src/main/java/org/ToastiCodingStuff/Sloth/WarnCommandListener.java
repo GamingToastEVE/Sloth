@@ -169,8 +169,7 @@ public class WarnCommandListener extends ListenerAdapter {
         String componentId = event.getComponentId();
 
         // Warn Lösch Bestätigung
-        if (componentId.startsWith("warn_delete_confirm:")) {
-            String gId = event.getGuild().getId();
+        if (componentId.startsWith("warn_delete_confirm:")) {String gId = event.getGuild().getId();
             if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
                 event.reply(t(gId, "moderation.no_permission")).setEphemeral(true).queue();
                 return;

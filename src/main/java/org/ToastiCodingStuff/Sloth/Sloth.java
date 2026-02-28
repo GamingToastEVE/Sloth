@@ -38,6 +38,8 @@ public class Sloth {
         // Set bot status to "Playing /help"
         api.getPresence().setActivity(Activity.playing("Starting up..."));
 
+        SystemsCommandListener systemsCommandListener = new SystemsCommandListener(handler);
+
         api.addEventListener(new LogChannelSlashCommandListener(handler));
         api.addEventListener(new WarnCommandListener(handler));
         api.addEventListener(new TicketCommandListener(handler));
@@ -54,11 +56,11 @@ public class Sloth {
         api.addEventListener(new RoleEventConfigListener(handler));
         api.addEventListener(new TimedRoleTriggerListener(handler, api));
         api.addEventListener(new EmbedEditorCommandListener(handler));
-        api.addEventListener(new SystemsCommandListener(handler));
+        api.addEventListener(systemsCommandListener);
         api.addEventListener(new ReminderCommandListener(handler));
         api.addEventListener(new LevelingSystemCommandListener(handler));
         api.addEventListener(new LanguageCommandListener(languageManager));
-        api.addEventListener(new SetupWizardListener(handler));
+        api.addEventListener(new SetupWizardListener(handler, systemsCommandListener));
 
         api.addEventListener(new HelpCommandListener(handler));
         api.addEventListener(new GuildEventListener(handler));

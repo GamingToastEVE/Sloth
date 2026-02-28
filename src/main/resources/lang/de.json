@@ -38,6 +38,7 @@
     "reason": "Grund",
     "duration": "Dauer",
     "page": "Seite"
+    "page": "Seite"
   },
   "buttons": {
     "back_to_overview": "Zurück zur Übersicht",
@@ -134,6 +135,7 @@
     "curve_logarithmic": "Logarithmisch",
     "curve_linear_desc": "Gleichmäßiger XP-Anstieg pro Level",
     "curve_exponential_desc": "Schnell steigende XP-Anforderungen",
+    "curve_logarithmic_desc": "Langsamere Skalierung auf höheren Leveln",
     "curve_logarithmic_desc": "Langsamere Skalierung auf höheren Leveln",
     "multiplier": "Multiplikator",
     "multiplier_desc": "XP-Anforderungen werden mit diesem Wert multipliziert.\nHöher = schwerer zu leveln. Niedriger = einfacher.",
@@ -261,6 +263,7 @@
     "warn_delete_failed": "❌ Verwarnung konnte nicht gelöscht werden. Sie existiert möglicherweise nicht mehr.",
     "warn_invalid_id": "❌ Ungültige Verwarnungs-ID.",
     "warn_not_found_entry": "❌ Verwarnung nicht gefunden."
+    "warn_not_found_entry": "❌ Verwarnung nicht gefunden."
   },
   "tickets": {
     "create_title": "Ticket erstellen",
@@ -344,6 +347,7 @@
     "transcript_generated_at": "Erstellt: %s",
     "transcript_separator": "=========================",
     "transcript_attachment": "    [Anhang: %s (%s)]",
+    "transcript_embed_title": "📄 Ticket-Transkript #%s"
     "transcript_embed_title": "📄 Ticket-Transkript #%s"
   },
   "ticket_panels": {
