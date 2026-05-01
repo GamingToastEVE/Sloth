@@ -97,7 +97,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
                     DatabaseHandler.RoleEventData newEvent = events.get(events.size() - 1);
                     sendEventDashboard(event, newEvent);
                 } else {
-                    event.reply("Error creating event.").setEphemeral(true).queue();
+                    event.reply(t(guildId, "general.error")).setEphemeral(true).queue();
                 }
                 break;
 
@@ -483,7 +483,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
         }
         embed.addField("4. Conditions", conditionText, false);
         embed.addField("5. Apply role instantly", data.instant + "", false);
-        embed.setFooter("Event-ID: " + data.id);
+        embed.setFooter(t(event.getGuild().getId(), "role_events.breadcrumb_detail", data.name) + " • Event-ID: " + data.id);
 
         // COMPONENTS
         List<ActionRow> rows = new ArrayList<>();
@@ -569,7 +569,7 @@ public class RoleEventConfigListener extends ListenerAdapter {
             menu.addOption(evt.name, String.valueOf(evt.id), evt.eventType + " -> " + evt.actionType);
         }
 
-        event.reply("Select an event:")
+        event.reply(t(guildId, "role_events.breadcrumb_main") + " — Select an event:")
                 .setComponents(ActionRow.of(menu.build()))
                 .setEphemeral(true)
                 .queue();

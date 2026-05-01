@@ -124,7 +124,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             "**" + groups.size() + "** " + t(guildId, "selectroles_groups") + "\n" +
             "**" + totalRoles + "** " + t(guildId, "selectroles_roles_total"), true);
 
-        embed.setFooter(t(guildId, "selectroles_ui_footer"));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_main"));
         embed.setTimestamp(java.time.Instant.now());
 
         // Buttons für Hauptaktionen
@@ -166,7 +166,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
             "**" + groups.size() + "** " + t(guildId, "selectroles_groups") + "\n" +
             "**" + totalRoles + "** " + t(guildId, "selectroles_roles_total"), true);
 
-        embed.setFooter(t(guildId, "selectroles_ui_footer"));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_main"));
         embed.setTimestamp(java.time.Instant.now());
 
         List<ActionRow> rows = new ArrayList<>();
@@ -194,6 +194,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📁 " + t(guildId, "selectroles_groups_title"));
         embed.setColor(new Color(87, 242, 135)); // Grün
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_groups"));
 
         if (groups.isEmpty()) {
             embed.setDescription(t(guildId, "selectroles_no_groups_hint"));
@@ -249,6 +250,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📁 " + group.name);
         embed.setColor(parseColor(group.color));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_group_detail", group.name));
 
         embed.addField("📝 " + t(guildId, "selectroles_group_title"), group.title, false);
         embed.addField("📄 " + t(guildId, "selectroles_group_description"),
@@ -330,6 +332,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📁 " + group.name);
         embed.setColor(parseColor(group.color));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_group_detail", group.name));
 
         embed.addField("📝 " + t(guildId, "selectroles_group_title"), group.title, false);
         embed.addField("📄 " + t(guildId, "selectroles_group_description"),
@@ -414,6 +417,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("🔃 " + t(guildId, "selectroles_move_role_title"));
         embed.setDescription(t(guildId, "selectroles_move_role_desc", role.getAsMention()));
         embed.setColor(new Color(88, 101, 242));
+        DatabaseHandler.RoleSelectGroupData grp = handler.getRoleSelectGroup(guildId, groupId);
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_role_move", grp != null ? grp.name : String.valueOf(groupId)));
 
         // Zeige aktuelle Position
         embed.addField("📍 " + t(guildId, "selectroles_current_position"),
@@ -452,6 +457,8 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("🔃 " + t(guildId, "selectroles_move_role_title"));
         embed.setDescription(t(guildId, "selectroles_move_role_desc", role.getAsMention()));
         embed.setColor(new Color(88, 101, 242));
+        DatabaseHandler.RoleSelectGroupData grp2 = handler.getRoleSelectGroup(guildId, groupId);
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_role_move", grp2 != null ? grp2.name : String.valueOf(groupId)));
 
         embed.addField("📍 " + t(guildId, "selectroles_current_position"),
             String.valueOf(currentIndex + 1) + " / " + roleIds.size(), true);
@@ -482,6 +489,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("🏷️ " + t(guildId, "selectroles_roles_title"));
         embed.setColor(new Color(235, 69, 158)); // Pink
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_roles"));
 
         // Ungrouped Roles
         if (!ungroupedRoles.isEmpty()) {
@@ -570,6 +578,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("📤 " + t(guildId, "selectroles_send_title"));
         embed.setDescription(t(guildId, "selectroles_send_description"));
         embed.setColor(new Color(87, 242, 135));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_send"));
 
         List<ActionRow> rows = new ArrayList<>();
 
@@ -614,6 +623,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("📤 " + t(guildId, "selectroles_send_type_title"));
         embed.setDescription(t(guildId, "selectroles_send_type_description"));
         embed.setColor(new Color(87, 242, 135));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_send_type"));
 
         String targetInfo;
         if (selection.equals("ungrouped")) {
@@ -656,6 +666,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("📤 " + t(guildId, "selectroles_select_channel"));
         embed.setDescription(t(guildId, "selectroles_select_channel_desc"));
         embed.setColor(new Color(87, 242, 135));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_send_channel"));
 
         String targetInfo;
         if (session.pendingSendSelection != null && session.pendingSendSelection.equals("ungrouped")) {
@@ -1359,6 +1370,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
         embed.setTitle("⚙️ " + t(guildId, "selectroles_settings_title"));
         embed.setDescription(t(guildId, "selectroles_settings_desc"));
         embed.setColor(new Color(153, 170, 181));
+        embed.setFooter(t(guildId, "selectroles_breadcrumb_settings"));
 
         // Zeige aktuelle Einstellungen
         embed.addField("📋 " + t(guildId, "selectroles_default_embed"),

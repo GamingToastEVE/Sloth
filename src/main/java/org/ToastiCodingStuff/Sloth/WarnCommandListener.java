@@ -152,7 +152,7 @@ public class WarnCommandListener extends ListenerAdapter {
         }
 
         embed.setDescription(desc.toString());
-        embed.setFooter("Select a warning below to remove it or view details.");
+        embed.setFooter(t(guildId, "moderation.breadcrumb_warnings_list", targetUser.getName()));
 
         // Antwort senden
         if (event instanceof SlashCommandInteractionEvent) {
@@ -267,7 +267,8 @@ public class WarnCommandListener extends ListenerAdapter {
                     if (warns.evidence != null) {
                         embed.setImage(warns.evidence);
                     }
-                    embed.setFooter("Use the buttons below to delete this warning or go back to the previous view.");
+                    embed.setFooter(t(guildId, "moderation.breadcrumb_warning_detail",
+                            targetUser != null ? targetUser.getName() : targetUserId, i));
                     Button deleteButton = Button.danger("warn_delete_confirm:" + warnId + ":" + targetUserId, "Delete Warning");
                     Button backButton = Button.secondary("warn_delete_back:" + targetUserId, "Back to Warnings");
                     event.getMessage().delete().queue();

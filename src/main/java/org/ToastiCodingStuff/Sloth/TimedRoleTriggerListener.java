@@ -7,8 +7,6 @@ import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.Event;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
-import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
-import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
@@ -36,68 +34,63 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
 
     @Override
     public void onGenericEvent(@NotNull GenericEvent event) {
-        if (!(event instanceof LevelUpEvent)) {
-            return;
-        }
-        System.out.println("LevelUpEvent detected, processing triggers...");
-        LevelUpEvent levelUpEvent = (LevelUpEvent) event;
-        Guild guild = levelUpEvent.getGuild();
-        Member member = levelUpEvent.getMember();
-        int newLevel = levelUpEvent.getNewLevel();
-        int oldLevel = levelUpEvent.getOldLevel();
+        if (event instanceof LevelUpEvent) {
+            System.out.println("LevelUpEvent detected, processing triggers...");
+            LevelUpEvent levelUpEvent = (LevelUpEvent) event;
+            Guild guild = levelUpEvent.getGuild();
+            Member member = levelUpEvent.getMember();
+            int newLevel = levelUpEvent.getNewLevel();
+            int oldLevel = levelUpEvent.getOldLevel();
 
-        List<DatabaseHandler.RoleEventData> eventsLevelReached = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_REACHED);
-        List<DatabaseHandler.RoleEventData> eventsLevelUp = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_UP);
+            List<DatabaseHandler.RoleEventData> eventsLevelReached = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_REACHED);
+            List<DatabaseHandler.RoleEventData> eventsLevelUp = handler.getRoleEventsByType(guild.getId(), RoleEventType.LEVEL_UP);
 
-        for (DatabaseHandler.RoleEventData eventConfig : eventsLevelReached) {
-            try {
-                JSONObject config = new JSONObject(eventConfig.triggerData);
-                if (config.has("level_threshold")) {
-                    int targetLevel = config.getInt("level_threshold");
-                    if (newLevel == targetLevel) {
-                        processTrigger(guild, member, RoleEventType.LEVEL_REACHED, String.valueOf(targetLevel));
+            for (DatabaseHandler.RoleEventData eventConfig : eventsLevelReached) {
+                try {
+                    JSONObject config = new JSONObject(eventConfig.triggerData);
+                    if (config.has("level_threshold")) {
+                        int targetLevel = config.getInt("level_threshold");
+                        if (newLevel == targetLevel) {
+                            processTrigger(guild, member, RoleEventType.LEVEL_REACHED, String.valueOf(targetLevel));
+                        }
                     }
+                } catch (JSONException e) {
+                    System.err.println("Failed to parse trigger_data JSON for LEVEL_REACHED: " + e.getMessage());
                 }
-            } catch (JSONException e) {
-                System.err.println("Failed to parse trigger_data JSON for LEVEL_REACHED: " + e.getMessage());
+            }
+
+            for (DatabaseHandler.RoleEventData eventConfig : eventsLevelUp) {
+                try {
+                    JSONObject config = new JSONObject(eventConfig.triggerData);
+                    if (config.has("level_threshold")) {
+                        int minLevel = config.getInt("level_threshold");
+                        if (newLevel >= minLevel) {
+                            processTrigger(guild, member, RoleEventType.LEVEL_UP, String.valueOf(minLevel));
+                        }
+                    }
+                } catch (JSONException e) {
+                    System.err.println("Failed to parse trigger_data JSON for LEVEL_UP: " + e.getMessage());
+                }
+            }
+        } else if (event instanceof MemberRoleChangeEvent) {
+            // Custom role change event – replaces native GuildMemberRoleAdd/RemoveEvent
+            MemberRoleChangeEvent roleChangeEvent = (MemberRoleChangeEvent) event;
+            Guild guild = roleChangeEvent.getGuild();
+            Member member = roleChangeEvent.getMember();
+
+            System.out.println("MemberRoleChangeEvent detected, processing triggers...");
+
+            for (net.dv8tion.jda.api.entities.Role role : roleChangeEvent.getAddedRoles()) {
+                processTrigger(guild, member, RoleEventType.ROLE_ADD, role.getId());
+            }
+            for (net.dv8tion.jda.api.entities.Role role : roleChangeEvent.getRemovedRoles()) {
+                processTrigger(guild, member, RoleEventType.ROLE_REMOVE, role.getId());
             }
         }
-
-        for (DatabaseHandler.RoleEventData eventConfig : eventsLevelUp) {
-            try {
-                JSONObject config = new JSONObject(eventConfig.triggerData);
-                if (config.has("level_threshold")) {
-                    int minLevel = config.getInt("level_threshold");
-                    if (newLevel >= minLevel) {
-                        processTrigger(guild, member, RoleEventType.LEVEL_UP, String.valueOf(minLevel));
-                    }
-                }
-            } catch (JSONException e) {
-                System.err.println("Failed to parse trigger_data JSON for LEVEL_UP: " + e.getMessage());
-            }
-        }
     }
-
-    // Trigger: Wenn ein User eine Rolle bekommt ("getrole")
-    @Override
-    public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
-        // Wir prüfen für JEDE Rolle, die hinzugefügt wurde
-        for (Role role : event.getRoles()) {
-            processTrigger(event.getGuild(), event.getMember(), RoleEventType.ROLE_ADD, role.getId());
-        }
-    }
-
-    // Trigger: Wenn einem User eine Rolle weggenommen wird ("removerole")
-    @Override
-    public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
-        for (Role role : event.getRoles()) {
-            processTrigger(event.getGuild(), event.getMember(), RoleEventType.ROLE_REMOVE, role.getId());
-        }
-    }
-
-    // Trigger: Wenn ein User einem Server joint.
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        System.out.println("GuildMemberJoinEvent detected, processing triggers...");
         processTrigger(event.getGuild(), event.getMember(), RoleEventType.MEMBER_JOIN, "");
     }
 
@@ -151,6 +144,8 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
      */
     private void processTrigger(Guild guild, Member member, RoleEventType type, String triggerEntityId) {
         String guildId = guild.getId();
+
+        System.out.println("Processing trigger for guild: " + guildId);
 
         // 1. Hole alle Regeln aus der DB für diesen Event-Typ
         List<DatabaseHandler.RoleEventData> events = handler.getRoleEventsByType(guildId, type);

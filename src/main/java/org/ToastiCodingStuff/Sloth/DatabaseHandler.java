@@ -253,7 +253,7 @@ public class DatabaseHandler {
             // Check for every table if already exist, if so apply migrations instead of full initialization
             String[] tableNames = {
                     "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
-                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds"
+                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds", "member_roles"
             };
             for (String tableName : tableNames) {
                 if (!tableAlreadyExist(tableName)) {
@@ -309,6 +309,9 @@ public class DatabaseHandler {
                             break;
                         case "custom_embeds":
                             createCustomEmbedsTable();
+                            break;
+                        case "member_roles":
+                            createMemberRolesTable();
                             break;
                     }
                     return;
@@ -665,6 +668,67 @@ public class DatabaseHandler {
                 ");";
         try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
+        }
+    }
+
+    // ==================== MEMBER ROLES SNAPSHOT TABLE ====================
+
+    private void createMemberRolesTable() throws SQLException {
+        String createTable = "CREATE TABLE IF NOT EXISTS member_roles (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                "guild_id VARCHAR(32) NOT NULL, " +
+                "user_id VARCHAR(32) NOT NULL, " +
+                "role_ids TEXT NOT NULL DEFAULT '', " +
+                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+                "UNIQUE(guild_id, user_id))";
+        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
+            stmt.execute(createTable);
+            System.out.println("Table 'member_roles' created successfully.");
+        }
+    }
+
+    /**
+     * Returns the stored role IDs for a guild member.
+     * Returns an empty list if no snapshot exists yet.
+     */
+    public List<String> getMemberRoles(String guildId, String userId) {
+        String query = "SELECT role_ids FROM member_roles WHERE guild_id = ? AND user_id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String raw = rs.getString("role_ids");
+                    if (raw == null || raw.isBlank()) return new ArrayList<>();
+                    return new ArrayList<>(Arrays.asList(raw.split(",")));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error fetching member roles snapshot: " + e.getMessage());
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * Upserts the role snapshot for a guild member.
+     *
+     * @param guildId  the guild ID
+     * @param userId   the user ID
+     * @param roleIds  current list of role IDs (excluding @everyone)
+     */
+    public void setMemberRoles(String guildId, String userId, List<String> roleIds) {
+        String csv = String.join(",", roleIds);
+        String query = "INSERT INTO member_roles (guild_id, user_id, role_ids, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) " +
+                "ON DUPLICATE KEY UPDATE role_ids = VALUES(role_ids), updated_at = CURRENT_TIMESTAMP";
+        try (Connection connection = getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, guildId);
+            pstmt.setString(2, userId);
+            pstmt.setString(3, csv);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error updating member roles snapshot: " + e.getMessage());
         }
     }
 
@@ -7474,5 +7538,91 @@ public class DatabaseHandler {
                 lastXpTimestamp != null ? lastXpTimestamp.toLocalDateTime() : null,
                 lastVoiceXpTimestamp != null ? lastVoiceXpTimestamp.toLocalDateTime() : null
         );
+    }
+
+    // ==================== SETUP WIZARD HELPER METHODS ====================
+
+    /**
+     * Get the default ticket category for setup wizard
+     */
+    public String getDefaultTicketCategory(String guildId) {
+        String query = "SELECT setup_ticket_category FROM guilds WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("setup_ticket_category");
+            }
+        } catch (SQLException e) {
+            // Column might not exist yet, ignore
+        }
+        return null;
+    }
+
+    /**
+     * Set the default ticket category for setup wizard
+     */
+    public void setDefaultTicketCategory(String guildId, String categoryId) {
+        // First ensure the column exists
+        try (Connection connection = getConnection()) {
+            String alterQuery = "ALTER TABLE guilds ADD COLUMN IF NOT EXISTS setup_ticket_category VARCHAR(32)";
+            PreparedStatement alterStmt = connection.prepareStatement(alterQuery);
+            alterStmt.executeUpdate();
+        } catch (SQLException e) {
+            // Column might already exist
+        }
+
+        String query = "UPDATE guilds SET setup_ticket_category = ? WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, categoryId);
+            stmt.setString(2, guildId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get the default ticket support role for setup wizard
+     */
+    public String getDefaultTicketSupportRole(String guildId) {
+        String query = "SELECT setup_ticket_support_role FROM guilds WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, guildId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("setup_ticket_support_role");
+            }
+        } catch (SQLException e) {
+            // Column might not exist yet, ignore
+        }
+        return null;
+    }
+
+    /**
+     * Set the default ticket support role for setup wizard
+     */
+    public void setDefaultTicketSupportRole(String guildId, String roleId) {
+        // First ensure the column exists
+        try (Connection connection = getConnection()) {
+            String alterQuery = "ALTER TABLE guilds ADD COLUMN IF NOT EXISTS setup_ticket_support_role VARCHAR(32)";
+            PreparedStatement alterStmt = connection.prepareStatement(alterQuery);
+            alterStmt.executeUpdate();
+        } catch (SQLException e) {
+            // Column might already exist
+        }
+
+        String query = "UPDATE guilds SET setup_ticket_support_role = ? WHERE id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setString(1, roleId);
+            stmt.setString(2, guildId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }

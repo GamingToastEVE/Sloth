@@ -69,12 +69,10 @@ public class SystemsCommandListener extends ListenerAdapter {
     public void onButtonInteraction(ButtonInteractionEvent event) {
         if (!event.getComponentId().startsWith("sys_toggle:")) return;
 
-        event.deferReply().queue();
-
         String guildId = event.getGuild().getId();
 
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.getHook().sendMessage(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
@@ -90,10 +88,13 @@ public class SystemsCommandListener extends ListenerAdapter {
         AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
         cmdUpdater.updateGuildCommandsFromActiveSystems("");
 
-        event.getMessage().editMessageEmbeds(buildEmbed(guildId, statuses).build())
-                .setComponents(buildButtons(statuses))
-                .queue();
-        event.getHook().deleteOriginal().queue();
+        // Use deferEdit to acknowledge and then edit the original message
+        event.deferEdit().queue(
+                success -> event.getHook().editOriginalEmbeds(buildEmbed(guildId, statuses).build())
+                        .setComponents(buildButtons(statuses))
+                        .queue(null, error -> System.err.println("Failed to edit message: " + error.getMessage())),
+                error -> System.err.println("Failed to defer edit: " + error.getMessage())
+        );
     }
 
     private EmbedBuilder buildEmbed(String guildId, Map<String, Boolean> statuses) {
