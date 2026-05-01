@@ -5,13 +5,8 @@ import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.selections.StringSelectMenu;
 
 import java.awt.Color;
 import java.util.List;
@@ -26,99 +21,48 @@ public class TimedRolesCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
-    public void sendEventDashboard(IReplyCallback event, DatabaseHandler.RoleEventData data) {
-        String guildId = event.getGuild().getId();
+    // ==================== LANGUAGE HELPER METHODS ====================
 
-        // 1. Das Embed bauen (Die Anzeige)
-        EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⚙️ Konfiguration: " + data.name);
-        embed.setColor(data.active ? Color.GREEN : Color.RED);
-        embed.setDescription("Bearbeite hier die Einstellungen für das zeitgesteuerte Event.");
-
-        // Status-Indikator
-        String statusEmoji = data.active ? "✅ Aktiv" : "🔴 Inaktiv";
-        embed.addField("Status", statusEmoji, true);
-
-        // Trigger-Typ (z.B. MEMBER_JOIN)
-        embed.addField("1. Auslöser (Trigger)", "`" + data.eventType + "`", true);
-
-        // Ziel-Rolle
-        Role role = event.getGuild().getRoleById(data.roleId);
-        String roleText = (role != null) ? role.getAsMention() : "❌ Gelöschte Rolle (" + data.roleId + ")";
-        String actionText = data.actionType.equals("ADD") ? "Hinzufügen" : "Entfernen";
-        embed.addField("2. Aktion & Rolle", actionText + " -> " + roleText, false);
-
-        // Dauer (formatiert)
-        String durationText = (data.durationSeconds > 0) ? formatDuration(data.durationSeconds) : "Permanent (0s)";
-        embed.addField("3. Dauer", durationText, true);
-
-        // Trigger-Daten (z.B. Warn-Limit)
-        String conditionText = (data.triggerData != null && !data.triggerData.equals("{}")) ? data.triggerData : "Keine Bedingungen";
-        embed.addField("4. Bedingungen", "`" + conditionText + "`", true);
-
-        embed.setFooter("Event-ID: " + data.id);
-
-        // 2. Das Dropdown-Menü bauen (Die Auswahl)
-        StringSelectMenu.Builder menu = StringSelectMenu.create("event_edit_select_" + data.id)
-                .setPlaceholder("Wähle eine Einstellung zum Bearbeiten...")
-                .addOption("Name ändern", "edit_name", "Den internen Namen ändern", Emoji.fromUnicode("📝"))
-                .addOption("Auslöser ändern", "edit_trigger", "Wann soll das passieren?", Emoji.fromUnicode("⚡"))
-                .addOption("Rolle ändern", "edit_role", "Welche Rolle ist betroffen?", Emoji.fromUnicode("🎭"))
-                .addOption("Aktion ändern (Add/Remove)", "edit_action", "Rolle geben oder nehmen?", Emoji.fromUnicode("🔄"))
-                .addOption("Dauer ändern", "edit_duration", "Wie lange hält die Rolle?", Emoji.fromUnicode("⏱️"))
-                .addOption("Bedingungen ändern", "edit_data", "Z.B. Anzahl der Warns", Emoji.fromUnicode("📋"));
-
-        // 3. Buttons für schnelle Aktionen (Toggle & Delete)
-        Button toggleBtn = data.active
-                ? Button.secondary("event_toggle_" + data.id, "Deaktivieren").withEmoji(Emoji.fromUnicode("⏸️"))
-                : Button.success("event_toggle_" + data.id, "Aktivieren").withEmoji(Emoji.fromUnicode("▶️"));
-
-        Button deleteBtn = Button.danger("event_delete_" + data.id, "Löschen").withEmoji(Emoji.fromUnicode("🗑️"));
-
-        // 4. Nachricht senden
-        // Prüfen ob es ein SlashCommand (reply) oder ButtonClick (edit) ist
-        if (event.isAcknowledged()) {
-            event.getHook().editOriginalEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menu.build()), ActionRow.of(toggleBtn, deleteBtn))
-                    .queue();
-        } else {
-            event.replyEmbeds(embed.build())
-                    .setComponents(ActionRow.of(menu.build()), ActionRow.of(toggleBtn, deleteBtn))
-                    .setEphemeral(true)
-                    .queue();
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
         }
+        return key;
     }
 
-    // Hilfsmethode: Sekunden in lesbaren Text umwandeln
-    private String formatDuration(long seconds) {
-        if (seconds < 60) return seconds + " Sekunden";
-        long minutes = seconds / 60;
-        if (minutes < 60) return minutes + " Minuten";
-        long hours = minutes / 60;
-        if (hours < 24) return hours + " Stunden";
-        long days = hours / 24;
-        return days + " Tage";
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
     }
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String command = event.getName();
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
 
         switch (command) {
             case "my-roles":
+                String guildId = Objects.requireNonNull(event.getGuild()).getId();
                 // Jeder User darf das sehen
                 handler.insertOrUpdateGlobalStatistic("my-roles");
                 handleMyRoles(event, guildId);
                 break;
             case "temprole":
+                String guildId2 = Objects.requireNonNull(event.getGuild()).getId();
                 // Nur Admins/Mods dürfen das
                 if (!event.getMember().hasPermission(Permission.MANAGE_ROLES)) {
-                    event.reply("❌ Du hast keine Berechtigung, temporäre Rollen zu verwalten.").setEphemeral(true).queue();
+                    event.reply(t(guildId2, "general.permission_denied")).setEphemeral(true).queue();
                     return;
                 }
                 handler.insertOrUpdateGlobalStatistic("temprole");
-                handleTempRoleManage(event, guildId);
+                handleTempRoleManage(event, guildId2);
                 break;
         }
     }
@@ -127,32 +71,36 @@ public class TimedRolesCommandListener extends ListenerAdapter {
      * Zeigt dem User seine eigenen aktiven temporären Rollen an.
      */
     private void handleMyRoles(SlashCommandInteractionEvent event, String guildId) {
-        String userId = event.getUser().getId();
-        List<DatabaseHandler.ActiveTimerData> timers = handler.getActiveTimersForUser(guildId, userId);
+        String oderId = event.getUser().getId();
+        List<DatabaseHandler.ActiveTimerData> timers = handler.getActiveTimersForUser(guildId, oderId);
+
+        LanguageManager lang = LanguageManager.getInstance();
+        boolean isGerman = lang != null && lang.getGuildLanguage(guildId).equals("de");
 
         if (timers.isEmpty()) {
-            event.reply("Du hast aktuell keine zeitbegrenzten Rollen.").setEphemeral(true).queue();
+            String msg = isGerman ? "Du hast aktuell keine zeitbegrenzten Rollen." : "You don't have any timed roles.";
+            event.reply(msg).setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle("⏳ Deine temporären Rollen");
+        embed.setTitle(isGerman ? "⏳ Deine temporären Rollen" : "⏳ Your Temporary Roles");
         embed.setColor(Color.ORANGE);
-        embed.setDescription("Hier ist eine Übersicht deiner Rollen, die automatisch ablaufen:");
+        embed.setDescription(isGerman ? "Hier ist eine Übersicht deiner Rollen, die automatisch ablaufen:" : "Here's an overview of your roles that will expire automatically:");
 
         StringBuilder content = new StringBuilder();
         Guild guild = event.getGuild();
 
         for (DatabaseHandler.ActiveTimerData timer : timers) {
             Role role = guild.getRoleById(timer.roleId);
-            String roleName = (role != null) ? role.getAsMention() : "Gelöschte Rolle (" + timer.roleId + ")";
+            String roleName = (role != null) ? role.getAsMention() : (isGerman ? "Gelöschte Rolle (" : "Deleted Role (") + timer.roleId + ")";
 
             // Discord Timestamp Format: <t:SECONDS:R> macht daraus "in 2 Tagen" oder "vor 5 Minuten"
             long unixSeconds = timer.expiresAt.getTime() / 1000;
 
             content.append("• ").append(roleName)
-                    .append(" \n  Expires: <t:").append(unixSeconds).append(":R>") // Relativ (in X Minuten)
-                    .append(" (<t:").append(unixSeconds).append(":f>)") // Absolut (Datum Uhrzeit)
+                    .append(" \n  ").append(isGerman ? "Läuft ab" : "Expires").append(": <t:").append(unixSeconds).append(":R>")
+                    .append(" (<t:").append(unixSeconds).append(":f>)")
                     .append("\n\n");
         }
 
@@ -172,8 +120,12 @@ public class TimedRolesCommandListener extends ListenerAdapter {
         Member target = event.getOption("user").getAsMember();
         Role role = event.getOption("role").getAsRole();
 
+        LanguageManager lang = LanguageManager.getInstance();
+        boolean isGerman = lang != null && lang.getGuildLanguage(guildId).equals("de");
+
         if (target == null) {
-            event.reply("❌ User nicht gefunden.").setEphemeral(true).queue();
+            String msg = isGerman ? "❌ Benutzer nicht gefunden." : "❌ User not found.";
+            event.reply(msg).setEphemeral(true).queue();
             return;
         }
 
@@ -183,7 +135,8 @@ public class TimedRolesCommandListener extends ListenerAdapter {
             long seconds = parseDuration(durationStr);
 
             if (seconds < 0) {
-                event.reply("❌ Ungültige Dauer. Nutze Formate wie `30m`, `24h`, `7d`.").setEphemeral(true).queue();
+                String msg = isGerman ? "❌ Ungültige Dauer. Nutze Formate wie `30m`, `24h`, `7d`." : "❌ Invalid duration. Use formats like `30m`, `24h`, `7d`.";
+                event.reply(msg).setEphemeral(true).queue();
                 return;
             }
 
@@ -191,13 +144,18 @@ public class TimedRolesCommandListener extends ListenerAdapter {
             event.getGuild().addRoleToMember(target, role).queue(
                     success -> {
                         // Timer in DB eintragen (EventID 0, da manuell)
-                        handler.addActiveTimer(guildId, target.getId(), role.getId(), seconds, 0);
+                        handler.addActiveTimer(guildId, target.getId(), role.getId(), 0, seconds);
 
                         long unixExpiry = (System.currentTimeMillis() / 1000) + seconds;
-                        event.reply("✅ Rolle " + role.getAsMention() + " an " + target.getAsMention() + " vergeben.\n" +
-                                "Läuft ab: <t:" + unixExpiry + ":R>").queue();
+                        String msg = isGerman
+                                ? "✅ Rolle " + role.getAsMention() + " an " + target.getAsMention() + " vergeben.\nLäuft ab: <t:" + unixExpiry + ":R>"
+                                : "✅ Role " + role.getAsMention() + " assigned to " + target.getAsMention() + ".\nExpires: <t:" + unixExpiry + ":R>";
+                        event.reply(msg).queue();
                     },
-                    error -> event.reply("❌ Fehler beim Vergeben der Rolle. Überprüfe meine Berechtigungen!").setEphemeral(true).queue()
+                    error -> {
+                        String msg = isGerman ? "❌ Fehler beim Vergeben der Rolle. Überprüfe meine Berechtigungen!" : "❌ Error assigning role. Check my permissions!";
+                        event.reply(msg).setEphemeral(true).queue();
+                    }
             );
 
         } else if (subcommand.equals("remove")) {
@@ -206,12 +164,17 @@ public class TimedRolesCommandListener extends ListenerAdapter {
                     success -> {
                         boolean deleted = handler.removeTimerManual(guildId, target.getId(), role.getId());
                         if (deleted) {
-                            event.reply("✅ Rolle entfernt und Timer gestoppt.").queue();
+                            String msg = isGerman ? "✅ Rolle entfernt und Timer gestoppt." : "✅ Role removed and timer stopped.";
+                            event.reply(msg).queue();
                         } else {
-                            event.reply("⚠️ Rolle entfernt, aber es wurde kein aktiver Timer in der Datenbank gefunden.").queue();
+                            String msg = isGerman ? "⚠️ Rolle entfernt, aber es wurde kein aktiver Timer in der Datenbank gefunden." : "⚠️ Role removed, but no active timer was found in the database.";
+                            event.reply(msg).queue();
                         }
                     },
-                    error -> event.reply("❌ Fehler beim Entfernen der Rolle.").setEphemeral(true).queue()
+                    error -> {
+                        String msg = isGerman ? "❌ Fehler beim Entfernen der Rolle." : "❌ Error removing role.";
+                        event.reply(msg).setEphemeral(true).queue();
+                    }
             );
         }
     }

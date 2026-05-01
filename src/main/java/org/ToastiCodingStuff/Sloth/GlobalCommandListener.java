@@ -10,13 +10,37 @@ public class GlobalCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent event) {
         if (!event.getName().equals("global-stats")) {return;}
 
+        event.deferReply().queue();
+
         EmbedBuilder embed = handler.getGlobalStats();
         EmbedBuilder embed2 = handler.getGlobalModStats();
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).queue();
         event.getChannel().sendMessageEmbeds(embed2.build()).queue();
     }
 }

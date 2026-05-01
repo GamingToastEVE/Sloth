@@ -45,7 +45,7 @@ import java.util.*;
  * <h2>Adding New Features:</h2>
  * To add new columns for a feature:
  * <ol>
- *   <li>Update the table schema definition in the appropriate create*Schema() method</li>
+ *   <li>Update the table schema definition in the appropriate creation*Schema() method</li>
  *   <li>Restart the application - migration runs automatically</li>
  *   <li>New columns are added with proper defaults, existing data is preserved</li>
  * </ol>
@@ -126,6 +126,11 @@ public class DatabaseMigrationManager {
         schemas.put("warnings", createWarningsSchema());
         schemas.put("moderation_actions", createModerationActionsSchema());
         schemas.put("tickets", createTicketsSchema());
+        schemas.put("ticket_panels", createTicketPanelsSchema());
+        schemas.put("ticket_categories", createTicketCategoriesSchema());
+        schemas.put("ticket_forms", createTicketFormsSchema());
+        schemas.put("ticket_form_fields", createTicketFormFieldsSchema());
+        schemas.put("ticket_form_responses", createTicketFormResponsesSchema());
         schemas.put("ticket_messages", createTicketMessagesSchema());
         schemas.put("guild_settings", createGuildSettingsSchema());
         schemas.put("statistics", createStatisticsSchema());
@@ -136,9 +141,15 @@ public class DatabaseMigrationManager {
         schemas.put("database_migrations", createDatabaseMigrationsSchema());
         schemas.put("global_statistics", createGlobalStatisticsSchema());
         schemas.put("just_verify_button", createJustVerifyButtonSchema());
-        // In DatabaseMigrationManager.java -> getExpectedSchemas()
+        schemas.put("custom_embeds", createCustomEmbedsSchema());
         schemas.put("role_events", createRoleEventsSchema());
         schemas.put("active_timers", createActiveTimersSchema());
+        schemas.put("reminders", createRemindersSchema());
+        schemas.put("level_settings", createLevelSettingsSchema());
+        schemas.put("user_levels", createUserLevelsSchema());
+        schemas.put("role_select", createRoleSelectSchema());
+        schemas.put("role_select_groups", createRoleSelectGroupsSchema());
+        schemas.put("role_select_embeds", createRoleSelectEmbedsSchema());
 
         return schemas;
     }
@@ -148,13 +159,15 @@ public class DatabaseMigrationManager {
      */
     private TableSchema createGuildsSchema() {
         return new TableSchema("guilds")
-            .addColumn("id", "INTEGER PRIMARY KEY")
-            .addColumn("name", "TEXT NOT NULL")
-            .addColumn("prefix", "TEXT DEFAULT '!'")
-            .addColumn("language", "TEXT DEFAULT 'de'")
-            .addColumn("created_at", "TEXT")
-            .addColumn("updated_at", "TEXT")
-            .addColumn("active", "INTEGER DEFAULT 1");
+                .addColumn("id", "VARCHAR(32) PRIMARY KEY")
+                .addColumn("name", "TEXT NOT NULL")
+                .addColumn("prefix", "TEXT DEFAULT '!'")
+                .addColumn("language", "TEXT DEFAULT 'de'")
+                .addColumn("created_at", "TEXT")
+                .addColumn("updated_at", "TEXT")
+                .addColumn("active", "INTEGER DEFAULT 1")
+                .addColumn("active_modules", "TEXT")
+                .addColumn("message_count_tracking", "INTEGER DEFAULT 0");
     }
 
     private TableSchema createJustVerifyButtonSchema() {
@@ -190,7 +203,8 @@ public class DatabaseMigrationManager {
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("moderator_id", "INTEGER NOT NULL")
             .addColumn("reason", "TEXT NOT NULL")
-            .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
+            .addColumn("severity", "TEXT DEFAULT 'MEDIUM' CHECK(severity IN ('NOTE', 'LOW', 'MEDIUM', 'HIGH', 'SEVERE'))")
+            .addColumn("evidence", "TEXT")
             .addColumn("active", "INTEGER DEFAULT 1")
             .addColumn("expires_at", "TEXT")
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
@@ -222,6 +236,7 @@ public class DatabaseMigrationManager {
             .addColumn("guild_id", "INTEGER NOT NULL")
             .addColumn("user_id", "INTEGER NOT NULL")
             .addColumn("channel_id", "INTEGER UNIQUE")
+            .addColumn("panel_id", "INTEGER")
             .addColumn("category", "TEXT DEFAULT 'general'")
             .addColumn("subject", "TEXT")
             .addColumn("status", "TEXT DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'IN_PROGRESS', 'WAITING', 'CLOSED'))")
@@ -234,6 +249,98 @@ public class DatabaseMigrationManager {
             .addColumn("closed_at", "TEXT");
     }
     
+    /**
+     * Define the ticket_panels table schema for multiple ticket systems per guild
+     */
+    private TableSchema createTicketPanelsSchema() {
+        return new TableSchema("ticket_panels")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("title", "VARCHAR(256) DEFAULT '🎫 Create a Ticket'")
+            .addColumn("description", "TEXT DEFAULT 'Click the button below to create a support ticket.'")
+            .addColumn("button_label", "VARCHAR(80) DEFAULT '📩 Create Ticket'")
+            .addColumn("button_emoji", "VARCHAR(50)")
+            .addColumn("button_color", "VARCHAR(20) DEFAULT 'PRIMARY'")
+            .addColumn("category_id", "VARCHAR(32)")
+            .addColumn("channel_id", "VARCHAR(32)")
+            .addColumn("support_role_id", "VARCHAR(32)")
+            .addColumn("ping_role_id", "VARCHAR(32)")
+            .addColumn("welcome_message", "TEXT DEFAULT 'Welcome to your support ticket! A staff member will assist you shortly.'")
+            .addColumn("embed_color", "VARCHAR(10) DEFAULT '#5865F2'")
+            .addColumn("embed_footer", "VARCHAR(256)")
+            .addColumn("embed_thumbnail", "TEXT")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("max_tickets_per_user", "INTEGER DEFAULT 1")
+            .addColumn("require_subject", "INTEGER DEFAULT 1")
+            .addColumn("require_description", "INTEGER DEFAULT 1")
+            .addColumn("panel_message_id", "VARCHAR(32)")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+            .addColumn("updated_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_categories table schema for multiple buttons/categories per panel
+     */
+    private TableSchema createTicketCategoriesSchema() {
+        return new TableSchema("ticket_categories")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("panel_id", "INTEGER NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("description", "VARCHAR(256)")
+            .addColumn("button_label", "VARCHAR(80) NOT NULL")
+            .addColumn("button_emoji", "VARCHAR(50)")
+            .addColumn("button_color", "VARCHAR(20) DEFAULT 'PRIMARY'")
+            .addColumn("category_id", "VARCHAR(32)")
+            .addColumn("welcome_message", "TEXT")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_forms table schema for multiple forms per category
+     */
+    private TableSchema createTicketFormsSchema() {
+        return new TableSchema("ticket_forms")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("category_id", "INTEGER NOT NULL")
+            .addColumn("name", "VARCHAR(100) NOT NULL")
+            .addColumn("description", "VARCHAR(256)")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_form_fields table schema for custom forms per category
+     */
+    private TableSchema createTicketFormFieldsSchema() {
+        return new TableSchema("ticket_form_fields")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("category_id", "INTEGER")
+            .addColumn("form_id", "INTEGER")
+            .addColumn("label", "VARCHAR(45) NOT NULL")
+            .addColumn("placeholder", "VARCHAR(100)")
+            .addColumn("field_type", "VARCHAR(20) DEFAULT 'SHORT'")
+            .addColumn("min_length", "INTEGER DEFAULT 0")
+            .addColumn("max_length", "INTEGER DEFAULT 1000")
+            .addColumn("required", "INTEGER DEFAULT 1")
+            .addColumn("position", "INTEGER DEFAULT 0")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * Define the ticket_form_responses table schema for storing form answers per ticket
+     */
+    private TableSchema createTicketFormResponsesSchema() {
+        return new TableSchema("ticket_form_responses")
+            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+            .addColumn("ticket_id", "INTEGER NOT NULL")
+            .addColumn("field_id", "INTEGER NOT NULL")
+            .addColumn("field_label", "VARCHAR(45) NOT NULL")
+            .addColumn("response", "TEXT")
+            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
+    }
+
     /**
      * Define the ticket_messages table schema
      */
@@ -391,6 +498,7 @@ public class DatabaseMigrationManager {
                 .addColumn("stack_type", "VARCHAR(16) DEFAULT 'REFRESH'")
                 .addColumn("trigger_data", "TEXT") // JSON String
                 .addColumn("active", "TINYINT(1) DEFAULT 1")
+                .addColumn("instant_apply", "TINYINT(1) DEFAULT 0")
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
     }
 
@@ -408,6 +516,195 @@ public class DatabaseMigrationManager {
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
                 // Index für schnelle Abfragen im Background-Loop
                 .addIndex("CREATE INDEX IF NOT EXISTS idx_timers_expires ON active_timers(expires_at)");
+    }
+
+    // Neue Methode hinzufügen:
+    private TableSchema createCustomEmbedsSchema() {
+        return new TableSchema("custom_embeds")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(100) NOT NULL")
+                .addColumn("data", "TEXT NOT NULL") // Speichert das komplette Embed als JSON
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    private TableSchema createRemindersSchema() {
+        return new TableSchema("reminders")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("guild_id", "VARCHAR(32)")
+                .addColumn("channel_id", "VARCHAR(32)")
+                .addColumn("title", "TEXT")
+                .addColumn("message", "TEXT NOT NULL")
+                .addColumn("dm", "TINYINT(1) DEFAULT 0")
+                .addColumn("remind_at", "DATETIME NOT NULL")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    private TableSchema createLevelSettingsSchema() {
+        return new TableSchema("level_settings")
+                .addColumn("guild_id", "VARCHAR(32) PRIMARY KEY")
+                .addColumn("enabled", "TINYINT(1) DEFAULT 1")
+
+                // Formula Settings
+                .addColumn("xp_curve", "VARCHAR(32) DEFAULT 'linear'") // linear, exponential, logarithmic
+                .addColumn("xp_multiplier", "DOUBLE DEFAULT 1.0")
+                .addColumn("max_level", "INTEGER DEFAULT 0") // 0 = unlimited
+
+                // 1. Message XP
+                .addColumn("message_xp_enabled", "TINYINT(1) DEFAULT 1")
+                .addColumn("message_xp_mode", "VARCHAR(32) DEFAULT 'random'") // random, fixed
+                .addColumn("xp_min", "INTEGER DEFAULT 15")
+                .addColumn("xp_max", "INTEGER DEFAULT 40")
+                .addColumn("cooldown_seconds", "INTEGER DEFAULT 60")
+                .addColumn("min_message_length", "INTEGER DEFAULT 5")
+
+                // 2. Voice XP
+                .addColumn("voice_xp_enabled", "TINYINT(1) DEFAULT 0")
+                .addColumn("voice_xp_min", "INTEGER DEFAULT 15")
+                .addColumn("voice_xp_max", "INTEGER DEFAULT 40")
+                .addColumn("voice_xp_amount", "INTEGER DEFAULT 10") // Legacy - kept for compatibility
+                .addColumn("voice_xp_cooldown", "INTEGER DEFAULT 180") // seconds
+                .addColumn("voice_xp_min_members", "INTEGER DEFAULT 2") // minimum members in channel
+                .addColumn("voice_xp_anti_afk", "TINYINT(1) DEFAULT 1") // require unmuted/undeafened
+
+                // 3. Reaction XP (NEW)
+                .addColumn("reaction_xp_enabled", "TINYINT(1) DEFAULT 0")
+                .addColumn("reaction_xp_awards", "VARCHAR(32) DEFAULT 'both'") // both, sender, receiver
+                .addColumn("reaction_xp_min", "INTEGER DEFAULT 5")
+                .addColumn("reaction_xp_max", "INTEGER DEFAULT 25")
+                .addColumn("reaction_xp_cooldown", "INTEGER DEFAULT 300") // seconds
+
+                // 4. Benachrichtigungen
+                .addColumn("levelup_channel_id", "VARCHAR(32) DEFAULT 'current'") // '0', 'current' oder ID
+                .addColumn("levelup_messages", "TEXT DEFAULT 'Congratulations {mention}, you are now level {level}!'") // JSON Array (Sollen auch Embeds unterstützen)
+                .addColumn("levelup_dm", "TINYINT(1) DEFAULT 0") // Default: keine DMs
+
+                // 5. Rollen
+                .addColumn("stack_rewards", "TINYINT(1) DEFAULT 1") // Standard: Rollen behalten
+                .addColumn("rewards", "TEXT") // JSON Array: [{level:1,role_id:"123"}, {level:5,role_id:"456"}]
+                .addColumn("apply_role_rewards", "TINYINT(1) DEFAULT 1") // Sofort Level geben, wenn User schon Rolle hat
+
+                // 6. Ausnahmen & Reset
+                .addColumn("ignored_channels", "TEXT") // IDs kommagetrennt
+                .addColumn("ignored_roles", "TEXT")    // IDs kommagetrennt
+                .addColumn("reset_on_leave", "TINYINT(1) DEFAULT 0") // Default: Daten behalten
+
+                .addColumn("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    /**
+     * User levels table schema - tracks XP and level for each user per guild
+     */
+    private TableSchema createUserLevelsSchema() {
+        return new TableSchema("user_levels")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("xp", "BIGINT DEFAULT 0")
+                .addColumn("level", "INT DEFAULT 0")
+                .addColumn("total_xp", "BIGINT DEFAULT 0") // Lifetime XP (never resets)
+                .addColumn("messages_count", "INT DEFAULT 0") // Total messages that earned XP
+                .addColumn("voice_minutes", "INT DEFAULT 0") // Total minutes in voice channels
+                .addColumn("last_xp_time", "DATETIME DEFAULT NULL") // For cooldown tracking
+                .addColumn("last_voice_xp_time", "DATETIME DEFAULT NULL") // For voice XP cooldown
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addColumn("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE UNIQUE INDEX idx_user_levels_guild_user ON user_levels(guild_id, user_id)")
+                .addIndex("CREATE INDEX idx_user_levels_guild_level ON user_levels(guild_id, level DESC)")
+                .addIndex("CREATE INDEX idx_user_levels_guild_xp ON user_levels(guild_id, total_xp DESC)");
+    }
+
+    /**
+     * Define the role_select table schema for role selection entries
+     */
+    private TableSchema createRoleSelectSchema() {
+        return new TableSchema("role_select")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("role_id", "VARCHAR(32) NOT NULL")
+                .addColumn("group_id", "INT DEFAULT NULL")
+                .addColumn("position", "INT DEFAULT 0")
+                .addColumn("label", "VARCHAR(64)")
+                .addColumn("description", "VARCHAR(255)")
+                .addColumn("emoji_id", "VARCHAR(64)")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_guild ON role_select(guild_id)")
+                .addIndex("CREATE INDEX idx_role_select_group ON role_select(guild_id, group_id)");
+    }
+
+    /**
+     * Define the role_select_groups table schema for grouping roles
+     */
+    private TableSchema createRoleSelectGroupsSchema() {
+        return new TableSchema("role_select_groups")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("name", "VARCHAR(64) NOT NULL")
+                .addColumn("position", "INT DEFAULT 0")
+                .addColumn("title", "VARCHAR(255)")
+                .addColumn("description", "TEXT")
+                .addColumn("footer", "TEXT")
+                .addColumn("color", "VARCHAR(32) DEFAULT '#3498db'")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_groups_guild ON role_select_groups(guild_id)");
+    }
+
+    /**
+     * Define the role_select_embeds table schema for sent role selection messages
+     */
+    private TableSchema createRoleSelectEmbedsSchema() {
+        return new TableSchema("role_select_embeds")
+                .addColumn("id", "INT PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("channel_id", "VARCHAR(32) NOT NULL")
+                .addColumn("message_id", "VARCHAR(32) NOT NULL")
+                .addColumn("group_id", "INT DEFAULT NULL")
+                .addColumn("display_type", "VARCHAR(32) NOT NULL DEFAULT 'BUTTON'")
+                .addColumn("title", "VARCHAR(255) NOT NULL")
+                .addColumn("description", "TEXT NOT NULL")
+                .addColumn("footer", "TEXT")
+                .addColumn("color", "VARCHAR(32) DEFAULT 'blue'")
+                .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                .addIndex("CREATE INDEX idx_role_select_embeds_guild ON role_select_embeds(guild_id)")
+                .addIndex("CREATE INDEX idx_role_select_embeds_message ON role_select_embeds(message_id)");
+    }
+
+    public void detectAndApplyMissingTables() throws SQLException {
+        System.out.println("Checking for missing tables...");
+
+        Map<String, TableSchema> expectedSchemas = getExpectedSchemas();
+
+        for (Map.Entry<String, TableSchema> entry : expectedSchemas.entrySet()) {
+            String tableName = entry.getKey();
+            TableSchema schema = entry.getValue();
+
+            if (!tableExists(tableName)) {
+                System.out.println("Table '" + tableName + "' is missing - creating it now.");
+
+                // Create table
+                StringBuilder createQuery = new StringBuilder("CREATE TABLE " + tableName + " (");
+                List<String> columnDefs = new ArrayList<>();
+
+                for (ColumnDefinition column : schema.columns.values()) {
+                    columnDefs.add(column.name + " " + column.sqlDefinition);
+                }
+
+                createQuery.append(String.join(", ", columnDefs));
+                createQuery.append(")");
+
+                try (Connection connection = databaseHandler.getConnection();
+                     Statement stmt = connection.createStatement()) {
+                    stmt.execute(createQuery.toString());
+                    System.out.println("Successfully created table '" + tableName + "'");
+
+                    // Apply indexes
+                    applyIndexes(tableName, schema);
+                } catch (SQLException e) {
+                    System.err.println("Failed to create table '" + tableName + "': " + e.getMessage());
+                }
+            }
+        }
     }
 
     /**
@@ -453,7 +750,7 @@ public class DatabaseMigrationManager {
         // Record this migration run
         recordMigrationRun("automatic_column_detection", "1.0", executionTime, true);
         
-        System.out.println("Migration check completed in " + executionTime + "ms");
+        System.out.println("Column Migration check completed in " + executionTime + "ms");
         System.out.println("Processed " + tablesProcessed + " tables, added " + totalColumnsAdded + " total columns");
     }
     

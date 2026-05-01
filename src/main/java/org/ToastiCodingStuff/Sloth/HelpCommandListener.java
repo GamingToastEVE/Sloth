@@ -1,13 +1,16 @@
 package org.ToastiCodingStuff.Sloth;
 
-import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.buttons.ButtonStyle;
+import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.separator.Separator;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.components.buttons.Button;
-import net.dv8tion.jda.api.interactions.components.ActionRow;
-
-import java.awt.*;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 
 public class HelpCommandListener extends ListenerAdapter {
 
@@ -17,386 +20,634 @@ public class HelpCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            if (guildId != null) {
+                return lang.get(guildId, key);
+            }
+            return lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            if (guildId != null) {
+                return lang.get(guildId, key, args);
+            }
+            String translation = lang.getTranslation(LanguageManager.DEFAULT_LANGUAGE, key);
+            try {
+                return String.format(translation, args);
+            } catch (Exception e) {
+                return translation;
+            }
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (event.getName().equals("help")) {
-            handler.insertOrUpdateGlobalStatistic("help");
-            handleHelpCommand(event);
+
+            if (!event.isFromGuild() || event.getGuild() == null) {
+                event.reply(t(null, "language.server_only")).setEphemeral(true).queue();
+                return;
+            }
+
+            String guildId = event.getGuild().getId();
+            Container container = buildHomePage(guildId);
+            MessageCreateBuilder messageBuilder = new MessageCreateBuilder().setComponents(container);
+            event.reply(messageBuilder.useComponentsV2().build()).queue();
         }
     }
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
-        
+
         if (customId.startsWith("help_")) {
-            handleHelpNavigation(event, customId);
+            if (!event.isFromGuild() || event.getGuild() == null) return;
+
+            String guildId = event.getGuild().getId();
+            String page = customId.substring(5);
+
+            Container container = buildPage(guildId, page);
+            if (container != null) {
+                MessageEditBuilder editBuilder = new MessageEditBuilder().setComponents(container);
+                event.editMessage(editBuilder.useComponentsV2().build()).queue();
+            }
         }
     }
 
-    private void handleHelpCommand(SlashCommandInteractionEvent event) {
-        // Show the main help page
-        showHelpPage(event, null, "home");
+    private Container buildPage(String guildId, String page) {
+        return switch (page) {
+            case "home" -> buildHomePage(guildId);
+            case "overview" -> buildOverviewPage(guildId);
+            case "systems" -> buildSystemsPage(guildId);
+            case "setup" -> buildSetupPage(guildId);
+            case "commands_1" -> buildCommandsPage1(guildId);
+            case "commands_2" -> buildCommandsPage2(guildId);
+            case "commands_3" -> buildCommandsPage3(guildId);
+            case "commands_4" -> buildCommandsPage4(guildId);
+            case "commands_5" -> buildCommandsPage5(guildId);
+            case "leveling_guide" -> buildLevelingGuidePage(guildId);
+            case "support_development" -> buildSupportPage(guildId);
+            case "legal" -> buildLegalPage(guildId);
+            case "rules_formatting" -> buildFormattingPage(guildId);
+            default -> buildHomePage(guildId);
+        };
     }
 
-    private void handleHelpNavigation(ButtonInteractionEvent event, String customId) {
-        // Extract page from custom ID (format: help_<page>)
-        String page = customId.substring(5);
-        showHelpPage(null, event, page);
+    // ==================== HOME PAGE ====================
+    private Container buildHomePage(String guildId) {
+        StringBuilder sections = new StringBuilder();
+        sections.append("🏠 **").append(t(guildId, "help.overview")).append("** - ").append(t(guildId, "help.overview_desc")).append("\n");
+        sections.append("⚙️ **").append(t(guildId, "help.systems")).append("** - ").append(t(guildId, "help.systems_desc")).append("\n");
+        sections.append("📋 **").append(t(guildId, "help.setup")).append("** - ").append(t(guildId, "help.setup_desc")).append("\n");
+        sections.append("📖 **").append(t(guildId, "help.commands")).append("** - ").append(t(guildId, "help.commands_desc")).append("\n");
+        sections.append("📈 **").append(t(guildId, "help.leveling")).append("** - ").append(t(guildId, "help.leveling_desc")).append("\n");
+        sections.append("🌐 **").append(t(guildId, "help.language")).append("** - ").append(t(guildId, "help.language_desc")).append("\n");
+        sections.append("🎨 **").append(t(guildId, "help.formatting")).append("** - ").append(t(guildId, "help.formatting_desc")).append("\n");
+        sections.append("📜 **").append(t(guildId, "help.legal")).append("** - ").append(t(guildId, "help.legal_desc")).append("\n");
+        sections.append("💡 **").append(t(guildId, "help.support")).append("** - ").append(t(guildId, "help.support_desc"));
+
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.title")),
+                TextDisplay.of(t(guildId, "help.welcome")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## " + t(guildId, "help.sections")),
+                TextDisplay.of(sections.toString()),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.note_rework") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal"))
+                )
+        ).withAccentColor(0x3498DB); // Blue
     }
 
-    private void showHelpPage(SlashCommandInteractionEvent slashEvent, ButtonInteractionEvent buttonEvent, String page) {
-        EmbedBuilder embed = new EmbedBuilder();
-        ActionRow actionRow;
-        ActionRow actionRow2;
+    // ==================== OVERVIEW PAGE ====================
+    private Container buildOverviewPage(String guildId) {
+        StringBuilder features = new StringBuilder();
+        features.append("• ").append(t(guildId, "help.feature_logging")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_moderation")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_tickets")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_statistics")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_roles")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_embeds")).append("\n");
+        features.append("• ").append(t(guildId, "help.feature_leveling"));
 
-        switch (page) {
-            case "home":
-                embed.setTitle("🤖 Sloth Bot - Help & Wiki")
-                        .setDescription("Welcome to Sloth! I'm a comprehensive Discord moderation and management bot.\n\n" +
-                                "**Available Help Sections:**\n" +
-                                "🏠 **Overview** - Learn about Sloth's features\n" +
-                                "⚙️ **Systems** - Available modular systems\n" +
-                                "📋 **Setup** - How to configure systems\n" +
-                                "📖 **Commands** - Complete command reference\n" +
-                                "🎨 **Formatting** - Rules embed formatting guide\n" +
-                                "📜 **Legal** - Terms of Service and Privacy Policy\n" +
-                                "💡 **Support Development** - How to support the bot\n\n" +
-                                "Note: this bot is completely reworked and settings from the old version will not carry over.")
-                        .setColor(Color.BLUE)
-                        .setFooter("Use the buttons below to navigate");
+        StringBuilder gettingStarted = new StringBuilder();
+        gettingStarted.append(t(guildId, "help.step1")).append("\n");
+        gettingStarted.append(t(guildId, "help.step2")).append("\n");
+        gettingStarted.append(t(guildId, "help.step3"));
 
-                actionRow = ActionRow.of(
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.overview_title")),
+                TextDisplay.of(t(guildId, "help.overview_intro")),
 
-            case "overview":
-                embed.setTitle("🏠 Sloth Bot - Overview")
-                        .setDescription("Sloth is designed to help server administrators manage their communities effectively.\n\n" +
-                                "**Key Features:**\n" +
-                                "• **Comprehensive Logging** - Track all server activities\n" +
-                                "• **Advanced Moderation** - Powerful tools for maintaining order\n" +
-                                "• **Ticket System** - Professional support channel management\n" +
-                                "• **Statistics Tracking** - Monitor server engagement\n\n" +
-                                "**Getting Started:**\n" +
-                                "1. All systems are available to use immediately\n" +
-                                "2. Configure each system using setup commands\n" +
-                                "3. Start managing your server more effectively!")
-                        .setColor(Color.GREEN)
-                        .setFooter("Navigate using buttons below");
+                Separator.createDivider(Separator.Spacing.LARGE),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+                TextDisplay.of("## " + t(guildId, "help.key_features")),
+                TextDisplay.of(features.toString()),
 
-            case "systems":
-                embed.setTitle("⚙️ Available Systems")
-                        .setDescription("Sloth offers several modular systems that can be independently activated:\n\n")
-                        .addField("🛡️ **Moderation System**", 
-                                "• Kick, ban, timeout users\n" +
-                                "• Message purging and slowmode\n" +
-                                "• Comprehensive moderation logging", false)
-                        .addField("⚠️ **Warning System**", 
-                                "• Issue warnings with severity levels\n" +
-                                "• Automatic actions on thresholds\n" +
-                                "• Warning history tracking", false)
-                        .addField("🎫 **Ticket System**", 
-                                "• Professional support channels\n" +
-                                "• Staff assignment and priorities", false)
-                        .addField("📝 **Log Channel System**", 
-                                "• Dedicated logging channels\n" +
-                                "• Track server events\n" +
-                                "• Comprehensive audit trail", false)
-                        .addField("📊 **Statistics System**", 
-                                "• Server activity tracking\n" +
-                                "• Daily and weekly reports\n" +
-                                "• Engagement metrics", false)
-                        .addField("📋 **Rules/Verification System**", 
-                                "• Custom rules embeds with verification buttons\n" +
-                                "• Role assignment upon verification\n" +
-                                "• Verification statistics tracking", false)
-                        .addField("🔘 **Verify Button System**", 
-                                "• Create custom verification buttons\n" +
-                                "• Assign/remove roles when users verify\n" +
-                                "• Support for multiple configurations (max 3)", false)
-                        .addField("🎭 **Select Roles System**", 
-                                "• Allow users to self-assign roles\n" +
-                                "• Role selection menus with descriptions and emojis\n" +
-                                "• Support for reactions, dropdowns, and buttons", false)
-                        .addField("⏱️ **Timed Roles System**", 
-                                "• Assign temporary roles that automatically expire\n" +
-                                "• Automated role management based on events\n" +
-                                "• Track active temporary roles per user", false)
-                        .setColor(Color.ORANGE)
-                        .setFooter("All systems are ready to use!");
+                Separator.createDivider(Separator.Spacing.LARGE),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_setup", "📋 Setup"),
-                        Button.primary("help_commands", "📖 Commands")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+                TextDisplay.of("## " + t(guildId, "help.getting_started")),
+                TextDisplay.of(gettingStarted.toString()),
 
-            case "setup":
-                embed.setTitle("📋 System Setup Guide")
-                        .setDescription("Follow these steps to configure Sloth for your server:\n\n")
-                        .addField("**Step 1: Choose Systems to Configure**", 
-                                "All systems are available to use:\n" +
-                                "• Log Channel, Warning, Ticket, Moderation, Statistics\n" +
-                                "• Configure only the ones you need", false)
-                        .addField("**Step 2: Configure Systems**", 
-                                "**Log Channel:** `/log-channel set #channel`\n" +
-                                "**Warning System:** `/warn settings-set`\n" +
-                                "**Ticket System:** `/ticket setup`\n" +
-                                "**Moderation:** Ready to use with `/mod` commands!", false)
-                        .addField("**Step 3: Create Panels (Optional)**", 
-                                "**Ticket Panel:** `/ticket panel` - Creates user-friendly ticket creation\n" +
-                                "Place in a public channel for easy access", false)
-                        .addField("**Step 4: Set Permissions**", 
-                                "• Ensure staff have appropriate Discord permissions\n" +
-                                "• Bot needs Admin permissions for full functionality\n" +
-                                "• Configure role-based access for tickets", false)
-                        .addField("**Formatting Rules Embeds**", 
-                                "Need help formatting your rules descriptions? Use Discord markdown!\n" +
-                                "📝 Click the 🎨 Formatting button below for a complete guide.", false)
-                        .setColor(Color.CYAN)
-                        .setFooter("Need help? Create a support ticket!");
+                Separator.createDivider(Separator.Spacing.LARGE),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_commands", "📖 Commands")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal"))
+                )
+        ).withAccentColor(0x2ECC71); // Green
+    }
 
-            case "commands":
-                embed.setTitle("📖 Command Reference")
-                        .setDescription("Complete list of available commands by system:\n\n")
-                        .addField("**Log Channel System**",
-                                "`/log-channel set` - Configure logging channel\n" +
-                                "`/log-channel get` - View current log channel", false)
-                        .addField("**Warning System**",
-                                "`/warn user` - Issue warning to user\n" +
-                                "`/warn settings-set` - Configure warning thresholds\n" +
-                                "`/warn settings-get` - View warning configuration", false)
-                        .addField("**Ticket System**",
-                                "`/ticket setup` - Configure ticket system\n" +
-                                "`/ticket panel` - Create ticket creation panel\n" +
-                                "`/ticket config` - Set custom title and description for ticket panel\n" +
-                                "`/ticket close` - Close current ticket\n" +
-                                "`/ticket assign` - Assign to staff member\n" +
-                                "`/ticket priority` - Change ticket priority\n" +
-                                "`/ticket info` - Get ticket information\n", false)
-                        .addField("**Moderation System**",
-                                "`/mod kick` `/mod ban` `/mod unban` - User management\n" +
-                                "`/mod timeout` `/mod untimeout` - Temporary restrictions\n" +
-                                "`/mod purge` - Delete multiple messages\n" +
-                                "`/mod slowmode` - Set channel slowmode", false)
-                        .addField("**Statistics System**",
-                                "`/stats lifetime` - Lifetime server statistics\n" +
-                                "`/stats today` - Today's server statistics\n" +
-                                "`/stats week` - Weekly statistics\n" +
-                                "`/stats date` - Statistics for specific date\n" +
-                                "`/stats user` - View user information and statistics", false)
-                        .addField("**Select Roles System**",
-                                "`/select-roles add` - Add role to selection list\n" +
-                                "`/select-roles remove` - Remove role from selection list\n" +
-                                "`/select-roles send` - Send role selection interface\n" +
-                                "*Supports reactions, dropdowns, and buttons*", false)
-                        .addField("**Rules/Verification System**",
-                                "`/rules add` - Create rules embeds with verification\n" +
-                                "`/rules setup` - Display rules in current channel\n" +
-                                "`/rules list` - List all rules embeds\n" +
-                                "`/rules remove` - Remove a rules embed\n" +
-                                "📝 *Need help formatting? Use the 🎨 Formatting button below!*", false)
-                        .addField("**Verify Button System**",
-                                "`/verify-button add` - Add verify button configuration (max 3)\n" +
-                                "`/verify-button send` - Send verify button message\n" +
-                                "`/verify-button remove` - Remove verify button from current channel", false)
-                        .addField("**Timed Roles System**",
-                                "`/my-roles` - View your active temporary roles and expiration times\n" +
-                                "`/temprole add` - Assign a temporary role to a user for a specified duration\n" +
-                                "`/temprole remove` - Remove a temporary role from a user\n" +
-                                "`/role-event create` - Create automated role events based on triggers\n" +
-                                "`/role-event list` - List and manage all role events", false)
-                        .addField("**General Commands**",
-                                "`/help` - Show this help system\n" +
-                                "`/feedback` - Send feedback to the developer", false)
-                        .setColor(Color.MAGENTA)
-                        .setFooter("All commands require appropriate permissions");
+    // ==================== SYSTEMS PAGE ====================
+    private Container buildSystemsPage(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.systems_title")),
+                TextDisplay.of(t(guildId, "help.systems_intro")),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+                Separator.createDivider(Separator.Spacing.LARGE),
 
-            case "support_developement":
-                embed.setTitle("💡 Support Development")
-                        .setDescription("Sloth is free to use, but development and hosting incur costs.\n\n" +
-                                "**Ways to Support:**\n" +
-                                "• **Donate:** https://ko-fi.com/gamingtoast27542\n" +
-                                "• **Feedback:** Join our [Support Server](https://discord.gg/dQT53fD8M5) to share ideas and report issues.\n" +
-                                "• **Spread the Word:** Recommend Sloth to other server admins.\n" +
-                                "\nEvery bit of support helps keep Sloth running and improving!" +
-                                "\n\nThank you for considering supporting Sloth!");
-                embed.setColor(Color.PINK)
-                        .setFooter("Navigate using buttons below");
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_rules_formatting", "🎨 Formatting"),
-                        Button.primary("help_legal", "📜 Legal"),
-                        Button.link("https://ko-fi.com/gamingtoast27542", "☕ Donate")
-                );
-                break;
+                TextDisplay.of("### " + t(guildId, "help.system_moderation")),
+                TextDisplay.of(t(guildId, "help.system_moderation_desc")),
 
-            case "legal":
-                embed.setTitle("📜 Legal Information")
-                        .setDescription("Important legal documents and policies for using Sloth Bot:\n\n")
-                        .addField("**📋 Terms of Service**", 
-                                "By using Sloth Bot, you agree to our Terms of Service.\n" +
-                                "**Key Points:**\n" +
-                                "• Must be 16+ to use (Discord ToS compliance)\n" +
-                                "• Use in accordance with Discord Guidelines\n" +
-                                "• No misuse, harassment, or exploitation\n" +
-                                "• Service provided \"as is\" without guarantees\n" +
-                                "\n📄 **Full document:** `Terms of Service.md` in repository", false)
-                        .addField("**🔒 Privacy Policy**", 
-                                "We respect your privacy and follow GDPR compliance.\n" +
-                                "**What we collect:**\n" +
-                                "• Discord user/server IDs (necessary for functionality)\n" +
-                                "• Command interactions and parameters\n" +
-                                "• Technical logs for stability and security\n" +
-                                "\n**Your rights:** Access, rectification, erasure, data portability\n" +
-                                "\n📄 **Full document:** `privacy policy.md` in repository", false)
-                        .addField("**📞 Contact Information**", 
-                                "For questions about Terms of Service or Privacy Policy:\n" +
-                                "• Discord: **gamingtoasti**\n" +
-                                "• Support Server: https://discord.gg/dQT53fD8M5", false)
-                        .setColor(Color.GRAY)
-                        .setFooter("Last updated: 06.09.25 • Navigate using buttons below");
+                TextDisplay.of("### " + t(guildId, "help.system_warning")),
+                TextDisplay.of(t(guildId, "help.system_warning_desc")),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_legal", "📜 Legal"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.link("https://github.com/GamingToastEVE/Sloth", "📄 View on GitHub")
-                );
-                break;
+                TextDisplay.of("### " + t(guildId, "help.system_ticket")),
+                TextDisplay.of(t(guildId, "help.system_ticket_desc")),
 
-            case "rules_formatting":
-                embed.setTitle("📝 Rules Embed Formatting Guide")
-                        .setDescription("Learn how to format your rules embed descriptions using Discord markdown:\n\n")
-                        .addField("**Basic Text Formatting**", 
-                                "• `**bold text**` → **bold text**\n" +
-                                "• `*italic text*` → *italic text*\n" +
-                                "• `__underlined text__` → __underlined text__\n" +
-                                "• `~~strikethrough~~` → ~~strikethrough~~\n" +
-                                "• `||spoiler text||` → ||spoiler text||", false)
-                        .addField("**Code Formatting**", 
-                                "• `` `inline code` `` → `inline code`\n" +
-                                "• ```\\n```code block```\\n``` → Multi-line code blocks\n" +
-                                "• ```\\n```language\\ncode```\\n``` → Syntax highlighted code", false)
-                        .addField("**Lists and Structure**", 
-                                "• `• Bullet point` → Bullet lists\n" +
-                                "• `1. Numbered item` → Numbered lists\n" +
-                                "• `> Quote text` → Block quotes\n" +
-                                "• `>>> Multi-line quote` → Multi-line quotes", false)
-                        .addField("**Links and Mentions**", 
-                                "• `[Link Text](https://example.com)` → Clickable links\n" +
-                                "• `<@userid>` → User mentions\n" +
-                                "• `<#channelid>` → Channel mentions\n" +
-                                "• `<@&roleid>` → Role mentions", false)
-                        .addField("**Special Characters**", 
-                                "• `:emoji_name:` → Discord emojis\n" +
-                                "• `<:name:id>` → Custom server emojis\n" +
-                                "• `\\n` → Line breaks in descriptions\n" +
-                                "• `\\*` → Escape special characters", false)
-                        .addField("**Tips for Rules Embeds**", 
-                                "• **Titles**: Only support plain text (no formatting)\n" +
-                                "• **Descriptions & Footers**: Support all Discord markdown\n" +
-                                "• Use **bold** for rule headers\n" +
-                                "• Use `code blocks` for examples\n" +
-                                "• Keep descriptions under 4096 characters\n" +
-                                "• Use line breaks (\\n) for better readability\n" +
-                                "• Test formatting before publishing\n" +
-                                "• Bot will warn if you use formatting in titles", false)
-                        .setColor(Color.YELLOW)
-                        .setFooter("Navigate using buttons below");
+                TextDisplay.of("### " + t(guildId, "help.system_logchannel")),
+                TextDisplay.of(t(guildId, "help.system_logchannel_desc")),
 
-                actionRow = ActionRow.of(
-                        Button.secondary("help_home", "🏠 Home"),
-                        Button.primary("help_overview", "🏠 Overview"),
-                        Button.primary("help_systems", "⚙️ Systems"),
-                        Button.primary("help_setup", "📋 Setup")
-                );
-                actionRow2 = ActionRow.of(
-                        Button.primary("help_commands", "📖 Commands"),
-                        Button.primary("help_support_developement", "💡 Support Development"),
-                        Button.primary("help_legal", "📜 Legal")
-                );
-                break;
+                TextDisplay.of("### " + t(guildId, "help.system_statistics")),
+                TextDisplay.of(t(guildId, "help.system_statistics_desc")),
 
-            default:
-                // Fallback to home page
-                showHelpPage(slashEvent, buttonEvent, "home");
-                return;
-        }
+                TextDisplay.of("### " + t(guildId, "help.system_leveling")),
+                TextDisplay.of(t(guildId, "help.system_leveling_desc")),
 
-        // Send the response
-        if (slashEvent != null) {
-            slashEvent.replyEmbeds(embed.build()).addComponents(actionRow, actionRow2).setEphemeral(false).queue();
-        } else if (buttonEvent != null) {
-            buttonEvent.editMessageEmbeds(embed.build()).setComponents(actionRow, actionRow2).queue();
-        }
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.systems_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal"))
+                )
+        ).withAccentColor(0xE67E22); // Orange
+    }
+
+    // ==================== SETUP PAGE ====================
+    private Container buildSetupPage(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.setup_title")),
+                TextDisplay.of(t(guildId, "help.setup_intro")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.setup_step1_title")),
+                TextDisplay.of(t(guildId, "help.setup_step1_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.setup_step2_title")),
+                TextDisplay.of(t(guildId, "help.setup_step2_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.setup_step3_title")),
+                TextDisplay.of(t(guildId, "help.setup_step3_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.setup_step4_title")),
+                TextDisplay.of(t(guildId, "help.setup_step4_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.setup_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal"))
+                )
+        ).withAccentColor(0x00CED1); // Cyan
+    }
+
+    // ==================== COMMANDS PAGE 1 ====================
+    private Container buildCommandsPage1(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.commands_page1_title")),
+                TextDisplay.of(t(guildId, "help.commands_page1_subtitle")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_mod_title")),
+                TextDisplay.of(t(guildId, "help.commands_mod_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_warn_title")),
+                TextDisplay.of(t(guildId, "help.commands_warn_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_log_title")),
+                TextDisplay.of(t(guildId, "help.commands_log_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.commands_page1_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_commands_2", t(guildId, "help.btn_next"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup"))
+                )
+        ).withAccentColor(0x9B59B6); // Magenta
+    }
+
+    // ==================== COMMANDS PAGE 2 ====================
+    private Container buildCommandsPage2(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.commands_page2_title")),
+                TextDisplay.of(t(guildId, "help.commands_page2_subtitle")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_ticket_title")),
+                TextDisplay.of(t(guildId, "help.commands_ticket_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_stats_title")),
+                TextDisplay.of(t(guildId, "help.commands_stats_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.commands_page2_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_commands_1", t(guildId, "help.btn_prev")),
+                        Button.primary("help_commands_3", t(guildId, "help.btn_next"))
+                ),
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home"))
+                )
+        ).withAccentColor(0x9B59B6); // Magenta
+    }
+
+    // ==================== COMMANDS PAGE 3 ====================
+    private Container buildCommandsPage3(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.commands_page3_title")),
+                TextDisplay.of(t(guildId, "help.commands_page3_subtitle")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_selectroles_title")),
+                TextDisplay.of(t(guildId, "help.commands_selectroles_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_timedroles_title")),
+                TextDisplay.of(t(guildId, "help.commands_timedroles_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_verify_title")),
+                TextDisplay.of(t(guildId, "help.commands_verify_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.commands_page3_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_commands_2", t(guildId, "help.btn_prev")),
+                        Button.primary("help_commands_4", t(guildId, "help.btn_next"))
+                ),
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home"))
+                )
+        ).withAccentColor(0x9B59B6); // Magenta
+    }
+
+    // ==================== COMMANDS PAGE 4 (LEVELING) ====================
+    private Container buildCommandsPage4(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.commands_page4_title")),
+                TextDisplay.of(t(guildId, "help.commands_page4_subtitle")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_level_title")),
+                TextDisplay.of(t(guildId, "help.commands_level_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_reminder_title")),
+                TextDisplay.of(t(guildId, "help.commands_reminder_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.commands_page4_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_commands_3", t(guildId, "help.btn_prev")),
+                        Button.primary("help_commands_5", t(guildId, "help.btn_next"))
+                ),
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home"))
+                )
+        ).withAccentColor(0x9B59B6); // Magenta
+    }
+
+    // ==================== COMMANDS PAGE 5 ====================
+    private Container buildCommandsPage5(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.commands_page5_title")),
+                TextDisplay.of(t(guildId, "help.commands_page5_subtitle")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_embed_title")),
+                TextDisplay.of(t(guildId, "help.commands_embed_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.commands_core_title")),
+                TextDisplay.of(t(guildId, "help.commands_core_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.commands_page5_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_commands_4", t(guildId, "help.btn_prev")),
+                        Button.secondary("help_home", t(guildId, "help.btn_home"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting"))
+                )
+        ).withAccentColor(0x9B59B6); // Magenta
+    }
+
+    // ==================== SUPPORT PAGE ====================
+    private Container buildSupportPage(String guildId) {
+        StringBuilder ways = new StringBuilder();
+        ways.append("• ").append(t(guildId, "help.support_donate")).append("\n");
+        ways.append("• ").append(t(guildId, "help.support_feedback")).append("\n");
+        ways.append("• ").append(t(guildId, "help.support_spread"));
+
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.support_title")),
+                TextDisplay.of(t(guildId, "help.support_intro")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## " + t(guildId, "help.support_ways")),
+                TextDisplay.of(ways.toString()),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of(t(guildId, "help.support_thanks")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands")),
+                        Button.primary("help_rules_formatting", t(guildId, "help.btn_formatting")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal")),
+                        Button.of(ButtonStyle.LINK, "https://ko-fi.com/gamingtoast27542", t(guildId, "help.btn_donate"))
+                )
+        ).withAccentColor(0xFF69B4); // Pink
+    }
+
+    // ==================== LEGAL PAGE ====================
+    private Container buildLegalPage(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.legal_title")),
+                TextDisplay.of(t(guildId, "help.legal_intro")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.legal_tos_title")),
+                TextDisplay.of(t(guildId, "help.legal_tos_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.legal_privacy_title")),
+                TextDisplay.of(t(guildId, "help.legal_privacy_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.legal_contact_title")),
+                TextDisplay.of(t(guildId, "help.legal_contact_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("*" + t(guildId, "help.legal_footer") + "*"),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.of(ButtonStyle.LINK, "https://github.com/GamingToastEVE/Sloth", "📄 GitHub")
+                )
+        ).withAccentColor(0x808080); // Gray
+    }
+
+    // ==================== LEVELING GUIDE PAGE ====================
+    private Container buildLevelingGuidePage(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.leveling_guide_title")),
+                TextDisplay.of(t(guildId, "help.leveling_guide_intro")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## " + t(guildId, "help.leveling_how_it_works")),
+                TextDisplay.of(t(guildId, "help.leveling_how_it_works_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_commands_title")),
+                TextDisplay.of(t(guildId, "help.leveling_commands_desc")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("## " + t(guildId, "help.leveling_settings_title")),
+                TextDisplay.of(t(guildId, "help.leveling_settings_intro")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_formula_title")),
+                TextDisplay.of(t(guildId, "help.leveling_formula_desc")),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_message_xp_title")),
+                TextDisplay.of(t(guildId, "help.leveling_message_xp_desc")),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_voice_xp_title")),
+                TextDisplay.of(t(guildId, "help.leveling_voice_xp_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_reaction_xp_title")),
+                TextDisplay.of(t(guildId, "help.leveling_reaction_xp_desc")),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_notifications_title")),
+                TextDisplay.of(t(guildId, "help.leveling_notifications_desc")),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_rewards_title")),
+                TextDisplay.of(t(guildId, "help.leveling_rewards_desc")),
+
+                TextDisplay.of("### " + t(guildId, "help.leveling_exceptions_title")),
+                TextDisplay.of(t(guildId, "help.leveling_exceptions_desc")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_commands_4", t(guildId, "help.btn_commands"))
+                )
+        ).withAccentColor(0x9B59B6); // Purple
+    }
+
+    // ==================== FORMATTING PAGE ====================
+    private Container buildFormattingPage(String guildId) {
+        return Container.of(
+                TextDisplay.of("# " + t(guildId, "help.formatting_title")),
+                TextDisplay.of(t(guildId, "help.formatting_intro")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_basic_title")),
+                TextDisplay.of(t(guildId, "help.formatting_basic_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_code_title")),
+                TextDisplay.of(t(guildId, "help.formatting_code_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_lists_title")),
+                TextDisplay.of(t(guildId, "help.formatting_lists_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_links_title")),
+                TextDisplay.of(t(guildId, "help.formatting_links_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_special_title")),
+                TextDisplay.of(t(guildId, "help.formatting_special_desc")),
+
+                Separator.createDivider(Separator.Spacing.SMALL),
+
+                TextDisplay.of("### " + t(guildId, "help.formatting_tips_title")),
+                TextDisplay.of(t(guildId, "help.formatting_tips_desc")),
+
+                Separator.createDivider(Separator.Spacing.LARGE),
+
+                ActionRow.of(
+                        Button.secondary("help_home", t(guildId, "help.btn_home")),
+                        Button.primary("help_overview", t(guildId, "help.btn_overview")),
+                        Button.primary("help_systems", t(guildId, "help.btn_systems")),
+                        Button.primary("help_setup", t(guildId, "help.btn_setup"))
+                ),
+                ActionRow.of(
+                        Button.primary("help_leveling_guide", t(guildId, "help.btn_leveling")),
+                        Button.primary("help_commands_1", t(guildId, "help.btn_commands")),
+                        Button.primary("help_support_development", t(guildId, "help.btn_support")),
+                        Button.primary("help_legal", t(guildId, "help.btn_legal"))
+                )
+        ).withAccentColor(0xFFD700); // Yellow
     }
 }
+

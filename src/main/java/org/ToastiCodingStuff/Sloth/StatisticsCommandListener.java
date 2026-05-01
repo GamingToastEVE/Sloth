@@ -1,12 +1,18 @@
 package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.json.JSONObject;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.List;
 
 public class StatisticsCommandListener extends ListenerAdapter {
 
@@ -14,6 +20,39 @@ public class StatisticsCommandListener extends ListenerAdapter {
 
     public StatisticsCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    // ==================== LANGUAGE HELPER METHODS ====================
+
+    private String t(String guildId, String key) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key);
+        }
+        return key;
+    }
+
+    private String t(String guildId, String key, Object... args) {
+        LanguageManager lang = LanguageManager.getInstance();
+        if (lang != null) {
+            return lang.get(guildId, key, args);
+        }
+        try {
+            return String.format(key, args);
+        } catch (Exception e) {
+            return key;
+        }
+    }
+
+    @Override
+    public void onMessageReceived(MessageReceivedEvent event) {
+        if (event.getAuthor().isBot() || event.getChannel() instanceof PrivateChannel) { return; }
+        boolean needsMessages = handler.doesGuildTrackMessages(event.getGuild().getId());
+        if (needsMessages) {
+            handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());
+        } else if (handler.isSystemActive("leveling", event.getGuild().getId())) {
+            handler.incrementUserMessagesSent(event.getGuild().getId(), event.getAuthor().getId());
+        }
     }
 
     @Override
@@ -28,6 +67,8 @@ public class StatisticsCommandListener extends ListenerAdapter {
         }
 
         String guildId = event.getGuild().getId();
+
+        event.deferReply().setEphemeral(true).queue();
 
         switch (subcommand) {
             case "today":
@@ -50,53 +91,48 @@ public class StatisticsCommandListener extends ListenerAdapter {
                 handler.insertOrUpdateGlobalStatistic("stats-user");
                 handleUserInfoCommand(event, guildId);
                 break;
-            case "lifetime":
-                if (!event.getMember().hasPermission(Permission.ADMINISTRATOR)) {return;}
-                handler.insertOrUpdateGlobalStatistic("stats-lifetime");
-                handleStatsCommand(event, guildId);
-                break;
         }
     }
 
     private void handleStatsCommand (SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getLifetimeModerationStatisticsEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleTodayStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getTodaysModerationStatisticsEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleWeeklyStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
         String currentDate = LocalDate.now().minusDays(7).toString(); // Get date 7 days ago
 
         EmbedBuilder embed = handler.getWeeklyModerationStatisticsEmbed(guildId, currentDate);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleDateStatsCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view statistics.").setEphemeral(true).queue();
             return;
         }
 
@@ -106,18 +142,18 @@ public class StatisticsCommandListener extends ListenerAdapter {
         try {
             LocalDate.parse(dateString);
         } catch (DateTimeParseException e) {
-            event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = handler.getModerationStatisticsForDateEmbed(guildId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 
     private void handleUserInfoCommand(SlashCommandInteractionEvent event, String guildId) {
         // Check if user has moderate members permission
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
-            event.reply("❌ You need Moderate Members permission to view user statistics.").setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ You need Moderate Members permission to view user statistics.").setEphemeral(true).queue();
             return;
         }
 
@@ -129,15 +165,15 @@ public class StatisticsCommandListener extends ListenerAdapter {
             try {
                 LocalDate.parse(dateString);
             } catch (DateTimeParseException e) {
-                event.reply("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
+                event.getHook().sendMessage("❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15).").setEphemeral(true).queue();
                 return;
             }
             EmbedBuilder embed = handler.getUserStatisticsForDateEmbed(guildId, userId, dateString);
-            event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+            event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
             return;
         }
         
         EmbedBuilder embed = handler.getUserInfoEmbed(guildId, userId);
-        event.replyEmbeds(embed.build()).setEphemeral(false).queue();
+        event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(false).queue();
     }
 }
