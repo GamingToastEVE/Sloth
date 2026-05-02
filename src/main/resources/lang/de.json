@@ -262,7 +262,9 @@
     "warn_deleted_success": "✅ Verwarnung erfolgreich gelöscht.",
     "warn_delete_failed": "❌ Verwarnung konnte nicht gelöscht werden. Sie existiert möglicherweise nicht mehr.",
     "warn_invalid_id": "❌ Ungültige Verwarnungs-ID.",
-    "warn_not_found_entry": "❌ Verwarnung nicht gefunden."
+    "warn_not_found_entry": "❌ Verwarnung nicht gefunden.",
+    "warn_issue_failed": "❌ Verwarnung konnte nicht ausgestellt werden. Bitte versuche es erneut oder wende dich an einen Administrator.",
+    "moderator_not_found": "❌ Moderator konnte nicht ermittelt werden. Bitte versuche es erneut."
   },
   "tickets": {
     "create_title": "Ticket erstellen",
@@ -753,7 +755,20 @@
     "apply_level_to_members_with_role": "Synchronisiere Level mit aktuellen Rollen",
     "rank": "Rang",
     "level": "Level",
-    "total_xp": "Gesamt-XP"
+    "total_xp": "Gesamt-XP",
+    "no_permission": "❌ Du benötigst die Berechtigung **Server verwalten**, um diese Einstellungen zu ändern.",
+    "no_rewards_to_remove": "❌ Keine Belohnungen zum Entfernen gefunden.",
+    "unknown_setting": "❌ Unbekannte Einstellung.",
+    "multiplier_too_low": "❌ Der Multiplikator muss mindestens 0,1 betragen.",
+    "multiplier_too_high": "❌ Der Multiplikator darf 10,0 nicht überschreiten.",
+    "multiplier_invalid": "❌ Bitte gib eine gültige Zahl für den Multiplikator ein.",
+    "max_level_negative": "❌ Das Max-Level darf nicht negativ sein.",
+    "max_level_too_high": "❌ Das Max-Level darf 10.000 nicht überschreiten.",
+    "max_level_invalid": "❌ Bitte gib eine gültige Zahl für das Max-Level ein.",
+    "xp_too_low": "❌ XP-Werte müssen mindestens 1 betragen.",
+    "xp_min_greater_max": "❌ Der minimale XP-Wert darf nicht größer als der maximale sein.",
+    "xp_max_too_high": "❌ Der maximale XP-Wert darf 10.000 nicht überschreiten.",
+    "xp_invalid": "❌ Bitte gib gültige Zahlen für die XP-Werte ein."
   },
   "formatting": {
     "title": "Embed-Formatierungsanleitung",

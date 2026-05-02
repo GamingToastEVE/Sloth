@@ -15,7 +15,7 @@ import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 /**
  * Command listener for language settings
  */
-public class LanguageCommandListener extends ListenerAdapter {
+public class LanguageCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final LanguageManager langManager;
 
@@ -24,8 +24,12 @@ public class LanguageCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("language")) return;
+    public String[] getHandledCommands() {
+        return new String[]{"language"};
+    }
+
+    @Override
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
         if (!event.isFromGuild()) {
             event.reply(langManager.getTranslation(LanguageManager.DEFAULT_LANGUAGE, "language.server_only")).setEphemeral(true).queue();
             return;

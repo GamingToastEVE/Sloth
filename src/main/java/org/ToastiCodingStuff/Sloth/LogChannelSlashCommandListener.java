@@ -5,12 +5,17 @@ import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-public class LogChannelSlashCommandListener extends ListenerAdapter {
+public class LogChannelSlashCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public LogChannelSlashCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"log-channel"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -36,10 +41,7 @@ public class LogChannelSlashCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction (SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("log-channel")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {

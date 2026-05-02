@@ -35,7 +35,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class EmbedEditorCommandListener extends ListenerAdapter {
+public class EmbedEditorCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
@@ -43,6 +43,10 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
         this.handler = handler;
     }
 
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"embed"};
+    }
     // ==================== LANGUAGE HELPER METHODS ====================
 
     private String t(String guildId, String key) {
@@ -155,8 +159,7 @@ public class EmbedEditorCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("embed")) return;
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
             String gid = event.getGuild().getId();
             event.reply(t(gid, "embed_editor.no_permission")).setEphemeral(true).queue();

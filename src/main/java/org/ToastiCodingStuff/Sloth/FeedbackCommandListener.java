@@ -11,12 +11,17 @@ import java.awt.*;
 import java.time.Instant;
 import java.util.Objects;
 
-public class FeedbackCommandListener extends ListenerAdapter {
+public class FeedbackCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private Guild guild;
 
     public FeedbackCommandListener(Guild guild) {
         this.guild = guild;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"feedback"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -42,24 +47,22 @@ public class FeedbackCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction (SlashCommandInteractionEvent event) {
-        if (event.getName().equals("feedback")) {
-            String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
-            EmbedBuilder eb = new EmbedBuilder();
-            eb.setTitle(t(guildId, "feedback.title"));
-            eb.setDescription(t(guildId, "feedback.success_description"));
-            eb.setColor(Color.GREEN);
-            eb.setTimestamp(Instant.now());
-            event.replyEmbeds(eb.build()).setEphemeral(true).queue();
-            EmbedBuilder eb2 = new EmbedBuilder();
-            eb2.setTitle(t(guildId, "feedback.new_title"));
-            eb2.setDescription(Objects.requireNonNull(event.getOption("message")).getAsString());
-            eb2.addField(t(guildId, "feedback.field_user"), event.getUser().getAsTag(), false);
-            eb2.addField(t(guildId, "feedback.field_user_id"), event.getUser().getId(), false);
-            eb2.setColor(Color.BLUE);
-            eb2.setTimestamp(Instant.now());
-            PrivateChannel channel = Objects.requireNonNull(guild.getOwner()).getUser().openPrivateChannel().complete();
-            channel.sendMessageEmbeds(eb2.build()).queue();
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
+        EmbedBuilder eb = new EmbedBuilder();
+        eb.setTitle(t(guildId, "feedback.title"));
+        eb.setDescription(t(guildId, "feedback.success_description"));
+        eb.setColor(Color.GREEN);
+        eb.setTimestamp(Instant.now());
+        event.replyEmbeds(eb.build()).setEphemeral(true).queue();
+        EmbedBuilder eb2 = new EmbedBuilder();
+        eb2.setTitle(t(guildId, "feedback.new_title"));
+        eb2.setDescription(Objects.requireNonNull(event.getOption("message")).getAsString());
+        eb2.addField(t(guildId, "feedback.field_user"), event.getUser().getAsTag(), false);
+        eb2.addField(t(guildId, "feedback.field_user_id"), event.getUser().getId(), false);
+        eb2.setColor(Color.BLUE);
+        eb2.setTimestamp(Instant.now());
+        PrivateChannel channel = Objects.requireNonNull(event.getJDA().getUserById("365042010626719745")).openPrivateChannel().complete();
+        channel.sendMessageEmbeds(eb2.build()).queue();
     }
 }

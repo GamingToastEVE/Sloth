@@ -262,7 +262,9 @@
     "warn_deleted_success": "✅ Warning deleted successfully.",
     "warn_delete_failed": "❌ Failed to delete warning. It may not exist.",
     "warn_invalid_id": "❌ Invalid warning ID.",
-    "warn_not_found_entry": "❌ Warning not found."
+    "warn_not_found_entry": "❌ Warning not found.",
+    "warn_issue_failed": "❌ Failed to issue warning. Please try again or contact an administrator.",
+    "moderator_not_found": "❌ Unable to determine the moderator. Please try again."
   },
   "tickets": {
     "create_title": "Create a Ticket",
@@ -753,7 +755,20 @@
     "apply_level_to_members_with_role": "Apply level to members with role",
     "rank": "Rank",
     "level": "Level",
-    "total_xp": "Total XP"
+    "total_xp": "Total XP",
+    "no_permission": "❌ You need **Manage Server** permission to change these settings.",
+    "no_rewards_to_remove": "❌ No rewards found to remove.",
+    "unknown_setting": "❌ Unknown setting.",
+    "multiplier_too_low": "❌ Multiplier must be at least 0.1.",
+    "multiplier_too_high": "❌ Multiplier cannot exceed 10.0.",
+    "multiplier_invalid": "❌ Please enter a valid number for the multiplier.",
+    "max_level_negative": "❌ Max level cannot be negative.",
+    "max_level_too_high": "❌ Max level cannot exceed 10,000.",
+    "max_level_invalid": "❌ Please enter a valid number for max level.",
+    "xp_too_low": "❌ XP values must be at least 1.",
+    "xp_min_greater_max": "❌ Minimum XP cannot be greater than maximum XP.",
+    "xp_max_too_high": "❌ Maximum XP cannot exceed 10,000.",
+    "xp_invalid": "❌ Please enter valid numbers for XP values."
   },
   "formatting": {
     "title": "Embed Formatting Guide",

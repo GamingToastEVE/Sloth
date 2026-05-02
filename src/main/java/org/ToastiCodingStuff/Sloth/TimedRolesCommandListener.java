@@ -13,12 +13,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class TimedRolesCommandListener extends ListenerAdapter {
+public class TimedRolesCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public TimedRolesCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"my-roles", "temprole"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -44,7 +49,7 @@ public class TimedRolesCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
         String command = event.getName();
 
         switch (command) {

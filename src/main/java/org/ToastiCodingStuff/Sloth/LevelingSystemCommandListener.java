@@ -40,7 +40,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class LevelingSystemCommandListener extends ListenerAdapter {
+public class LevelingSystemCommandListener extends ListenerAdapter implements SlashCommandHandler {
+
     private final DatabaseHandler handler;
     private final Random random = new Random();
 
@@ -54,11 +55,23 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     // Scheduled executor for voice XP awards
     private final ScheduledExecutorService voiceXpScheduler = Executors.newScheduledThreadPool(1);
 
+    /**
+     * Cleanly shut down the voice XP scheduler – call this on bot shutdown to prevent thread leaks.
+     */
+    public void shutdown() {
+        voiceXpScheduler.shutdownNow();
+    }
+
     public LevelingSystemCommandListener(DatabaseHandler handler) {
         this.handler = handler;
 
         // Start voice XP award task - runs every 60 seconds
         voiceXpScheduler.scheduleAtFixedRate(this::awardVoiceXp, 60, 60, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"leveling"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -148,16 +161,12 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         if (joined != null && left == null) {
             // User joined a voice channel
             voiceJoinTimes.put(key, System.currentTimeMillis());
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " joined voice, now tracking");
         } else if (left != null && joined == null) {
             // User left voice channel
             voiceJoinTimes.remove(key);
             lastVoiceXpTime.remove(key);
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " left voice, stopped tracking");
-        } else if (joined != null) {
-            // User switched channels - keep tracking
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " switched channels, still tracking");
         }
+        // User switched channels - tracking continues automatically
     }
 
     /**
@@ -166,7 +175,6 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     private void syncExistingVoiceUsers() {
         if (jdaInstance == null) return;
 
-        System.out.println("[VoiceXP] Syncing existing voice users...");
         int count = 0;
 
         for (Guild guild : jdaInstance.getGuilds()) {
@@ -969,8 +977,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     // ==================== SLASH COMMANDS ====================
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("leveling")) return;
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) return;

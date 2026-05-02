@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class SelectRolesCommandListener extends ListenerAdapter {
+public class SelectRolesCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
@@ -56,6 +56,11 @@ public class SelectRolesCommandListener extends ListenerAdapter {
 
     public SelectRolesCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"select-roles"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -91,10 +96,7 @@ public class SelectRolesCommandListener extends ListenerAdapter {
     // ==================== SLASH COMMAND HANDLER ====================
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("select-roles")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         handler.insertOrUpdateGlobalStatistic("select-roles");
 

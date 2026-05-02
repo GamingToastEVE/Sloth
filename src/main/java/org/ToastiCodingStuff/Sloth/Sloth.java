@@ -20,6 +20,7 @@ import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
 
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class Sloth {
@@ -43,31 +44,58 @@ public class Sloth {
         api.getPresence().setActivity(Activity.playing("Starting up..."));
 
         SystemsCommandListener systemsCommandListener = new SystemsCommandListener(handler);
+        LogChannelSlashCommandListener logChannelListener = new LogChannelSlashCommandListener(handler);
+        WarnCommandListener warnListener = new WarnCommandListener(handler);
+        TicketCommandListener ticketListener = new TicketCommandListener(handler);
+        TicketPanelCommandListener ticketPanelListener = new TicketPanelCommandListener(handler);
+        StatisticsCommandListener statisticsListener = new StatisticsCommandListener(handler);
+        ModerationCommandListener moderationListener = new ModerationCommandListener(handler);
+        JustVerifyButtonCommandListener verifyListener = new JustVerifyButtonCommandListener(handler);
+        GlobalCommandListener globalListener = new GlobalCommandListener(handler);
+        FeedbackCommandListener feedbackListener = new FeedbackCommandListener(guild);
+        SelectRolesCommandListener selectRolesListener = new SelectRolesCommandListener(handler);
+        TimedRolesCommandListener timedRolesListener = new TimedRolesCommandListener(handler);
+        RoleEventConfigListener roleEventListener = new RoleEventConfigListener(handler);
+        EmbedEditorCommandListener embedEditorListener = new EmbedEditorCommandListener(handler);
+        ReminderCommandListener reminderListener = new ReminderCommandListener(handler);
+        LevelingSystemCommandListener levelingListener = new LevelingSystemCommandListener(handler);
+        LanguageCommandListener languageListener = new LanguageCommandListener(languageManager);
+        HelpCommandListener helpListener = new HelpCommandListener(handler);
 
-        api.addEventListener(new LogChannelSlashCommandListener(handler));
-        api.addEventListener(new WarnCommandListener(handler));
-        api.addEventListener(new TicketCommandListener(handler));
-        api.addEventListener(new TicketPanelCommandListener(handler));
+        // Zentraler Slash-Command-Router: leitet SlashCommandInteractionEvents direkt an den
+        // zuständigen Handler weiter, statt alle Listener zu durchlaufen.
+        SlashCommandRouter slashCommandRouter = new SlashCommandRouter(List.of(
+                logChannelListener, warnListener, ticketListener, ticketPanelListener,
+                statisticsListener, moderationListener, verifyListener, globalListener,
+                feedbackListener, selectRolesListener, timedRolesListener, roleEventListener,
+                embedEditorListener, systemsCommandListener, reminderListener,
+                levelingListener, languageListener, helpListener
+        ));
+
+        // Router für Slash-Commands (ein einzelner Listener statt vieler)
+        api.addEventListener(slashCommandRouter);
+
+        // Alle anderen Listener (Button, Select, Modal, Message-Events etc.)
+        api.addEventListener(warnListener);
+        api.addEventListener(ticketListener);
+        api.addEventListener(ticketPanelListener);
         api.addEventListener(new TicketCreationListener(handler));
-        api.addEventListener(new StatisticsCommandListener(handler));
-        api.addEventListener(new ModerationCommandListener(handler));
-        api.addEventListener(new JustVerifyButtonCommandListener(handler));
+        api.addEventListener(statisticsListener);
+        api.addEventListener(moderationListener);
+        api.addEventListener(verifyListener);
         api.addEventListener(new OnGuildLeaveListener(handler));
-        api.addEventListener(new GlobalCommandListener(handler));
-        api.addEventListener(new FeedbackCommandListener(guild));
-        api.addEventListener(new SelectRolesCommandListener(handler));
-        api.addEventListener(new TimedRolesCommandListener(handler));
-        api.addEventListener(new RoleEventConfigListener(handler));
+        api.addEventListener(selectRolesListener);
+        api.addEventListener(timedRolesListener);
+        api.addEventListener(roleEventListener);
         api.addEventListener(new TimedRoleTriggerListener(handler, api));
         api.addEventListener(new MemberRoleTrackingListener(handler));
-        api.addEventListener(new EmbedEditorCommandListener(handler));
+        api.addEventListener(embedEditorListener);
         api.addEventListener(systemsCommandListener);
-        api.addEventListener(new ReminderCommandListener(handler));
-        api.addEventListener(new LevelingSystemCommandListener(handler));
-        api.addEventListener(new LanguageCommandListener(languageManager));
+        api.addEventListener(reminderListener);
+        api.addEventListener(levelingListener);
+        api.addEventListener(languageListener);
         api.addEventListener(new SetupWizardListener(handler, systemsCommandListener));
-
-        api.addEventListener(new HelpCommandListener(handler));
+        api.addEventListener(helpListener);
         api.addEventListener(new GuildEventListener(handler));
 
         // Register all system commands globally

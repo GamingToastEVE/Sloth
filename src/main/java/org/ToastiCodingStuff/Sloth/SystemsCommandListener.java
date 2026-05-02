@@ -14,12 +14,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class SystemsCommandListener extends ListenerAdapter {
+public class SystemsCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public SystemsCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"systems"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -45,8 +50,7 @@ public class SystemsCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("systems")) return;
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         event.deferReply().queue();
 

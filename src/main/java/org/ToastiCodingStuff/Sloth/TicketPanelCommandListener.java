@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Listener for managing multiple ticket panels with an interactive UI.
  * This allows servers to have multiple ticket systems for different purposes.
  */
-public class TicketPanelCommandListener extends ListenerAdapter {
+public class TicketPanelCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
     private final Map<String, UserSession> userSessions = new ConcurrentHashMap<>();
@@ -54,6 +54,11 @@ public class TicketPanelCommandListener extends ListenerAdapter {
 
     public TicketPanelCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"ticket-panels"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -89,10 +94,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
     // ==================== SLASH COMMAND HANDLER ====================
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("ticket-panels")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
             event.reply(t(event.getGuild().getId(), "general.permission_denied")).setEphemeral(true).queue();

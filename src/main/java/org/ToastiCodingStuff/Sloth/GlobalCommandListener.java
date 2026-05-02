@@ -1,46 +1,30 @@
 package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-public class GlobalCommandListener extends ListenerAdapter {
+public class GlobalCommandListener extends ListenerAdapter implements SlashCommandHandler {
+
     private final DatabaseHandler handler;
 
     public GlobalCommandListener(DatabaseHandler handler) {
         this.handler = handler;
     }
 
-    // ==================== LANGUAGE HELPER METHODS ====================
+    // ==================== SLASH COMMAND HANDLER ====================
 
-    private String t(String guildId, String key) {
-        LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null) {
-            return lang.get(guildId, key);
-        }
-        return key;
-    }
-
-    private String t(String guildId, String key, Object... args) {
-        LanguageManager lang = LanguageManager.getInstance();
-        if (lang != null) {
-            return lang.get(guildId, key, args);
-        }
-        try {
-            return String.format(key, args);
-        } catch (Exception e) {
-            return key;
-        }
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"global-stats"};
     }
 
     @Override
-    public void onSlashCommandInteraction(net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("global-stats")) {return;}
-
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
 
         EmbedBuilder embed = handler.getGlobalStats();
         EmbedBuilder embed2 = handler.getGlobalModStats();
-        event.getHook().sendMessageEmbeds(embed.build()).queue();
-        event.getChannel().sendMessageEmbeds(embed2.build()).queue();
+        event.getHook().sendMessageEmbeds(embed.build(), embed2.build()).queue();
     }
 }

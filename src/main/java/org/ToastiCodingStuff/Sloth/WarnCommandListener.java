@@ -21,12 +21,17 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-public class WarnCommandListener extends ListenerAdapter {
+public class WarnCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public WarnCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"warn"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -56,19 +61,21 @@ public class WarnCommandListener extends ListenerAdapter {
         if (!event.getName().equals("warning")) {
             return;
         }
+        // Bug fix: null-check for guild
+        if (event.getGuild() == null) return;
         handleWarnCommand(event, event.getGuild().getId());
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("warn")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {
             return;
         }
+
+        // Bug fix: null-check for guild and member
+        if (event.getGuild() == null || event.getMember() == null) return;
 
         String guildId = event.getGuild().getId();
 
@@ -93,17 +100,22 @@ public class WarnCommandListener extends ListenerAdapter {
     }
 
     private void handleListWarningsCommand(SlashCommandInteractionEvent event, String guildId) {
+        // Bug fix: null-check for option
+        if (event.getOption("user") == null) {
+            event.reply(t(guildId, "moderation.specify_user")).setEphemeral(true).queue();
+            return;
+        }
         Member targetMember = event.getOption("user").getAsMember();
         if (targetMember == null) {
-            event.reply("User not found.").setEphemeral(true).queue();
+            event.reply(t(guildId, "moderation.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
         sendWarnListEmbed(event, guildId, targetMember.getUser());
     }
 
-    // --- NEUE HELPER METHODE: Embed & Menü bauen ---
-    // Ausgelagert, damit wir sie auch nach dem Löschen eines Warns aufrufen können (Refresh)
+    // --- HELPER METHODE: Embed & Menü bauen ---
+    // Bug fix: Unterscheidung zwischen erstem Reply und Edit-Reply
     private void sendWarnListEmbed(IReplyCallback event, String guildId, User targetUser) {
         List<DatabaseHandler.WarningData> warnings = handler.getUserActiveWarnings(guildId, targetUser.getId());
 
@@ -115,13 +127,9 @@ public class WarnCommandListener extends ListenerAdapter {
         if (warnings.isEmpty()) {
             embed.setDescription(t(guildId, "moderation.no_warnings"));
             embed.setColor(Color.GREEN);
-            // Wenn keine Warns da sind, senden wir nur das Embed ohne Menü
-            if (event instanceof SlashCommandInteractionEvent) {
-                event.getHook().sendMessageEmbeds(embed.build()).setEphemeral(true).queue();
-            } else if (event instanceof StringSelectInteractionEvent) {
-                // Wenn wir aus dem Dropdown kommen (letzter Warn gelöscht), updaten wir die Nachricht
-                ((StringSelectInteractionEvent) event).editMessageEmbeds(embed.build()).setComponents().queue();
-            }
+            // Bug fix: Alle Pfade nutzen replyEmbeds – da wir nach message.delete() immer
+            // eine frische Interaction haben, ist reply() korrekt.
+            event.replyEmbeds(embed.build()).setComponents().setEphemeral(true).queue();
             return;
         }
 
@@ -138,7 +146,6 @@ public class WarnCommandListener extends ListenerAdapter {
         for (DatabaseHandler.WarningData warn : warnings) {
             if (count >= 25) break;
 
-            // Text für Embed
             desc.append("**ID: ").append(warn.id).append("** | ")
                     .append(warn.date).append("\n")
                     .append("Reason: `").append(warn.reason).append("`\n")
@@ -154,46 +161,55 @@ public class WarnCommandListener extends ListenerAdapter {
         embed.setDescription(desc.toString());
         embed.setFooter(t(guildId, "moderation.breadcrumb_warnings_list", targetUser.getName()));
 
-        // Antwort senden
-        if (event instanceof SlashCommandInteractionEvent) {
-            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
-        } else if (event instanceof StringSelectInteractionEvent) {
-            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
-        } else {
-            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
-        }
+        event.replyEmbeds(embed.build()).setComponents(ActionRow.of(menuBuilder.build())).setEphemeral(true).queue();
     }
 
     @Override
     public void onButtonInteraction(net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent event) {
+        // Bug fix: null-checks for guild and member
+        if (event.getGuild() == null || event.getMember() == null) return;
+
         String componentId = event.getComponentId();
 
         // Warn Lösch Bestätigung
-        if (componentId.startsWith("warn_delete_confirm:")) {String gId = event.getGuild().getId();
+        if (componentId.startsWith("warn_delete_confirm:")) {
+            String gId = event.getGuild().getId();
             if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
                 event.reply(t(gId, "moderation.no_permission")).setEphemeral(true).queue();
                 return;
             }
 
-            String warnIdStr = componentId.split(":")[1];
+            String[] parts = componentId.split(":");
+            // Bug fix: Bounds-Check vor Zugriff auf parts[1] und parts[2]
+            if (parts.length < 3) {
+                event.reply(t(gId, "moderation.warn_invalid_id")).setEphemeral(true).queue();
+                return;
+            }
+
+            String warnIdStr = parts[1];
+            String targetUserId = parts[2];
+
             try {
                 int warnId = Integer.parseInt(warnIdStr);
                 boolean success = handler.deactivateWarning(warnId, event.getGuild().getId());
-                if (success) {
-                    event.reply(t(gId, "moderation.warn_deleted_success")).setEphemeral(true).queue();
 
-                    // Nach dem Löschen die Warnliste neu senden (Refresh)
-                    String guildId = event.getGuild().getId();
-                    String targetUserId = componentId.split(":")[2];
-                    if (targetUserId != null) {
-                        User targetUser = event.getJDA().getUserById(targetUserId);
-                        if (targetUser != null) {
-                            event.getMessage().delete().queue();
-                            sendWarnListEmbed(event, guildId, targetUser);
-                        }
-                    }
+                // Bug fix: Erst Nachricht löschen, dann ein einziges reply() senden.
+                // Danach Warnliste als neues Reply holen (über retrieveUserById + queue).
+                event.getMessage().delete().queue();
+
+                if (success) {
+                    event.getJDA().retrieveUserById(targetUserId).queue(
+                        targetUser -> {
+                            if (targetUser != null) {
+                                // sendWarnListEmbed sendet ein neues replyEmbeds
+                                sendWarnListEmbed(event, gId, targetUser);
+                            } else {
+                                event.reply(t(gId, "moderation.warn_deleted_success")).setEphemeral(true).queue();
+                            }
+                        },
+                        error -> event.reply(t(gId, "moderation.warn_deleted_success")).setEphemeral(true).queue()
+                    );
                 } else {
-                    event.getMessage().delete().queue();
                     event.reply(t(gId, "moderation.warn_delete_failed")).setEphemeral(true).queue();
                 }
             } catch (NumberFormatException e) {
@@ -205,15 +221,20 @@ public class WarnCommandListener extends ListenerAdapter {
         // Zurück zur Warnliste
         else if (componentId.startsWith("warn_delete_back:")) {
             String targetUserId = componentId.split(":")[1];
-            System.out.println("DEBUG: Back button pressed for user ID " + targetUserId);
-            User targetUser = event.getJDA().retrieveUserById(targetUserId).complete();
-            System.out.println("DEBUG: Retrieved user: " + targetUser);
-            if (targetUser != null) {
-                String guildId = event.getGuild().getId();
-                sendWarnListEmbed(event, guildId, targetUser);
-            } else {
-                event.reply(t(event.getGuild().getId(), "moderation.user_not_found")).setEphemeral(true).queue();
-            }
+            String guildId = event.getGuild().getId();
+
+            // Bug fix: Blocking .complete() durch .queue() ersetzt + Nachricht erst löschen
+            event.getMessage().delete().queue();
+            event.getJDA().retrieveUserById(targetUserId).queue(
+                targetUser -> {
+                    if (targetUser != null) {
+                        sendWarnListEmbed(event, guildId, targetUser);
+                    } else {
+                        event.reply(t(guildId, "moderation.user_not_found")).setEphemeral(true).queue();
+                    }
+                },
+                error -> event.reply(t(guildId, "moderation.user_not_found")).setEphemeral(true).queue()
+            );
         }
     }
 
@@ -227,15 +248,18 @@ public class WarnCommandListener extends ListenerAdapter {
             return;
         }
 
-        // Berechtigungscheck (Sicherheitshalber nochmal)
+        // Bug fix: null-checks for guild and member
+        if (event.getGuild() == null || event.getMember() == null) return;
+
+        // Berechtigungscheck
         if (!event.getMember().hasPermission(Permission.MODERATE_MEMBERS)) {
             event.reply(t(event.getGuild().getId(), "moderation.no_permission")).setEphemeral(true).queue();
             return;
         }
 
         String guildId = event.getGuild().getId();
-        String targetUserId = componentId.split(":")[1]; // User ID aus der ID extrahieren
-        String selectedWarnIdStr = event.getValues().get(0); // Die ausgewählte Warn ID
+        String targetUserId = componentId.split(":")[1];
+        String selectedWarnIdStr = event.getValues().get(0);
 
         try {
             int warnId = Integer.parseInt(selectedWarnIdStr);
@@ -271,6 +295,8 @@ public class WarnCommandListener extends ListenerAdapter {
                             targetUser != null ? targetUser.getName() : targetUserId, i));
                     Button deleteButton = Button.danger("warn_delete_confirm:" + warnId + ":" + targetUserId, "Delete Warning");
                     Button backButton = Button.secondary("warn_delete_back:" + targetUserId, "Back to Warnings");
+
+                    // Bug fix: Erst Nachricht löschen, dann neues reply() senden
                     event.getMessage().delete().queue();
                     event.replyEmbeds(embed.build())
                             .setComponents(ActionRow.of(backButton, deleteButton))
@@ -287,6 +313,12 @@ public class WarnCommandListener extends ListenerAdapter {
     }
 
     private void handleWarnCommand(SlashCommandInteractionEvent event, String guildId) {
+        // Bug fix: null-checks für Pflichtoptionen
+        if (event.getOption("user") == null || event.getOption("reason") == null) {
+            event.reply(t(guildId, "moderation.specify_user")).setEphemeral(true).queue();
+            return;
+        }
+
         Member targetMember = event.getOption("user").getAsMember();
         String reason = event.getOption("reason").getAsString();
         String severity = event.getOption("severity") != null ? event.getOption("severity").getAsString() : "MEDIUM";
@@ -297,20 +329,23 @@ public class WarnCommandListener extends ListenerAdapter {
             return;
         }
 
+        // Bug fix: null-check for member (should not happen in guild context, but defensive)
+        if (event.getMember() == null) {
+            event.reply(t(guildId, "moderation.moderator_not_found")).setEphemeral(true).queue();
+            return;
+        }
+
         String userId = targetMember.getId();
         String moderatorId = event.getMember().getId();
 
-        // Insert or update user data using new method
         handler.insertOrUpdateUser(userId, targetMember.getEffectiveName(),
                 targetMember.getUser().getDiscriminator(),
                 targetMember.getUser().getAvatarUrl());
 
-        // Insert or update moderator data
         handler.insertOrUpdateUser(moderatorId, event.getMember().getEffectiveName(),
                 event.getUser().getDiscriminator(),
                 event.getUser().getAvatarUrl());
 
-        // Calculate expiration time based on warn settings
         String expiresAt = null;
         if (handler.hasWarnSystemSettings(guildId)) {
             int warnTimeHours = handler.getWarnTimeHours(guildId);
@@ -329,13 +364,12 @@ public class WarnCommandListener extends ListenerAdapter {
                 try {
                     threshold = Integer.parseInt(triggerDataJson.getString("threshold"));
                 } catch (NumberFormatException e) {
-                    continue; // Skip invalid entries
+                    continue;
                 }
 
                 int activeWarnings = handler.getActiveWarningsCount(guildId, targetMember.getId());
 
-                if (activeWarnings + 1 == threshold) { // +1 because we are about to add a warning
-                    // Apply role
+                if (activeWarnings + 1 == threshold) {
                     Role role = event.getGuild().getRoleById(eventData.roleId);
                     if (role != null) {
                         long durationSeconds = eventData.durationSeconds;
@@ -348,11 +382,9 @@ public class WarnCommandListener extends ListenerAdapter {
             }
         }
 
-        // Use new insertWarning method instead of legacy approach
         int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt, evidence);
 
         if (warningId > 0) {
-            // Check if user has reached max warnings and apply timeout if needed
             int activeWarnings = handler.getActiveWarningsCount(guildId, userId);
             String timeoutMessage = "";
 
@@ -361,26 +393,19 @@ public class WarnCommandListener extends ListenerAdapter {
                 int timeoutMinutes = handler.getTimeMuted(guildId);
 
                 if (activeWarnings >= maxWarns) {
-                    // Check timeout permissions
                     if (event.getGuild().getSelfMember().hasPermission(Permission.MODERATE_MEMBERS) &&
                         event.getGuild().getSelfMember().canInteract(targetMember)) {
 
-                        // Apply Discord timeout
                         Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
                         targetMember.timeoutFor(timeoutDuration)
                             .reason("Maximum warnings reached (" + activeWarnings + "/" + maxWarns + ")")
                             .queue(
                                 success -> {
-                                    // Log timeout action
                                     String timeoutExpiresAt = LocalDateTime.now().plusMinutes(timeoutMinutes)
                                             .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                                     handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT",
                                         "Maximum warnings reached", timeoutDuration.toString(), timeoutExpiresAt);
-
-                                    // Update statistics
                                     handler.incrementTimeoutsPerformed(guildId);
-
-                                    // Update user statistics
                                     handler.incrementUserTimeoutsReceived(guildId, userId);
                                     handler.incrementUserTimeoutsPerformed(guildId, moderatorId);
                                 },
@@ -399,29 +424,24 @@ public class WarnCommandListener extends ListenerAdapter {
                     "\nWarning ID: " + warningId +
                     (expiresAt != null ? "\nExpires: " + expiresAt : "") + timeoutMessage).queue();
 
-            // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
-
-            // Update statistics for warnings issued
             handler.incrementWarningsIssued(guildId);
-
-            // Update user statistics
             handler.incrementUserWarningsReceived(guildId, userId);
             handler.incrementUserWarningsIssued(guildId, moderatorId);
-
-            // Send audit log entry to log channel
-            handler.sendAuditLogEntry(event.getGuild(), "WARN", "", targetMember,
-                    event.getMember(), reason);
+            handler.sendAuditLogEntry(event.getGuild(), "WARN", "", targetMember, event.getMember(), reason);
         } else {
-            event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
+            event.reply(t(guildId, "moderation.warn_issue_failed")).setEphemeral(true).queue();
         }
     }
 
     private void handleWarnCommand(UserContextInteractionEvent event, String guildId) {
+        // Bug fix: null-check for guild and member
+        if (event.getGuild() == null || event.getMember() == null) return;
+
         Member targetMember = event.getTargetMember();
         String reason = t(guildId, "moderation.warned_via_context_menu");
         String severity = t(guildId, "moderation.warned_via_context_menu");
-        String evidence = null; // No evidence option in context menu
+        String evidence = null;
 
         if (targetMember == null) {
             event.reply("User not found in this server.").setEphemeral(true).queue();
@@ -431,17 +451,14 @@ public class WarnCommandListener extends ListenerAdapter {
         String userId = targetMember.getId();
         String moderatorId = event.getMember().getId();
 
-        // Insert or update user data using new method
         handler.insertOrUpdateUser(userId, targetMember.getEffectiveName(),
                 targetMember.getUser().getDiscriminator(),
                 targetMember.getUser().getAvatarUrl());
 
-        // Insert or update moderator data
         handler.insertOrUpdateUser(moderatorId, event.getMember().getEffectiveName(),
                 event.getUser().getDiscriminator(),
                 event.getUser().getAvatarUrl());
 
-        // Calculate expiration time based on warn settings
         String expiresAt = null;
         if (handler.hasWarnSystemSettings(guildId)) {
             int warnTimeHours = handler.getWarnTimeHours(guildId);
@@ -460,13 +477,12 @@ public class WarnCommandListener extends ListenerAdapter {
                 try {
                     threshold = Integer.parseInt(triggerDataJson.getString("threshold"));
                 } catch (NumberFormatException e) {
-                    continue; // Skip invalid entries
+                    continue;
                 }
 
                 int activeWarnings = handler.getActiveWarningsCount(guildId, targetMember.getId());
 
-                if (activeWarnings + 1 == threshold) { // +1 because we are about to add a warning
-                    // Apply role
+                if (activeWarnings + 1 == threshold) {
                     Role role = event.getGuild().getRoleById(eventData.roleId);
                     if (role != null) {
                         long durationSeconds = eventData.durationSeconds;
@@ -479,11 +495,9 @@ public class WarnCommandListener extends ListenerAdapter {
             }
         }
 
-        // Use new insertWarning method instead of legacy approach
         int warningId = handler.insertWarning(guildId, userId, moderatorId, reason, severity, expiresAt, evidence);
 
         if (warningId > 0) {
-            // Check if user has reached max warnings and apply timeout if needed
             int activeWarnings = handler.getActiveWarningsCount(guildId, userId);
             String timeoutMessage = "";
 
@@ -492,31 +506,24 @@ public class WarnCommandListener extends ListenerAdapter {
                 int timeoutMinutes = handler.getTimeMuted(guildId);
 
                 if (activeWarnings >= maxWarns) {
-                    // Check timeout permissions
                     if (event.getGuild().getSelfMember().hasPermission(Permission.MODERATE_MEMBERS) &&
                             event.getGuild().getSelfMember().canInteract(targetMember)) {
 
-                        // Apply Discord timeout
                         Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
                         targetMember.timeoutFor(timeoutDuration)
                                 .reason("Maximum warnings reached (" + activeWarnings + "/" + maxWarns + ")")
                                 .queue(
                                         success -> {
-                                            // Log timeout action
                                             String timeoutExpiresAt = LocalDateTime.now().plusMinutes(timeoutMinutes)
                                                     .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                                             handler.insertModerationAction(guildId, userId, moderatorId, "TIMEOUT",
                                                     "Maximum warnings reached", timeoutDuration.toString(), timeoutExpiresAt);
-
-                                            // Update statistics
                                             handler.incrementTimeoutsPerformed(guildId);
-
-                                            // Update user statistics
                                             handler.incrementUserTimeoutsReceived(guildId, userId);
                                             handler.incrementUserTimeoutsPerformed(guildId, moderatorId);
                                         },
                                         error -> {
-                                            // Handle timeout failure silently - warning was still issued
+                                            // Handle timeout failure silently
                                         }
                                 );
                         timeoutMessage = "\n⏱️ **User has been timed out for " + timeoutMinutes + " minutes** (reached " + activeWarnings + "/" + maxWarns + " warnings)";
@@ -530,37 +537,33 @@ public class WarnCommandListener extends ListenerAdapter {
                     "\nWarning ID: " + warningId +
                     (expiresAt != null ? "\nExpires: " + expiresAt : "") + timeoutMessage).queue();
 
-            // Insert moderation action using new method
             handler.insertModerationAction(guildId, userId, moderatorId, "WARN", reason, null, expiresAt);
-
-            // Update statistics for warnings issued
             handler.incrementWarningsIssued(guildId);
-
-            // Update user statistics
             handler.incrementUserWarningsReceived(guildId, userId);
             handler.incrementUserWarningsIssued(guildId, moderatorId);
-
-            // Send audit log entry to log channel
-            handler.sendAuditLogEntry(event.getGuild(), "WARN", "", targetMember,
-                    event.getMember(), reason);
+            handler.sendAuditLogEntry(event.getGuild(), "WARN", "", targetMember, event.getMember(), reason);
         } else {
-            event.reply("Failed to issue warning. Please try again or contact an administrator.").setEphemeral(true).queue();
+            event.reply(t(guildId, "moderation.warn_issue_failed")).setEphemeral(true).queue();
         }
     }
 
     private void handleSetWarnSettingsCommand(SlashCommandInteractionEvent event, String guildId) {
+        // Bug fix: null-checks for required options
+        if (event.getOption("max_warns") == null || event.getOption("timeout_minutes") == null) {
+            event.reply(t(guildId, "moderation.specify_user")).setEphemeral(true).queue();
+            return;
+        }
+
         int maxWarns = event.getOption("max_warns").getAsInt();
         int timeoutMinutes = event.getOption("timeout_minutes").getAsInt();
         int warnTimeHours = event.getOption("warn_time_hours") != null ?
                 event.getOption("warn_time_hours").getAsInt() : 24;
 
-        // Validate timeout duration (max 28 days = 40320 minutes)
         if (timeoutMinutes < 1 || timeoutMinutes > 40320) {
             event.reply(t(guildId, "moderation.timeout_invalid_duration")).setEphemeral(true).queue();
             return;
         }
 
-        // Use existing setWarnSettings method but pass null for roleID since we don't use mute roles anymore
         handler.setWarnSettings(guildId, maxWarns, timeoutMinutes, null, warnTimeHours);
 
         event.reply("Warn settings updated successfully!\n" +
@@ -575,7 +578,6 @@ public class WarnCommandListener extends ListenerAdapter {
             return;
         }
 
-        // Use existing getter methods
         int maxWarns = handler.getMaxWarns(guildId);
         int timeoutMinutes = handler.getTimeMuted(guildId);
         int warnTimeHours = handler.getWarnTimeHours(guildId);
