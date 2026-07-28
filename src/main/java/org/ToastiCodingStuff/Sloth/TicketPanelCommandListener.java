@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Listener for managing multiple ticket panels with an interactive UI.
  * This allows servers to have multiple ticket systems for different purposes.
  */
-public class TicketPanelCommandListener extends ListenerAdapter {
+public class TicketPanelCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
     private final Map<String, UserSession> userSessions = new ConcurrentHashMap<>();
@@ -54,6 +54,11 @@ public class TicketPanelCommandListener extends ListenerAdapter {
 
     public TicketPanelCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"ticket-panels"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -89,10 +94,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
     // ==================== SLASH COMMAND HANDLER ====================
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("ticket-panels")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_SERVER)) {
             event.reply(t(event.getGuild().getId(), "general.permission_denied")).setEphemeral(true).queue();
@@ -117,7 +119,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.addField("📊 " + t(guildId, "ticket_panels.stats"),
             "**" + panels.size() + "** " + t(guildId, "ticket_panels.panels_count"), true);
 
-        embed.setFooter(t(guildId, "ticket_panels.ui_footer"));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_main"));
         embed.setTimestamp(java.time.Instant.now());
 
         List<ActionRow> rows = new ArrayList<>();
@@ -147,7 +149,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.addField("📊 " + t(guildId, "ticket_panels.stats"),
             "**" + panels.size() + "** " + t(guildId, "ticket_panels.panels_count"), true);
 
-        embed.setFooter(t(guildId, "ticket_panels.ui_footer"));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_main"));
         embed.setTimestamp(java.time.Instant.now());
 
         List<ActionRow> rows = new ArrayList<>();
@@ -173,6 +175,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📋 " + t(guildId, "ticket_panels.list_title"));
         embed.setColor(new Color(87, 242, 135));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_list"));
 
         if (panels.isEmpty()) {
             embed.setDescription(t(guildId, "ticket_panels.no_panels_hint"));
@@ -265,6 +268,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("🎫 " + panel.name);
         embed.setColor(parseColor(panel.embedColor));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_detail", panel.name));
 
         embed.addField("📝 " + t(guildId, "ticket_panels.field_title"), panel.title, false);
         embed.addField("📄 " + t(guildId, "ticket_panels.field_description"),
@@ -1084,6 +1088,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.setTitle("🔧 " + t(guildId, "ticket_panels.edit_channels_title"));
         embed.setDescription(t(guildId, "ticket_panels.edit_channels_desc"));
         embed.setColor(parseColor(panel.embedColor));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_channels", panel.name));
 
         // Show current settings
         StringBuilder current = new StringBuilder();
@@ -1322,6 +1327,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.setTitle("📂 " + t(guildId, "ticket_panels.categories_title"));
         embed.setDescription(t(guildId, "ticket_panels.categories_desc", panel != null ? panel.name : "Panel"));
         embed.setColor(new Color(87, 242, 135));
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_categories", panel != null ? panel.name : "Panel"));
 
         if (categories.isEmpty()) {
             embed.addField(t(guildId, "ticket_panels.no_categories"),
@@ -1406,6 +1412,9 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         String emoji = category.buttonEmoji != null ? category.buttonEmoji + " " : "📂 ";
         embed.setTitle(emoji + category.name);
         embed.setColor(new Color(235, 69, 158));
+        DatabaseHandler.TicketPanelData parentPanel = handler.getTicketPanel(category.panelId);
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_category_detail",
+            parentPanel != null ? parentPanel.name : "Panel", category.name));
 
         embed.addField("🔘 " + t(guildId, "ticket_panels.field_button"), category.buttonLabel, true);
         embed.addField("🎨 " + t(guildId, "ticket_panels.field_color"), category.buttonColor, true);
@@ -1480,6 +1489,7 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.setTitle("📋 " + t(guildId, "ticket_panels.panel_forms_title"));
         embed.setDescription(t(guildId, "ticket_panels.panel_forms_desc", panel != null ? panel.name : "Panel"));
         embed.setColor(new Color(114, 137, 218));
+        if (panel != null) embed.setFooter(t(guildId, "ticket_panels.breadcrumb_forms", panel.name, "Forms"));
 
         if (categories.isEmpty()) {
             embed.addField(t(guildId, "ticket_panels.no_categories"),
@@ -1551,6 +1561,9 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.setTitle("📋 " + t(guildId, "ticket_panels.forms_title"));
         embed.setDescription(t(guildId, "ticket_panels.forms_desc", category != null ? category.name : "Category"));
         embed.setColor(new Color(114, 137, 218));
+        DatabaseHandler.TicketPanelData fp = category != null ? handler.getTicketPanel(category.panelId) : null;
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_forms",
+            fp != null ? fp.name : "Panel", category != null ? category.name : "Category"));
 
         if (forms.isEmpty()) {
             embed.addField(t(guildId, "ticket_panels.no_forms"),
@@ -1598,6 +1611,9 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         embed.setTitle("📋 " + t(guildId, "ticket_panels.forms_title"));
         embed.setDescription(t(guildId, "ticket_panels.forms_desc", category != null ? category.name : "Category"));
         embed.setColor(new Color(114, 137, 218));
+        DatabaseHandler.TicketPanelData fp2 = category != null ? handler.getTicketPanel(category.panelId) : null;
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_forms",
+            fp2 != null ? fp2.name : "Panel", category != null ? category.name : "Category"));
 
         if (forms.isEmpty()) {
             embed.addField(t(guildId, "ticket_panels.no_forms"),
@@ -1651,6 +1667,10 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📋 " + form.name);
         embed.setColor(new Color(114, 137, 218));
+        DatabaseHandler.TicketCategoryData formCat = handler.getTicketCategory(form.categoryId);
+        DatabaseHandler.TicketPanelData formPanel = formCat != null ? handler.getTicketPanel(formCat.panelId) : null;
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_form_detail",
+            formPanel != null ? formPanel.name : "Panel", form.name));
 
         if (form.description != null) {
             embed.addField("📄 " + t(guildId, "ticket_panels.field_description"), form.description, false);
@@ -1718,6 +1738,10 @@ public class TicketPanelCommandListener extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder();
         embed.setTitle("📋 " + form.name);
         embed.setColor(new Color(114, 137, 218));
+        DatabaseHandler.TicketCategoryData formCat2 = handler.getTicketCategory(categoryId);
+        DatabaseHandler.TicketPanelData formPanel2 = formCat2 != null ? handler.getTicketPanel(formCat2.panelId) : null;
+        embed.setFooter(t(guildId, "ticket_panels.breadcrumb_form_detail",
+            formPanel2 != null ? formPanel2.name : "Panel", form.name));
 
         if (form.description != null) {
             embed.addField("📄 " + t(guildId, "ticket_panels.field_description"), form.description, false);

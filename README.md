@@ -58,6 +58,40 @@ Sloth offers several systems that can be used:
 - Load and modify saved embeds
 - Publish embeds with optional verify button integration
 
+### 🌐 Language System
+- Multi-language support for the bot
+- Server administrators can choose their preferred language
+- Currently supports English and German
+- Easy language switching via `/language` command
+
+### 📈 Leveling System
+- Track user activity with XP and levels
+- Earn XP from messages and voice chat participation
+- View individual rank cards with `/level rank`
+- Server-wide leaderboard with `/level leaderboard`
+- Configurable leveling settings for administrators
+- Automatic level-up notifications
+
+### ⏰ Reminder System
+- Set personal reminders with custom titles and messages
+- Flexible time format (e.g., 10m, 1h, 2d)
+- Choose between DM or channel notifications
+- List and manage all active reminders
+- Commands:
+  - `/reminder set` - Create a new reminder
+  - `/reminder list` - View all your active reminders
+
+### 🚀 Setup Wizard
+- Interactive onboarding experience for new servers
+- Step-by-step configuration of bot systems
+- Guided setup for log channels, moderation, tickets, and more
+- Makes initial configuration quick and easy
+
+### ⚙️ Systems Management
+- Enable or disable bot systems per server
+- Use `/systems` command to control which features are active
+- Customize Sloth to fit your server's specific needs
+
 ## Setup
 
 ### 1. Clone the Repository
@@ -143,9 +177,20 @@ Navigate between help sections using the interactive buttons.
 - `/stats date` - Statistics for specific date
 - `/stats user` - View user information and statistics
 
+#### Leveling System
+- `/level rank` - View your or another user's rank and XP
+- `/level leaderboard` - View the server's XP leaderboard
+- `/level settings` - Configure leveling system settings (admin only)
+
+#### Reminder System
+- `/reminder set` - Create a new reminder with custom time and message
+- `/reminder list` - View all your active reminders
+
 #### General Commands
 - `/help` - Access interactive help system
 - `/feedback` - Send feedback to the developer
+- `/language` - Change the bot's language for your server
+- `/systems` - Enable or disable bot systems for your server
 
 #### Rules/Verification System
 - `/rules add` - Create rules embeds with verification buttons
@@ -184,6 +229,10 @@ Sloth uses MariaDB for data storage and automatically creates and manages the da
 - Ticket information and transcripts
 - System activation status
 - Activity statistics
+- User XP and leveling data
+- Member role snapshots for tracking changes
+- Reminders and scheduled tasks
+- Saved embeds and role events
 
 For detailed database setup instructions, see [DATABASE_SETUP.md](DATABASE_SETUP.md).
 
@@ -200,11 +249,12 @@ Sloth/
 │   ├── AddGuildSlashCommands.java              # Command registration
 │   ├── HelpCommandListener.java                # Help system
 │   ├── TicketCommandListener.java              # Ticket system
+│   ├── TicketPanelCommandListener.java         # Ticket panel creation
+│   ├── TicketCreationListener.java             # Ticket creation handling
 │   ├── WarnCommandListener.java                # Warning system
 │   ├── ModerationCommandListener.java          # Moderation system
 │   ├── LogChannelSlashCommandListener.java     # Logging system
 │   ├── StatisticsCommandListener.java          # Statistics tracking
-│   ├── AddRulesEmbedToChannelCommandListener.java # Rules embed system
 │   ├── JustVerifyButtonCommandListener.java    # Verify button system
 │   ├── SelectRolesCommandListener.java         # Select roles system
 │   ├── FeedbackCommandListener.java            # Feedback system
@@ -212,7 +262,24 @@ Sloth/
 │   ├── TimedRoleTriggerListener.java           # Timed roles triggers
 │   ├── RoleEventConfigListener.java            # Role event configuration
 │   ├── EmbedEditorCommandListener.java         # Embed editor system
-│   └── GuildEventListener.java                 # Guild event handling
+│   ├── LanguageCommandListener.java            # Language settings
+│   ├── LanguageManager.java                    # Language management
+│   ├── LevelingSystemCommandListener.java      # Leveling system
+│   ├── ReminderCommandListener.java            # Reminder system
+│   ├── SetupWizardListener.java                # Server setup wizard
+│   ├── SystemsCommandListener.java             # Systems management
+│   ├── GlobalCommandListener.java              # Global command handling
+│   ├── GuildEventListener.java                 # Guild event handling
+│   ├── MemberRoleTrackingListener.java         # Member role snapshot tracking
+│   ├── MemberRoleChangeEvent.java              # Custom role change event
+│   ├── OnGuildLeaveListener.java               # Guild leave handling
+│   ├── LevelUpEvent.java                       # Level-up event
+│   ├── ActionType.java                         # Action type enum
+│   ├── RoleEventType.java                      # Role event type enum
+│   └── ColorUtil.java                          # Color utility functions
+├── src/main/resources/lang/
+│   ├── en.json                                 # English translations
+│   └── de.json                                 # German translations
 ├── build.gradle.kts                            # Build configuration
 ├── .env.example                                 # Environment variables template
 ├── DATABASE_SETUP.md                           # Database setup guide

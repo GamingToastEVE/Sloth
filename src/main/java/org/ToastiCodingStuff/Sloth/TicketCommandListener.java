@@ -17,12 +17,17 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Objects;
 
-public class TicketCommandListener extends ListenerAdapter {
+public class TicketCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public TicketCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"ticket"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -48,10 +53,7 @@ public class TicketCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("ticket")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {
@@ -108,8 +110,14 @@ public class TicketCommandListener extends ListenerAdapter {
 
         // Close ticket in database (extract ticket ID from ticketInfo)
         String[] parts = ticketInfo.split(" \\| ");
-        int ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
-        
+        int ticketId;
+        try {
+            ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
+            return;
+        }
+
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), reason);
         
         if (success) {
@@ -157,8 +165,14 @@ public class TicketCommandListener extends ListenerAdapter {
 
         // Close ticket in database
         String[] parts = ticketInfo.split(" \\| ");
-        int ticketId = Integer.parseInt(parts[0].substring(4));
-        
+        int ticketId;
+        try {
+            ticketId = Integer.parseInt(parts[0].substring(4));
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
+            return;
+        }
+
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), t(guildId, "tickets.closed_via_button"));
 
         if (success) {
@@ -217,7 +231,8 @@ public class TicketCommandListener extends ListenerAdapter {
         // Acknowledge the interaction and delete the channel
         event.reply(t(guildId, "tickets.deleting_channel")).setEphemeral(true).queue(
             success -> channel.delete().reason(t(guildId, "tickets.channel_delete_reason_by_user", event.getUser().getEffectiveName())).queue(),
-            error -> event.reply(t(guildId, "tickets.delete_failed")).setEphemeral(true).queue()
+            // Bug fix: can't call event.reply() again in error callback (already acknowledged)
+            error -> System.err.println("Failed to send delete acknowledgment: " + error.getMessage())
         );
     }
 

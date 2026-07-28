@@ -12,12 +12,17 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 
-public class HelpCommandListener extends ListenerAdapter {
+public class HelpCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public HelpCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"help"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -54,19 +59,16 @@ public class HelpCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (event.getName().equals("help")) {
-
-            if (!event.isFromGuild() || event.getGuild() == null) {
-                event.reply(t(null, "language.server_only")).setEphemeral(true).queue();
-                return;
-            }
-
-            String guildId = event.getGuild().getId();
-            Container container = buildHomePage(guildId);
-            MessageCreateBuilder messageBuilder = new MessageCreateBuilder().setComponents(container);
-            event.reply(messageBuilder.useComponentsV2().build()).queue();
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
+        if (!event.isFromGuild() || event.getGuild() == null) {
+            event.reply(t(null, "language.server_only")).setEphemeral(true).queue();
+            return;
         }
+
+        String guildId = event.getGuild().getId();
+        Container container = buildHomePage(guildId);
+        MessageCreateBuilder messageBuilder = new MessageCreateBuilder().setComponents(container);
+        event.reply(messageBuilder.useComponentsV2().build()).queue();
     }
 
     @Override

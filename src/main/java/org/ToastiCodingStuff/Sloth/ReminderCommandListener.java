@@ -22,12 +22,17 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class ReminderCommandListener extends ListenerAdapter {
+public class ReminderCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public ReminderCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"reminder"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -64,8 +69,7 @@ public class ReminderCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("reminder")) return;
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) return;
@@ -175,16 +179,20 @@ public class ReminderCommandListener extends ListenerAdapter {
     }
 
     private void handleSetReminder(SlashCommandInteractionEvent event, String userId, String guildId) {
+        // Bug fix: null-checks for required options
+        if (event.getOption("title") == null || event.getOption("time") == null) {
+            event.reply(t(guildId, "reminders.invalid_time")).setEphemeral(true).queue();
+            return;
+        }
         String title = event.getOption("title").getAsString();
         String timeStr = event.getOption("time").getAsString();
         String message = "";
         if (event.getOption("message") != null) {
             message = event.getOption("message").getAsString();
         }
-        boolean dm = true;
-        if (event.getOption("dm") != null && event.getOption("dm").getAsBoolean()) {
-            dm = event.getOption("dm").getAsBoolean();
-        }
+        // Bug fix: dm was always true – option value was only applied if it was true, never if false.
+        // Correct logic: default true, but respect the option value when explicitly provided.
+        boolean dm = event.getOption("dm") == null || event.getOption("dm").getAsBoolean();
 
         long secondsToAdd = 0;
 
@@ -203,7 +211,7 @@ public class ReminderCommandListener extends ListenerAdapter {
             }
         } else {
             // Fehlerbehandlung: Format nicht erkannt
-            System.out.println("Ungültiges Format: " + timeStr);
+            // Bug fix: removed debug System.out.println
         }
 
         if (secondsToAdd <= 0) {
@@ -277,9 +285,14 @@ public class ReminderCommandListener extends ListenerAdapter {
     }
 
     private void handleRemoveReminder(SlashCommandInteractionEvent event, String userId) {
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
+        if (event.getOption("id") == null) {
+            event.reply(t(guildId, "reminders.id_error")).setEphemeral(true).queue();
+            return;
+        }
         int id = event.getOption("id").getAsInt();
         boolean success = handler.deleteReminder(id, userId);
-        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
+        // guildId already declared above
 
         if (success) {
             event.reply(t(guildId, "reminders.deleted_success", id)).setEphemeral(true).queue();
@@ -358,7 +371,6 @@ public class ReminderCommandListener extends ListenerAdapter {
                 case "d": totalSeconds += amount * 86400L; break;
             }
         }
-        System.out.println("Parsed duration: " + totalSeconds + " seconds from input: " + input);
         return found ? totalSeconds : 0;
     }
 

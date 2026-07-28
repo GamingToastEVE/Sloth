@@ -13,12 +13,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class TimedRolesCommandListener extends ListenerAdapter {
+public class TimedRolesCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public TimedRolesCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"my-roles", "temprole"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -44,7 +49,7 @@ public class TimedRolesCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
         String command = event.getName();
 
         switch (command) {
@@ -74,32 +79,28 @@ public class TimedRolesCommandListener extends ListenerAdapter {
         String oderId = event.getUser().getId();
         List<DatabaseHandler.ActiveTimerData> timers = handler.getActiveTimersForUser(guildId, oderId);
 
-        LanguageManager lang = LanguageManager.getInstance();
-        boolean isGerman = lang != null && lang.getGuildLanguage(guildId).equals("de");
-
         if (timers.isEmpty()) {
-            String msg = isGerman ? "Du hast aktuell keine zeitbegrenzten Rollen." : "You don't have any timed roles.";
-            event.reply(msg).setEphemeral(true).queue();
+            event.reply(t(guildId, "temproles.no_roles")).setEphemeral(true).queue();
             return;
         }
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle(isGerman ? "⏳ Deine temporären Rollen" : "⏳ Your Temporary Roles");
+        embed.setTitle("⏳ " + t(guildId, "temproles.title"));
         embed.setColor(Color.ORANGE);
-        embed.setDescription(isGerman ? "Hier ist eine Übersicht deiner Rollen, die automatisch ablaufen:" : "Here's an overview of your roles that will expire automatically:");
+        embed.setDescription(t(guildId, "temproles.description"));
 
         StringBuilder content = new StringBuilder();
         Guild guild = event.getGuild();
 
         for (DatabaseHandler.ActiveTimerData timer : timers) {
             Role role = guild.getRoleById(timer.roleId);
-            String roleName = (role != null) ? role.getAsMention() : (isGerman ? "Gelöschte Rolle (" : "Deleted Role (") + timer.roleId + ")";
+            String roleName = (role != null) ? role.getAsMention() : t(guildId, "verify_button.deleted_role", timer.roleId);
 
             // Discord Timestamp Format: <t:SECONDS:R> macht daraus "in 2 Tagen" oder "vor 5 Minuten"
             long unixSeconds = timer.expiresAt.getTime() / 1000;
 
             content.append("• ").append(roleName)
-                    .append(" \n  ").append(isGerman ? "Läuft ab" : "Expires").append(": <t:").append(unixSeconds).append(":R>")
+                    .append(" \n  ").append(t(guildId, "temproles.expires")).append(": <t:").append(unixSeconds).append(":R>")
                     .append(" (<t:").append(unixSeconds).append(":f>)")
                     .append("\n\n");
         }
@@ -120,12 +121,8 @@ public class TimedRolesCommandListener extends ListenerAdapter {
         Member target = event.getOption("user").getAsMember();
         Role role = event.getOption("role").getAsRole();
 
-        LanguageManager lang = LanguageManager.getInstance();
-        boolean isGerman = lang != null && lang.getGuildLanguage(guildId).equals("de");
-
         if (target == null) {
-            String msg = isGerman ? "❌ Benutzer nicht gefunden." : "❌ User not found.";
-            event.reply(msg).setEphemeral(true).queue();
+            event.reply(t(guildId, "moderation.user_not_found")).setEphemeral(true).queue();
             return;
         }
 
@@ -135,8 +132,7 @@ public class TimedRolesCommandListener extends ListenerAdapter {
             long seconds = parseDuration(durationStr);
 
             if (seconds < 0) {
-                String msg = isGerman ? "❌ Ungültige Dauer. Nutze Formate wie `30m`, `24h`, `7d`." : "❌ Invalid duration. Use formats like `30m`, `24h`, `7d`.";
-                event.reply(msg).setEphemeral(true).queue();
+                event.reply("❌ " + t(guildId, "temproles.invalid_duration")).setEphemeral(true).queue();
                 return;
             }
 
@@ -147,15 +143,10 @@ public class TimedRolesCommandListener extends ListenerAdapter {
                         handler.addActiveTimer(guildId, target.getId(), role.getId(), 0, seconds);
 
                         long unixExpiry = (System.currentTimeMillis() / 1000) + seconds;
-                        String msg = isGerman
-                                ? "✅ Rolle " + role.getAsMention() + " an " + target.getAsMention() + " vergeben.\nLäuft ab: <t:" + unixExpiry + ":R>"
-                                : "✅ Role " + role.getAsMention() + " assigned to " + target.getAsMention() + ".\nExpires: <t:" + unixExpiry + ":R>";
+                        String msg = "✅ " + t(guildId, "temproles.add_success", role.getAsMention(), target.getAsMention(), "<t:" + unixExpiry + ":R>");
                         event.reply(msg).queue();
                     },
-                    error -> {
-                        String msg = isGerman ? "❌ Fehler beim Vergeben der Rolle. Überprüfe meine Berechtigungen!" : "❌ Error assigning role. Check my permissions!";
-                        event.reply(msg).setEphemeral(true).queue();
-                    }
+                    error -> event.reply("❌ " + t(guildId, "temproles.error_assign")).setEphemeral(true).queue()
             );
 
         } else if (subcommand.equals("remove")) {
@@ -164,17 +155,12 @@ public class TimedRolesCommandListener extends ListenerAdapter {
                     success -> {
                         boolean deleted = handler.removeTimerManual(guildId, target.getId(), role.getId());
                         if (deleted) {
-                            String msg = isGerman ? "✅ Rolle entfernt und Timer gestoppt." : "✅ Role removed and timer stopped.";
-                            event.reply(msg).queue();
+                            event.reply("✅ " + t(guildId, "temproles.remove_success")).queue();
                         } else {
-                            String msg = isGerman ? "⚠️ Rolle entfernt, aber es wurde kein aktiver Timer in der Datenbank gefunden." : "⚠️ Role removed, but no active timer was found in the database.";
-                            event.reply(msg).queue();
+                            event.reply("⚠️ " + t(guildId, "temproles.remove_no_timer")).queue();
                         }
                     },
-                    error -> {
-                        String msg = isGerman ? "❌ Fehler beim Entfernen der Rolle." : "❌ Error removing role.";
-                        event.reply(msg).setEphemeral(true).queue();
-                    }
+                    error -> event.reply("❌ " + t(guildId, "temproles.error_remove")).setEphemeral(true).queue()
             );
         }
     }

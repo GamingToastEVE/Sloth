@@ -13,12 +13,17 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class ModerationCommandListener extends ListenerAdapter {
+public class ModerationCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public ModerationCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"mod"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -44,15 +49,15 @@ public class ModerationCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("mod")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {
             return;
         }
+
+        // Bug fix: null-check for guild and member
+        if (event.getGuild() == null || event.getMember() == null) return;
 
         event.deferReply().setEphemeral(true).queue();
 
@@ -239,7 +244,11 @@ public class ModerationCommandListener extends ListenerAdapter {
             return;
         }
 
-        String oderId = event.getOption("userid").getAsString();
+        String oderId = event.getOption("userid") != null ? event.getOption("userid").getAsString() : null;
+        if (oderId == null) {
+            event.getHook().sendMessage(t(guildId, "moderation.specify_user")).setEphemeral(true).queue();
+            return;
+        }
         String reason = event.getOption("reason") != null ?
                 event.getOption("reason").getAsString() : t(guildId, "moderation.no_reason");
 
@@ -276,7 +285,11 @@ public class ModerationCommandListener extends ListenerAdapter {
             return;
         }
 
-        Member targetMember = event.getOption("user").getAsMember();
+        Member targetMember = event.getOption("user") != null ? event.getOption("user").getAsMember() : null;
+        if (event.getOption("minutes") == null) {
+            event.getHook().sendMessage(t(guildId, "general.invalid_input")).setEphemeral(true).queue();
+            return;
+        }
         int minutes = event.getOption("minutes").getAsInt();
         String reason = event.getOption("reason") != null ? 
                 event.getOption("reason").getAsString() : t(guildId, "moderation.no_reason");
@@ -345,8 +358,8 @@ public class ModerationCommandListener extends ListenerAdapter {
             return;
         }
 
-        Member targetMember = event.getOption("user").getAsMember();
-        String reason = event.getOption("reason") != null ? 
+        Member targetMember = event.getOption("user") != null ? event.getOption("user").getAsMember() : null;
+        String reason = event.getOption("reason") != null ?
                 event.getOption("reason").getAsString() : t(guildId, "moderation.no_reason");
 
         if (targetMember == null) {
@@ -399,6 +412,10 @@ public class ModerationCommandListener extends ListenerAdapter {
             return;
         }
 
+        if (event.getOption("amount") == null) {
+            event.getHook().sendMessage(t(guildId, "general.invalid_input")).setEphemeral(true).queue();
+            return;
+        }
         int amount = event.getOption("amount").getAsInt();
         Member targetUser = event.getOption("user") != null ? event.getOption("user").getAsMember() : null;
 
@@ -476,6 +493,10 @@ public class ModerationCommandListener extends ListenerAdapter {
             return;
         }
 
+        if (event.getOption("seconds") == null) {
+            event.getHook().sendMessage(t(guildId, "general.invalid_input")).setEphemeral(true).queue();
+            return;
+        }
         int seconds = event.getOption("seconds").getAsInt();
 
         if (seconds < 0 || seconds > 21600) { // Max 6 hours

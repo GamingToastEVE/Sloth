@@ -40,7 +40,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class LevelingSystemCommandListener extends ListenerAdapter {
+public class LevelingSystemCommandListener extends ListenerAdapter implements SlashCommandHandler {
+
     private final DatabaseHandler handler;
     private final Random random = new Random();
 
@@ -54,11 +55,23 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     // Scheduled executor for voice XP awards
     private final ScheduledExecutorService voiceXpScheduler = Executors.newScheduledThreadPool(1);
 
+    /**
+     * Cleanly shut down the voice XP scheduler – call this on bot shutdown to prevent thread leaks.
+     */
+    public void shutdown() {
+        voiceXpScheduler.shutdownNow();
+    }
+
     public LevelingSystemCommandListener(DatabaseHandler handler) {
         this.handler = handler;
 
         // Start voice XP award task - runs every 60 seconds
         voiceXpScheduler.scheduleAtFixedRate(this::awardVoiceXp, 60, 60, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"leveling"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -148,16 +161,12 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         if (joined != null && left == null) {
             // User joined a voice channel
             voiceJoinTimes.put(key, System.currentTimeMillis());
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " joined voice, now tracking");
         } else if (left != null && joined == null) {
             // User left voice channel
             voiceJoinTimes.remove(key);
             lastVoiceXpTime.remove(key);
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " left voice, stopped tracking");
-        } else if (joined != null) {
-            // User switched channels - keep tracking
-            System.out.println("[VoiceXP] User " + event.getMember().getEffectiveName() + " switched channels, still tracking");
         }
+        // User switched channels - tracking continues automatically
     }
 
     /**
@@ -166,7 +175,6 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     private void syncExistingVoiceUsers() {
         if (jdaInstance == null) return;
 
-        System.out.println("[VoiceXP] Syncing existing voice users...");
         int count = 0;
 
         for (Guild guild : jdaInstance.getGuilds()) {
@@ -969,8 +977,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
     // ==================== SLASH COMMANDS ====================
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("leveling")) return;
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) return;
@@ -1024,16 +1031,16 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                     // Refresh the view
                     Container container = showRewardEditPage(event.getGuild());
                     event.editMessage(new MessageEditBuilder().setComponents(container).useComponentsV2().build()).queue();
-                    event.getHook().sendMessage("✅ Reward removed successfully.").setEphemeral(true).queue();
+                    event.getHook().sendMessage("✅ " + t(guildId, "leveling_.reward_removed_success")).setEphemeral(true).queue();
                 } else {
-                    event.reply("❌ Failed to update database.").setEphemeral(true).queue();
+                    event.reply("❌ " + t(guildId, "leveling_.reward_removed_failure")).setEphemeral(true).queue();
                 }
             } else {
-                event.reply("❌ Reward not found in settings.").setEphemeral(true).queue();
+                event.reply("❌ " + t(guildId, "leveling_.reward_removed_failure")).setEphemeral(true).queue();
             }
 
         } catch (Exception e) {
-            event.reply("❌ Error processing removal: " + e.getMessage()).setEphemeral(true).queue();
+            event.reply("❌ " + t(guildId, "general.error") + ": " + e.getMessage()).setEphemeral(true).queue();
             e.printStackTrace();
         }
     }
@@ -1056,6 +1063,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
         // We use a list to build components dynamically
+        TextDisplay breadcrumb = TextDisplay.of(t(guildId, "leveling_.breadcrumb_manage_rewards"));
         TextDisplay title = TextDisplay.of(t(guildId, "leveling_.rewards_title"));
         Separator sep1 = Separator.createDivider(Separator.Spacing.SMALL);
         TextDisplay rewardsDesc = TextDisplay.of(t(guildId, "leveling_.rewards_desc"));
@@ -1096,9 +1104,9 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
                 System.err.println("Error parsing rewards for edit page: " + e.getMessage());
             }
         }
-        Container container = Container.of(title, sep1, rewardsDesc, sep2, ac1);
+        Container container = Container.of(breadcrumb, title, sep1, rewardsDesc, sep2, ac1);
         if (optSep1 != null && optTxt1 != null && optAc1 != null) {
-            container = Container.of(title, sep1, rewardsDesc, sep2, ac1, optSep1, optTxt1, optAc1);
+            container = Container.of(breadcrumb, title, sep1, rewardsDesc, sep2, ac1, optSep1, optTxt1, optAc1);
         }
         return container;
     }
@@ -1298,7 +1306,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         } catch (Exception e) {
             e.printStackTrace();
-            event.getHook().sendMessage("❌ Error: " + e.getMessage()).setEphemeral(true).queue();
+            event.getHook().sendMessage("❌ " + t(guildId, "leveling_.applied_levels_to_members_with_role_failure") + ": " + e.getMessage()).setEphemeral(true).queue();
         }
     }
 
@@ -1311,7 +1319,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Permission check
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
-            event.reply("❌ You need **Manage Server** permission to change these settings.").setEphemeral(true).queue();
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
@@ -1406,6 +1414,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build rank card container
         Container rankContainer = Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_rank")),
                 TextDisplay.of(String.format("# 📊 %s's %s", targetMember.getEffectiveName(), t(guildId, "leveling_.rank"))),
 
                 Separator.createDivider(Separator.Spacing.SMALL),
@@ -1500,6 +1509,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build leaderboard container
         Container leaderboardContainer = Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_leaderboard")),
                 TextDisplay.of(String.format("# " + t(guildId, "leveling_.leaderboard_title"), event.getGuild().getName())),
                 TextDisplay.of(String.format("-# " + t(guildId, "leveling_.page") + " • " + t(guildId, "leveling_.total_members"),
                         page, Math.max(1, totalPages), totalUsers)),
@@ -1594,6 +1604,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
 
         // Build leaderboard container
         Container leaderboardContainer = Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_leaderboard")),
                 TextDisplay.of(String.format("# " + t(guildId, "leveling_.leaderboard_title"), event.getGuild().getName())),
                 TextDisplay.of(String.format("-# " + t(guildId, "leveling_.page") + " • " + t(guildId, "leveling_.total_members"), newPage, Math.max(1, totalPages), totalUsers)),
 
@@ -1657,6 +1668,8 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         String curveText = settings.xpCurve.substring(0, 1).toUpperCase() + settings.xpCurve.substring(1);
 
         return Container.of(
+                // Breadcrumb
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_main")),
                 // Header
                 TextDisplay.of("# " + t(guildId, "leveling_.settings_title")),
                 TextDisplay.of(t(guildId, "leveling_.settings_description")),
@@ -1739,6 +1752,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         String maxLevelText = settings.maxLevel == 0 ? "Unlimited" : String.valueOf(settings.maxLevel);
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_formula")),
                 TextDisplay.of("# 📐 Formula Settings"),
                 TextDisplay.of("Configure how XP requirements scale per level."),
 
@@ -1807,6 +1821,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         String statusText = settings.messageXpEnabled ? "✅ " + t(guildId, "general.enabled") : "❌ " + t(guildId, "general.disabled");
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_message_xp")),
                 TextDisplay.of("# " + t(guildId, "leveling_.message_xp_title")),
                 TextDisplay.of(t(guildId, "leveling_.message_xp_description")),
 
@@ -1861,6 +1876,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_voice_xp")),
                 TextDisplay.of("# 🎤 Voice XP"),
                 TextDisplay.of("Configure XP earned from voice channels."),
 
@@ -1931,6 +1947,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         };
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_reaction_xp")),
                 TextDisplay.of("# 👍 Reaction XP"),
                 TextDisplay.of("Configure XP earned from reactions."),
 
@@ -2006,6 +2023,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_notifications")),
                 TextDisplay.of("# 🔔 Notification Settings"),
                 TextDisplay.of("Configure level-up announcements."),
 
@@ -2059,6 +2077,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_rewards")),
                 TextDisplay.of("# 🎁 Role Rewards"),
                 TextDisplay.of("Configure roles given at specific levels."),
 
@@ -2122,6 +2141,7 @@ public class LevelingSystemCommandListener extends ListenerAdapter {
         }
 
         return Container.of(
+                TextDisplay.of(t(guildId, "leveling_.breadcrumb_exceptions")),
                 TextDisplay.of("# 🚫 Exceptions & Reset"),
                 TextDisplay.of("Configure channels/roles to exclude and leave behavior."),
 

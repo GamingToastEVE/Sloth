@@ -14,12 +14,17 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 
-public class StatisticsCommandListener extends ListenerAdapter {
+public class StatisticsCommandListener extends ListenerAdapter implements SlashCommandHandler {
 
     private final DatabaseHandler handler;
 
     public StatisticsCommandListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public String[] getHandledCommands() {
+        return new String[]{"stats"};
     }
 
     // ==================== LANGUAGE HELPER METHODS ====================
@@ -56,10 +61,7 @@ public class StatisticsCommandListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getName().equals("stats")) {
-            return;
-        }
+    public void handleSlashCommand(SlashCommandInteractionEvent event) {
 
         String subcommand = event.getSubcommandName();
         if (subcommand == null) {

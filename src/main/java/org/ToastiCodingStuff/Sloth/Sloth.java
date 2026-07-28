@@ -16,8 +16,11 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
 
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class Sloth {
@@ -25,6 +28,8 @@ public class Sloth {
         Dotenv dotenv = Dotenv.load();
         JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
+                .setChunkingFilter(ChunkingFilter.ALL)
+                .setMemberCachePolicy(MemberCachePolicy.ALL)
                 .build();
         api.awaitReady();
 
@@ -39,30 +44,58 @@ public class Sloth {
         api.getPresence().setActivity(Activity.playing("Starting up..."));
 
         SystemsCommandListener systemsCommandListener = new SystemsCommandListener(handler);
+        LogChannelSlashCommandListener logChannelListener = new LogChannelSlashCommandListener(handler);
+        WarnCommandListener warnListener = new WarnCommandListener(handler);
+        TicketCommandListener ticketListener = new TicketCommandListener(handler);
+        TicketPanelCommandListener ticketPanelListener = new TicketPanelCommandListener(handler);
+        StatisticsCommandListener statisticsListener = new StatisticsCommandListener(handler);
+        ModerationCommandListener moderationListener = new ModerationCommandListener(handler);
+        JustVerifyButtonCommandListener verifyListener = new JustVerifyButtonCommandListener(handler);
+        GlobalCommandListener globalListener = new GlobalCommandListener(handler);
+        FeedbackCommandListener feedbackListener = new FeedbackCommandListener(guild);
+        SelectRolesCommandListener selectRolesListener = new SelectRolesCommandListener(handler);
+        TimedRolesCommandListener timedRolesListener = new TimedRolesCommandListener(handler);
+        RoleEventConfigListener roleEventListener = new RoleEventConfigListener(handler);
+        EmbedEditorCommandListener embedEditorListener = new EmbedEditorCommandListener(handler);
+        ReminderCommandListener reminderListener = new ReminderCommandListener(handler);
+        LevelingSystemCommandListener levelingListener = new LevelingSystemCommandListener(handler);
+        LanguageCommandListener languageListener = new LanguageCommandListener(languageManager);
+        HelpCommandListener helpListener = new HelpCommandListener(handler);
 
-        api.addEventListener(new LogChannelSlashCommandListener(handler));
-        api.addEventListener(new WarnCommandListener(handler));
-        api.addEventListener(new TicketCommandListener(handler));
-        api.addEventListener(new TicketPanelCommandListener(handler));
+        // Zentraler Slash-Command-Router: leitet SlashCommandInteractionEvents direkt an den
+        // zuständigen Handler weiter, statt alle Listener zu durchlaufen.
+        SlashCommandRouter slashCommandRouter = new SlashCommandRouter(List.of(
+                logChannelListener, warnListener, ticketListener, ticketPanelListener,
+                statisticsListener, moderationListener, verifyListener, globalListener,
+                feedbackListener, selectRolesListener, timedRolesListener, roleEventListener,
+                embedEditorListener, systemsCommandListener, reminderListener,
+                levelingListener, languageListener, helpListener
+        ));
+
+        // Router für Slash-Commands (ein einzelner Listener statt vieler)
+        api.addEventListener(slashCommandRouter);
+
+        // Alle anderen Listener (Button, Select, Modal, Message-Events etc.)
+        api.addEventListener(warnListener);
+        api.addEventListener(ticketListener);
+        api.addEventListener(ticketPanelListener);
         api.addEventListener(new TicketCreationListener(handler));
-        api.addEventListener(new StatisticsCommandListener(handler));
-        api.addEventListener(new ModerationCommandListener(handler));
-        api.addEventListener(new JustVerifyButtonCommandListener(handler));
+        api.addEventListener(statisticsListener);
+        api.addEventListener(moderationListener);
+        api.addEventListener(verifyListener);
         api.addEventListener(new OnGuildLeaveListener(handler));
-        api.addEventListener(new GlobalCommandListener(handler));
-        api.addEventListener(new FeedbackCommandListener(guild));
-        api.addEventListener(new SelectRolesCommandListener(handler));
-        api.addEventListener(new TimedRolesCommandListener(handler));
-        api.addEventListener(new RoleEventConfigListener(handler));
+        api.addEventListener(selectRolesListener);
+        api.addEventListener(timedRolesListener);
+        api.addEventListener(roleEventListener);
         api.addEventListener(new TimedRoleTriggerListener(handler, api));
-        api.addEventListener(new EmbedEditorCommandListener(handler));
+        api.addEventListener(new MemberRoleTrackingListener(handler));
+        api.addEventListener(embedEditorListener);
         api.addEventListener(systemsCommandListener);
-        api.addEventListener(new ReminderCommandListener(handler));
-        api.addEventListener(new LevelingSystemCommandListener(handler));
-        api.addEventListener(new LanguageCommandListener(languageManager));
+        api.addEventListener(reminderListener);
+        api.addEventListener(levelingListener);
+        api.addEventListener(languageListener);
         api.addEventListener(new SetupWizardListener(handler, systemsCommandListener));
-
-        api.addEventListener(new HelpCommandListener(handler));
+        api.addEventListener(helpListener);
         api.addEventListener(new GuildEventListener(handler));
 
         // Register all system commands globally
@@ -111,53 +144,57 @@ public class Sloth {
                     if (guild1 != null) {
                         Role role = guild1.getRoleById(timer.roleId);
                         if (role != null) {
+                            String sourceName = handler.getRoleEvent(timer.sourceEventId) != null
+                                    ? handler.getRoleEvent(timer.sourceEventId).name
+                                    : "No source found";
+
+                            // Original action was REMOVE -> now ADD the role back
                             if (timer.actionType == null || timer.actionType.equalsIgnoreCase(String.valueOf(ActionType.REMOVE))) {
                                 guild1.retrieveMemberById(timer.userId).queue(
                                         member -> {
-                                            // 3. Rolle entfernen
-                                            if (!member.getRoles().contains(role)) {
-                                                if (handler.getRoleEvent(timer.sourceEventId) == null) {
-                                                    guild1.addRoleToMember(member, role).reason("Timed Role expired, Role gets added again: No source found.").queue();
-                                                } else {
-                                                    guild1.addRoleToMember(member, role).reason("Timed Role expired, Role gets added again: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
-                                                }
-                                            } else {
-                                                if (handler.getRoleEvent(timer.sourceEventId) == null) {
-                                                    guild1.removeRoleFromMember(member, role).reason("Timed Role expired, Role gets added again: No source found.").queue();
-                                                } else {
-                                                    guild1.removeRoleFromMember(member, role).reason("Timed Role expired, Role gets added again: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
-                                                }
-                                            }
-                                            // Optional: User benachrichtigen
-                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " auf " + guild1.getName() + " ist abgelaufen.").queue());
+                                            // Role was removed, now add it back
+                                            guild1.addRoleToMember(member, role)
+                                                    .reason("Timed Role expired, adding role back: " + sourceName)
+                                                    .queue(
+                                                            success -> System.out.println("Added role " + role.getName() + " back to " + member.getUser().getName()),
+                                                            error -> {
+                                                                System.err.println("Failed to add role: " + error.getMessage());
+                                                                sendTimerErrorToLogChannel(handler, guild1, member.getUser().getName(), role.getName(), "ADD", error.getMessage());
+                                                            }
+                                                    );
                                         },
-                                        error -> System.err.println("Member " + timer.userId + " not found/left guild.")
+                                        error -> {
+                                            System.err.println("Member " + timer.userId + " not found/left guild.");
+                                            sendTimerErrorToLogChannel(handler, guild1, timer.userId, role.getName(), "MEMBER_NOT_FOUND", "Member not found or left the guild");
+                                        }
                                 );
+                            // Original action was ADD -> now REMOVE the role
                             } else if (timer.actionType.equalsIgnoreCase(String.valueOf(ActionType.ADD))) {
                                 guild1.retrieveMemberById(timer.userId).queue(
                                         member -> {
-                                            // 3. Rolle hinzufügen
-                                            if (member.getRoles().contains(role)) {
-                                                if (handler.getRoleEvent(timer.sourceEventId) == null) {
-                                                    guild1.removeRoleFromMember(member, role).reason("Timed Role expired, Role gets added again: No source found.").queue();
-                                                } else {
-                                                    guild1.removeRoleFromMember(member, role).reason("Timed Role expired, Role gets added again: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
-                                                }
-                                            } else {
-                                                if (handler.getRoleEvent(timer.sourceEventId) == null) {
-                                                    guild1.addRoleToMember(member, role).reason("Timed Role expired, Role gets added again: No source found.").queue();
-                                                } else {
-                                                    guild1.addRoleToMember(member, role).reason("Timed Role expired, Role gets added again: " + handler.getRoleEvent(timer.sourceEventId).name).queue();
-                                                }
-                                            }
-                                            // Optional: User benachrichtigen
-                                            // member.getUser().openPrivateChannel().queue(ch -> ch.sendMessage("Deine Rolle " + role.getName() + " wurde dir wieder hinzugefügt.").queue());
+                                            // Role was added, now remove it
+                                            guild1.removeRoleFromMember(member, role)
+                                                    .reason("Timed Role expired, removing role: " + sourceName)
+                                                    .queue(
+                                                            success -> System.out.println("Removed role " + role.getName() + " from " + member.getUser().getName()),
+                                                            error -> {
+                                                                System.err.println("Failed to remove role: " + error.getMessage());
+                                                                sendTimerErrorToLogChannel(handler, guild1, member.getUser().getName(), role.getName(), "REMOVE", error.getMessage());
+                                                            }
+                                                    );
                                         },
-                                        error -> System.err.println("Member " + timer.userId + " not found/left guild.")
+                                        error -> {
+                                            System.err.println("Member " + timer.userId + " not found/left guild.");
+                                            sendTimerErrorToLogChannel(handler, guild1, timer.userId, role.getName(), "MEMBER_NOT_FOUND", "Member not found or left the guild");
+                                        }
                                 );
                             }
-
+                        } else {
+                            System.err.println("Role " + timer.roleId + " not found in guild " + timer.guildId);
+                            sendTimerErrorToLogChannel(handler, guild1, timer.userId, timer.roleId, "ROLE_NOT_FOUND", "Role no longer exists");
                         }
+                    } else {
+                        System.err.println("Guild " + timer.guildId + " not found");
                     }
                     // 4. Timer aus DB löschen (egal ob erfolgreich oder nicht, damit Loop nicht hängt)
                     handler.removeTimer(timer.id);
@@ -256,12 +293,33 @@ public class Sloth {
 
         System.out.println("Starting registering commands in servers...");
 
-        for (Guild guild : api.getGuilds()) {
-            System.out.println("Registering commands in guild: " + guild.getName() + " (ID: " + guild.getId() + ")");
+        Thread t = new Thread(() -> {
+            List<Guild> guilds = api.getGuilds();
+            for (Guild guild : guilds) {
+                System.out.println("Registering commands in guild: " + guild.getName() + " (" + guild.getId() + ")");
+                AddGuildSlashCommands provider = new AddGuildSlashCommands(guild, handler);
+                List<CommandData> commandsToRegister = new ArrayList<>();
+                commandsToRegister.addAll(provider.getCoreCommands());
+                java.util.Map<String, Boolean> systems = handler.getGuildSystemsStatus(guild.getId());
+                for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
+                    if (entry.getValue()) { // If system is active
+                        commandsToRegister.addAll(provider.getCommandsForSystem(entry.getKey()));
+                        commandsToRegister.addAll(provider.getUserCommandsForSystem(entry.getKey()));
+                    }
+                }
+                guild.updateCommands().addCommands(commandsToRegister).queue(
+                        success -> System.out.println("Successfully registered commands in guild: " + guild.getName()),
+                        error -> System.err.println("Failed to register commands in guild: " + guild.getName() + " - " + error.getMessage())
+                );
+                try {
+                    TimeUnit.MILLISECONDS.sleep(500); // Sleep to avoid hitting rate limits
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+        t.start();
 
-            updateGuildCommandsFromActiveSystems(guild.getId(), handler, api);
-            TimeUnit.MILLISECONDS.sleep(100);
-        }
 
         System.out.println("Finished registering commands in all servers.");
     }
@@ -290,6 +348,47 @@ public class Sloth {
         guild.updateCommands().addCommands(activeCommands).queue(
                 success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
                 error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
+        );
+    }
+
+    /**
+     * Sends an error message to the guild's log channel when a timed role action fails
+     */
+    private static void sendTimerErrorToLogChannel(DatabaseHandler handler, Guild guild, String userIdentifier, String roleIdentifier, String action, String errorMessage) {
+        if (!handler.hasLogChannel(guild.getId())) {
+            return; // No log channel configured
+        }
+
+        String logChannelId = handler.getLogChannelID(guild.getId());
+        TextChannel logChannel = guild.getTextChannelById(logChannelId);
+
+        if (logChannel == null || !logChannel.canTalk()) {
+            System.err.println("Log channel not found or cannot send messages: " + logChannelId);
+            return;
+        }
+
+        EmbedBuilder embed = new EmbedBuilder();
+        embed.setTitle("⚠️ Timed Role Error");
+        embed.setColor(0xFF6B6B); // Red color for errors
+
+        String actionDescription = switch (action) {
+            case "ADD" -> "Failed to add role back to user";
+            case "REMOVE" -> "Failed to remove role from user";
+            case "MEMBER_NOT_FOUND" -> "Member not found for role action";
+            case "ROLE_NOT_FOUND" -> "Role not found for timed action";
+            default -> "Unknown error during timed role action";
+        };
+
+        embed.setDescription(actionDescription);
+        embed.addField("User", userIdentifier, true);
+        embed.addField("Role", roleIdentifier, true);
+        embed.addField("Error Details", errorMessage, false);
+        embed.setTimestamp(java.time.Instant.now());
+        embed.setFooter("Timed Roles System");
+
+        logChannel.sendMessageEmbeds(embed.build()).queue(
+                success -> {},
+                error -> System.err.println("Failed to send error to log channel: " + error.getMessage())
         );
     }
 }
