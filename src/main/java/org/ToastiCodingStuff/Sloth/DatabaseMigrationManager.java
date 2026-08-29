@@ -131,7 +131,6 @@ public class DatabaseMigrationManager {
         schemas.put("ticket_forms", createTicketFormsSchema());
         schemas.put("ticket_form_fields", createTicketFormFieldsSchema());
         schemas.put("ticket_form_responses", createTicketFormResponsesSchema());
-        schemas.put("ticket_messages", createTicketMessagesSchema());
         schemas.put("guild_settings", createGuildSettingsSchema());
         schemas.put("statistics", createStatisticsSchema());
         schemas.put("user_statistics", createUserStatisticsSchema());
@@ -167,7 +166,10 @@ public class DatabaseMigrationManager {
                 .addColumn("updated_at", "TEXT")
                 .addColumn("active", "INTEGER DEFAULT 1")
                 .addColumn("active_modules", "TEXT")
-                .addColumn("message_count_tracking", "INTEGER DEFAULT 0");
+                .addColumn("message_count_tracking", "INTEGER DEFAULT 0")
+                // Set when the bot is removed from the guild; starts the retention clock
+                // that DatabaseHandler.purgeExpiredGuildData() acts on
+                .addColumn("left_at", "DATETIME NULL");
     }
 
     private TableSchema createJustVerifyButtonSchema() {
@@ -341,21 +343,6 @@ public class DatabaseMigrationManager {
             .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
     }
 
-    /**
-     * Define the ticket_messages table schema
-     */
-    private TableSchema createTicketMessagesSchema() {
-        return new TableSchema("ticket_messages")
-            .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
-            .addColumn("ticket_id", "INTEGER NOT NULL")
-            .addColumn("user_id", "INTEGER NOT NULL")
-            .addColumn("message_id", "INTEGER NOT NULL")
-            .addColumn("content", "TEXT NOT NULL")
-            .addColumn("attachments", "TEXT")
-            .addColumn("is_staff", "INTEGER DEFAULT 0")
-            .addColumn("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP");
-    }
-    
     /**
      * Define the guild_settings table schema
      */

@@ -85,14 +85,17 @@ public class SystemsCommandListener extends ListenerAdapter implements SlashComm
         // 1. Toggle state in DB
         boolean newState = handler.toggleSystem(guildId, systemName);
 
+        System.out.println("System '" + systemName + "' toggled to: " + (newState ? "ENABLED" : "DISABLED") + " for guild " + guildId);
+
+        // 2. Update guild commands based on new active systems
+        // 2. Update guild commands based on new active systems
+        AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
+        cmdUpdater.updateGuildCommandsFromActiveSystems(null);
+
+        // 3. Get updated statuses and refresh the UI
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);
 
-        System.out.println("New State: " + newState);
-
-        AddGuildSlashCommands cmdUpdater = new AddGuildSlashCommands(event.getGuild(), handler);
-        cmdUpdater.updateGuildCommandsFromActiveSystems("");
-
-        // Use deferEdit to acknowledge and then edit the original message
+        // 4. Update the message with new status
         event.deferEdit().queue(
                 success -> event.getHook().editOriginalEmbeds(buildEmbed(guildId, statuses).build())
                         .setComponents(buildButtons(statuses))
@@ -173,6 +176,7 @@ public class SystemsCommandListener extends ListenerAdapter implements SlashComm
 
         if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
             event.getHook().sendMessage(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
+            return;
         }
 
         Map<String, Boolean> statuses = handler.getGuildSystemsStatus(guildId);

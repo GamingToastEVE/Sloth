@@ -182,25 +182,24 @@ public class TicketCreationListener extends ListenerAdapter {
 
     // ==================== TICKET CREATION ====================
 
-    private void handleCreateTicketButton(ButtonInteractionEvent event, int panelId) {
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
-        DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
+    /**
+     * A max of 0 (or below) means "unlimited" - the setup wizard offers that as an
+     * explicit option, so it must not be compared against the open ticket count.
+     */
+    static boolean hasReachedTicketLimit(int openTickets, int maxTicketsPerUser) {
+        return maxTicketsPerUser > 0 && openTickets >= maxTicketsPerUser;
+    }
 
-        if (panel == null) {
-            event.reply(t(guildId, "ticket_panels.not_found")).setEphemeral(true).queue();
-            return;
-        }
-
-        // Check max tickets per user
-        int openTickets = handler.getUserOpenTicketCount(guildId, event.getUser().getId(), panelId);
-        if (openTickets >= panel.maxTicketsPerUser) {
-            event.reply(t(guildId, "tickets.max_tickets_reached", panel.maxTicketsPerUser)).setEphemeral(true).queue();
-            return;
-        }
-
-        // Show modal for ticket creation
-        Modal.Builder modalBuilder = Modal.create("ticket_create_modal_" + panelId, "Create Ticket - " + panel.name);
-
+    /**
+     * Add the subject and description inputs the panel asks for.
+     * <p>
+     * Used by every ticket creation path so a panel's requireSubject / requireDescription
+     * settings apply whether the ticket is opened from the panel button or from one of its
+     * category buttons. When a panel requires neither, an optional subject is offered so
+     * the modal is never empty.
+     */
+    private void addSubjectAndDescriptionInputs(Modal.Builder modalBuilder,
+                                                DatabaseHandler.TicketPanelData panel) {
         if (panel.requireSubject) {
             TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
                 .setPlaceholder("Brief description of your issue...")
@@ -217,7 +216,6 @@ public class TicketCreationListener extends ListenerAdapter {
             modalBuilder.addComponents(Label.of("Description", descInput));
         }
 
-        // If neither subject nor description is required, add at least a subject field
         if (!panel.requireSubject && !panel.requireDescription) {
             TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
                 .setPlaceholder("Brief description (optional)")
@@ -225,6 +223,27 @@ public class TicketCreationListener extends ListenerAdapter {
                 .build();
             modalBuilder.addComponents(Label.of("Subject (optional)", subjectInput));
         }
+    }
+
+    private void handleCreateTicketButton(ButtonInteractionEvent event, int panelId) {
+        String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
+
+        if (panel == null) {
+            event.reply(t(guildId, "ticket_panels.not_found")).setEphemeral(true).queue();
+            return;
+        }
+
+        // Check max tickets per user
+        int openTickets = handler.getUserOpenTicketCount(guildId, event.getUser().getId(), panelId);
+        if (hasReachedTicketLimit(openTickets, panel.maxTicketsPerUser)) {
+            event.reply(t(guildId, "tickets.max_tickets_reached", panel.maxTicketsPerUser)).setEphemeral(true).queue();
+            return;
+        }
+
+        // Show modal for ticket creation
+        Modal.Builder modalBuilder = Modal.create("ticket_create_modal_" + panelId, "Create Ticket - " + panel.name);
+        addSubjectAndDescriptionInputs(modalBuilder, panel);
 
         event.replyModal(modalBuilder.build()).queue();
     }
@@ -338,16 +357,12 @@ public class TicketCreationListener extends ListenerAdapter {
     private void handleCloseTicketButton(ButtonInteractionEvent event, int panelId) {
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
         TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
 
-        if (ticketInfo == null) {
+        if (ticketId == null) {
             event.reply(t(guildId, "tickets.not_found")).setEphemeral(true).queue();
             return;
         }
-
-        // Extract ticket ID from ticketInfo
-        String[] parts = ticketInfo.split(" \\| ");
-        int ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
 
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), "Closed via button");
 
@@ -644,7 +659,7 @@ public class TicketCreationListener extends ListenerAdapter {
 
         // Check max tickets per user
         int openTickets = handler.getUserOpenTicketCount(guildId, event.getUser().getId(), category.panelId);
-        if (openTickets >= panel.maxTicketsPerUser) {
+        if (hasReachedTicketLimit(openTickets, panel.maxTicketsPerUser)) {
             event.reply(t(guildId, "tickets.max_tickets_reached", panel.maxTicketsPerUser)).setEphemeral(true).queue();
             return;
         }
@@ -680,18 +695,7 @@ public class TicketCreationListener extends ListenerAdapter {
                 // Show default modal first (Subject + Description)
                 Modal.Builder modalBuilder = Modal.create("ticket_cat_modal_" + categoryId + "_withforms_" + formIdsStr,
                     "Create Ticket - " + category.name + " (1/" + totalSteps + ")");
-
-                TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
-                    .setPlaceholder("Brief description of your issue...")
-                    .setRequiredRange(5, 100)
-                    .build();
-                modalBuilder.addComponents(Label.of("Subject", subjectInput));
-
-                TextInput descInput = TextInput.create("description", TextInputStyle.PARAGRAPH)
-                    .setPlaceholder("Please provide as much detail as possible...")
-                    .setRequiredRange(10, 1000)
-                    .build();
-                modalBuilder.addComponents(Label.of("Description", descInput));
+                addSubjectAndDescriptionInputs(modalBuilder, panel);
 
                 event.replyModal(modalBuilder.build()).queue();
                 return;
@@ -721,18 +725,7 @@ public class TicketCreationListener extends ListenerAdapter {
         } else {
             // No custom form fields - use default modal
             Modal.Builder modalBuilder = Modal.create("ticket_cat_modal_" + categoryId, "Create Ticket - " + category.name);
-
-            TextInput subjectInput = TextInput.create("subject", TextInputStyle.SHORT)
-                .setPlaceholder("Brief description of your issue...")
-                .setRequiredRange(5, 100)
-                .build();
-            modalBuilder.addComponents(Label.of("Subject", subjectInput));
-
-            TextInput descInput = TextInput.create("description", TextInputStyle.PARAGRAPH)
-                .setPlaceholder("Please provide as much detail as possible...")
-                .setRequiredRange(10, 1000)
-                .build();
-            modalBuilder.addComponents(Label.of("Description", descInput));
+            addSubjectAndDescriptionInputs(modalBuilder, panel);
 
             event.replyModal(modalBuilder.build()).queue();
         }

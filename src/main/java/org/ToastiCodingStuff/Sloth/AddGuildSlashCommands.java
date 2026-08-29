@@ -97,6 +97,7 @@ public class AddGuildSlashCommands {
         allCommands.addAll(getTimedRoleCommands());
         allCommands.addAll(getRoleEventCommands());
         allCommands.add(getEmbedEditorCommand());
+        allCommands.add(getDataCommand());
         return allCommands;
     }
 
@@ -331,7 +332,8 @@ public class AddGuildSlashCommands {
 
     /**
      * Returns the list of CORE commands that should be registered GLOBALLY.
-     * These commands are always active.
+     * These commands are always active and available on all servers.
+     * Should NOT be registered per-guild to avoid duplicates.
      */
     public List<SlashCommandData> getCoreCommands() {
         List<SlashCommandData> core = new ArrayList<>();
@@ -340,7 +342,40 @@ public class AddGuildSlashCommands {
         core.add(Commands.slash("language", cmd("language"))
                 .setDefaultPermissions(net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions.enabledFor(net.dv8tion.jda.api.Permission.MANAGE_SERVER)));
         core.add(getFeedbackCommands().get(0));
+        core.add(getDataCommand());
         return core;
+    }
+
+    /**
+     * Transparency command. Core rather than system-specific: every user must be able to
+     * see what is stored about them, regardless of which systems a server has enabled.
+     */
+    private SlashCommandData getDataCommand() {
+        return Commands.slash("data", "Information about the data stored about you")
+                .addSubcommands(
+                        new SubcommandData("info", "Show what data Sloth has stored about you")
+                );
+    }
+
+    /**
+     * Returns the list of commands for active systems in a guild.
+     * Does NOT include core commands (those are registered globally).
+     *
+     * @param guildId The guild ID to check active systems for
+     * @return List of commands for currently active systems
+     */
+    public List<CommandData> getActiveSystemCommands(String guildId) {
+        java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guildId);
+        List<CommandData> activeCommands = new ArrayList<>();
+
+        for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
+            if (entry.getValue()) { // If system is active
+                activeCommands.addAll(getCommandsForSystem(entry.getKey()));
+                activeCommands.addAll(getUserCommandsForSystem(entry.getKey()));
+            }
+        }
+
+        return activeCommands;
     }
 
     /**
@@ -379,13 +414,17 @@ public class AddGuildSlashCommands {
     /**
      * Updates the slash commands for the specified guild based on active systems.
      * This replaces all guild-specific commands with the current active set.
+     *
+     * NOTE: Core commands (help, language, feedback, systems) are registered globally
+     * and should NOT be registered per-guild to avoid duplicates.
+     * Only system-specific commands are registered here.
      */
     public void updateGuildCommandsFromActiveSystems(String guildId) {
         Guild guild;
-        if (guildId.isBlank() || databaseHandler == null) {
+        if (guildId == null || guildId.isBlank() || databaseHandler == null) {
             guild = this.guild;
             if (guild == null || databaseHandler == null) {
-                System.out.println("No guild or databasehandler found.");
+                System.err.println("Cannot update guild commands - no guild or database handler found.");
                 return;
             }
         } else {
@@ -396,20 +435,16 @@ public class AddGuildSlashCommands {
             }
         }
 
+        System.out.println("Updating commands for guild: " + guild.getName() + " (" + guild.getId() + ")");
 
-        java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
-        List<SlashCommandData> activeCommands = new ArrayList<>();
+        // Get only system-specific commands (core commands are registered globally)
+        List<CommandData> commandsToRegister = getActiveSystemCommands(guild.getId());
 
-        for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
-            if (entry.getValue()) { // If system is active
-                System.out.println("Adding commands for active system: " + entry.getKey());
-                activeCommands.addAll(getCommandsForSystem(entry.getKey()));
-            }
-        }
+        System.out.println("  → Registering " + commandsToRegister.size() + " system-specific commands");
 
-        guild.updateCommands().addCommands(activeCommands).queue(
-                success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
-                error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
+        guild.updateCommands().addCommands(commandsToRegister).queue(
+                success -> System.out.println("  ✓ Successfully updated commands for guild: " + guild.getName()),
+                error -> System.err.println("  ✗ Failed to update commands for guild " + guild.getName() + ": " + error.getMessage())
         );
     }
 

@@ -275,7 +275,6 @@
     "session_expired": "Deine Ticket-Erstellungssitzung ist abgelaufen. Bitte versuche es erneut.",
     "close_button": "Ticket schließen",
     "closed": "Dieses Ticket wurde geschlossen.",
-    "transcript_saved": "Das Transkript wurde gespeichert.",
     "already_open": "Du hast bereits ein offenes Ticket.",
     "not_found": "Ticket nicht gefunden.",
     "no_permission": "Du hast keine Berechtigung, Tickets zu verwalten.",
@@ -332,23 +331,10 @@
     "new_priority": "Neue Priorität",
     "priority_failed": "❌ Ticket-Priorität konnte nicht aktualisiert werden.",
     "info_embed_title": "🎫 Ticket-Informationen",
-    "transcript_no_intent": "❌ Bot hat keinen Message Content Intent aktiviert. Transkripte können nicht erstellt werden.",
-    "transcript_disabled": "❌ Transkripte sind für diesen Server deaktiviert.",
-    "transcript_no_permission": "❌ Du hast keine Berechtigung, Transkripte für dieses Ticket zu erstellen.",
-    "transcript_generated": "📄 Ticket-Transkript erstellt:",
-    "transcript_failed": "❌ Transkript-Datei konnte nicht erstellt werden.",
-    "transcript_history_failed": "❌ Kanalverlauf für Transkript konnte nicht abgerufen werden.",
     "audit_log_target": "Ticket #%s",
     "channel_delete_reason_closed": "Ticket geschlossen",
     "closed_via_button": "Über Button geschlossen",
-    "channel_delete_reason_by_user": "Ticket-Kanal gelöscht von %s",
-    "transcript_header": "=== TICKET-TRANSKRIPT ===",
-    "transcript_ticket_id": "Ticket-ID: %s",
-    "transcript_channel": "Kanal: #%s",
-    "transcript_generated_at": "Erstellt: %s",
-    "transcript_separator": "=========================",
-    "transcript_attachment": "    [Anhang: %s (%s)]",
-    "transcript_embed_title": "📄 Ticket-Transkript #%s"
+    "channel_delete_reason_by_user": "Ticket-Kanal gelöscht von %s"
   },
   "ticket_panels": {
     "ui_title": "Ticket-Panel Manager",
@@ -846,8 +832,8 @@
     "warn_defaults": "⚡ Befehle: /warn, /warnings\n📋 Verwarnungsspeicher: Permanent bis gelöscht\n👤 Pro-Benutzer-Verfolgung: Unbegrenzte Verwarnungen\n🗑️ Löschung: Admins können Verwarnungen entfernen",
 
     "step_ticket_title": "## 🎫 Schritt 5: Ticketsystem",
-    "step_ticket_description": "Erstelle ein Support-Ticketsystem mit anpassbaren Panels, Kategorien und automatischen Transkripten.",
-    "ticket_defaults": "⚡ Befehle: /ticket setup, /ticket panel, /ticket close\n📋 Panels: Mehrere anpassbare Panels\n📝 Kategorien: Eigene Ticket-Kategorien mit Formularen\n📄 Transkripte: Automatisch beim Schließen\n👥 Max Tickets pro Benutzer: Konfigurierbar",
+    "step_ticket_description": "Erstelle ein Support-Ticketsystem mit anpassbaren Panels, Kategorien und Formularen.",
+    "ticket_defaults": "⚡ Befehle: /ticket-panels, /ticket close, /ticket assign\n📋 Panels: Mehrere anpassbare Panels\n📝 Kategorien: Eigene Ticket-Kategorien mit Formularen\n👥 Max Tickets pro Benutzer: Konfigurierbar",
 
     "step_leveling_title": "## 📈 Schritt 6: Levelsystem",
     "step_leveling_description": "Binde deine Community mit XP-Belohnungen für Nachrichten, Sprachaktivität und Reaktionen ein. Konfiguriere Rollenbelohnungen für bestimmte Level.",
@@ -942,6 +928,7 @@
     "ticket_panel_sent": "Ticket-Panel gesendet",
 
     "config_ticket_max_tickets": "🎫 **Max. Tickets pro Benutzer:**",
+    "btn_ticket_config_next": "Weiter (Panel-Kanal wählen)",
     "select_max_tickets_placeholder": "Limit wählen...",
     "ticket_per_user": "Ticket pro Benutzer",
     "tickets_per_user": "Tickets pro Benutzer",
@@ -1157,5 +1144,31 @@
   "selectroles_choose_type_desc": "Wähle, wie Benutzer ihre Rollen auswählen können.",
   "selectroles_sent_success_to_channel": "Rollenauswahl-Nachricht wurde in %s gesendet!",
   "selectroles_error_channel_not_found": "Der ausgewählte Channel wurde nicht gefunden.",
-  "selectroles_error_no_selection": "Keine Auswahl gefunden. Bitte starte von vorne."
+  "selectroles_error_no_selection": "Keine Auswahl gefunden. Bitte starte von vorne.",
+
+  "data": {
+    "info_title": "🔒 Deine gespeicherten Daten",
+    "info_description": "Das ist alles, was Sloth über deinen Discord-Account gespeichert hat – über alle Server hinweg, auf denen ihr gemeinsam seid. Nur du siehst diese Nachricht.",
+    "section_profile": "👤 Profil",
+    "section_records": "📊 Datensätze",
+    "section_not_stored": "🚫 Nicht gespeichert",
+    "section_rights": "⚖️ Deine Rechte",
+    "field_username": "Benutzername",
+    "field_discriminator": "Discriminator",
+    "field_avatar": "Avatar-URL",
+    "field_first_seen": "Erstmals gespeichert",
+    "stored": "gespeichert",
+    "not_stored": "nicht gespeichert",
+    "no_profile": "Zu deinem Account sind keine Profildaten gespeichert.",
+    "count_warnings": "Verwarnungen",
+    "count_moderation": "Moderationsaktionen",
+    "count_tickets": "Tickets",
+    "count_role_snapshots": "Rollen-Snapshots (für Timed Roles)",
+    "count_timers": "Aktive Timed Roles",
+    "count_reminders": "Erinnerungen",
+    "count_levels": "Leveling-Datensätze",
+    "count_statistics": "Aktivitätsstatistiken",
+    "not_stored_note": "Sloth speichert niemals den Inhalt deiner Nachrichten, deine E-Mail-Adresse, deine IP-Adresse oder deine Direktnachrichten.",
+    "rights_note": "Du kannst jederzeit eine Kopie oder die Löschung deiner Daten anfordern – über den Support-Server oder slothbotdev@gmail.com. Die Daten eines Servers werden %d Tage nach dem Entfernen von Sloth gelöscht."
+  }
 }

@@ -20,6 +20,13 @@ dependencies {
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.json:json:20240303")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<JavaCompile> {

@@ -928,7 +928,9 @@ public class TicketPanelCommandListener extends ListenerAdapter implements Slash
             .build();
 
         TextInput emojiInput = TextInput.create("emoji", TextInputStyle.SHORT)
-            .setValue(panel.buttonEmoji != null ? panel.buttonEmoji : "No emoji selected")
+            // Prefilled empty rather than with a placeholder word, which used to be saved
+            // back into the database as if it were the emoji
+            .setValue(TicketPanelRenderer.isValidEmoji(panel.buttonEmoji) ? panel.buttonEmoji : "")
             .setPlaceholder("📩 or custom emoji")
             .setRequired(false)
             .build();
@@ -1196,71 +1198,8 @@ public class TicketPanelCommandListener extends ListenerAdapter implements Slash
             targetChannel = event.getChannel().asTextChannel();
         }
 
-        // Build the embed
-        EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle(panel.title);
-        embed.setDescription(handler.processLinebreaks(panel.description));
-        embed.setColor(parseColor(panel.embedColor));
-        if (panel.embedFooter != null && !panel.embedFooter.isBlank()) {
-            embed.setFooter(panel.embedFooter);
-        } else {
-            embed.setFooter("Ticket System • " + panel.name);
-        }
-
-        // Check if panel has categories
-        List<DatabaseHandler.TicketCategoryData> categories = handler.getTicketCategories(panelId);
-        List<ActionRow> actionRows = new ArrayList<>();
-
-        if (!categories.isEmpty()) {
-            // Build category buttons (max 5 per row, max 5 rows = 25 buttons)
-            List<Button> currentRowButtons = new ArrayList<>();
-            for (DatabaseHandler.TicketCategoryData category : categories) {
-                Button catButton;
-                System.out.println("Category Button Emoji: " + category.buttonEmoji);
-                if (!category.buttonEmoji.equals("No emoji selected") && isValidEmoji(category.buttonEmoji)) {
-                    try {
-                        catButton = Button.of(getButtonStyle(category.buttonColor), "ticket_cat_" + category.id,
-                            category.buttonLabel, Emoji.fromFormatted(category.buttonEmoji));
-                    } catch (Exception e) {
-                        catButton = Button.of(getButtonStyle(category.buttonColor), "ticket_cat_" + category.id,
-                            category.buttonLabel);
-                    }
-                } else {
-                    catButton = Button.of(getButtonStyle(category.buttonColor), "ticket_cat_" + category.id,
-                        category.buttonLabel);
-                }
-                currentRowButtons.add(catButton);
-
-                // Max 5 buttons per row
-                if (currentRowButtons.size() >= 5) {
-                    actionRows.add(ActionRow.of(currentRowButtons));
-                    currentRowButtons = new ArrayList<>();
-                }
-
-                // Max 5 rows
-                if (actionRows.size() >= 5) break;
-            }
-
-            // Add remaining buttons
-            if (!currentRowButtons.isEmpty() && actionRows.size() < 5) {
-                actionRows.add(ActionRow.of(currentRowButtons));
-            }
-        } else {
-            // No categories - use single button
-            Button ticketButton;
-            System.out.println("Panel Button Emoji: " + panel.buttonEmoji);
-            if (!panel.buttonEmoji.equals("No emoji selected") && isValidEmoji(panel.buttonEmoji)) {
-                try {
-                    ticketButton = Button.of(getButtonStyle(panel.buttonColor), "create_ticket_" + panelId,
-                        panel.buttonLabel, Emoji.fromFormatted(panel.buttonEmoji));
-                } catch (Exception e) {
-                    ticketButton = Button.of(getButtonStyle(panel.buttonColor), "create_ticket_" + panelId, panel.buttonLabel);
-                }
-            } else {
-                ticketButton = Button.of(getButtonStyle(panel.buttonColor), "create_ticket_" + panelId, panel.buttonLabel);
-            }
-            actionRows.add(ActionRow.of(ticketButton));
-        }
+        EmbedBuilder embed = TicketPanelRenderer.buildEmbed(handler, panel);
+        List<ActionRow> actionRows = TicketPanelRenderer.buildComponents(handler, panel, panelId);
 
         targetChannel.sendMessageEmbeds(embed.build())
             .setComponents(actionRows)
@@ -2689,27 +2628,11 @@ public class TicketPanelCommandListener extends ListenerAdapter implements Slash
     // ==================== HELPER METHODS ====================
 
     private Color parseColor(String colorStr) {
-        if (colorStr == null || colorStr.isBlank()) {
-            return new Color(88, 101, 242);
-        }
-        try {
-            if (colorStr.startsWith("#")) {
-                return Color.decode(colorStr);
-            }
-            return Color.decode("#" + colorStr);
-        } catch (Exception e) {
-            return new Color(88, 101, 242);
-        }
+        return TicketPanelRenderer.parseColor(colorStr);
     }
 
     private ButtonStyle getButtonStyle(String style) {
-        if (style == null) return ButtonStyle.PRIMARY;
-        return switch (style.toUpperCase()) {
-            case "SUCCESS", "GREEN" -> ButtonStyle.SUCCESS;
-            case "DANGER", "RED" -> ButtonStyle.DANGER;
-            case "SECONDARY", "GRAY", "GREY" -> ButtonStyle.SECONDARY;
-            default -> ButtonStyle.PRIMARY;
-        };
+        return TicketPanelRenderer.getButtonStyle(style);
     }
 
     /**
@@ -2717,26 +2640,7 @@ public class TicketPanelCommandListener extends ListenerAdapter implements Slash
      * Accepts Unicode emojis and custom Discord emojis in format <:name:id> or <a:name:id>
      */
     private boolean isValidEmoji(String emoji) {
-        if (emoji == null || emoji.isBlank()) {
-            return false;
-        }
-
-        String trimmed = emoji.trim();
-
-        // Check for custom Discord emoji format: <:name:id> or <a:name:id>
-        if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
-            // Must match pattern <:name:123456789> or <a:name:123456789>
-            return trimmed.matches("<a?:[a-zA-Z0-9_]+:\\d+>");
-        }
-
-        // For Unicode emojis, try to create the emoji object and validate
-        try {
-            Emoji testEmoji = Emoji.fromFormatted(trimmed);
-            // If we get here without exception and emoji is not null, it's valid
-            return testEmoji != null;
-        } catch (Exception e) {
-            return false;
-        }
+        return TicketPanelRenderer.isValidEmoji(emoji);
     }
 }
 

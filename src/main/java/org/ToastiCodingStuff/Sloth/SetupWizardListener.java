@@ -1,6 +1,5 @@
 package org.ToastiCodingStuff.Sloth;
 
-import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -19,7 +18,6 @@ import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionE
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 
-import java.awt.*;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,8 +26,12 @@ public class SetupWizardListener extends ListenerAdapter {
     private final DatabaseHandler handler;
     private final SystemsCommandListener systemsListener;
 
-    // Store temporary panel IDs created during setup
+    // Store temporary panel IDs created during setup, keyed per guild AND user so two
+    // admins running the wizard at the same time do not overwrite each other's panel.
     private final Map<String, Integer> setupPanelIds = new ConcurrentHashMap<>();
+
+    // Name of the ticket panel the wizard creates / reuses
+    private static final String WIZARD_PANEL_NAME = "Support";
 
     // System keys for easy access
     private static final String[] SYSTEMS = {
@@ -118,6 +120,11 @@ public class SetupWizardListener extends ListenerAdapter {
             String systemName = componentId.split(":")[1];
             // Enable system and show config
             handler.toggleSystem(guildId, systemName);
+            if (systemName.equals("ticket")) {
+                // Create the panel up front so category, support role and max tickets can
+                // be picked in any order
+                ensureSetupPanel(guildId, event.getUser().getId());
+            }
             Container configStep = getConfigStepForSystem(guildId, systemName);
             if (configStep != null) {
                 event.editMessage(new MessageEditBuilder().setComponents(configStep).useComponentsV2().build()).queue();
@@ -133,10 +140,18 @@ public class SetupWizardListener extends ListenerAdapter {
         // Skip config buttons - go to next main step
         else if (componentId.startsWith("setup_skip_config:")) {
             String systemName = componentId.split(":")[1];
+            if (systemName.equals("ticket")) {
+                clearSetupPanel(guildId, event.getUser().getId());
+            }
             event.editMessage(new MessageEditBuilder().setComponents(getCurrentStepContainer(guildId, systemName)).useComponentsV2().build()).queue();
+        }
+        // Ticket config done - continue to the panel channel step
+        else if (componentId.equals("setup_ticket_config_next")) {
+            event.editMessage(new MessageEditBuilder().setComponents(buildTicketPanelChannelStep(guildId)).useComponentsV2().build()).queue();
         }
         // Ticket panel step - skip sending panel
         else if (componentId.equals("setup_ticket_skip_panel")) {
+            clearSetupPanel(guildId, event.getUser().getId());
             event.editMessage(new MessageEditBuilder().setComponents(buildTicketStep(guildId)).useComponentsV2().build()).queue();
         }
         // Next step buttons
@@ -181,6 +196,54 @@ public class SetupWizardListener extends ListenerAdapter {
             )).useComponentsV2().build()).queue();
             systemsListener.sendSystemMessage(event);
         }
+    }
+
+    // ==================== TICKET SETUP SESSION ====================
+
+    /**
+     * Session key for the panel a user is currently configuring. Keyed per guild and
+     * user - the wizard can be open in several places at once.
+     */
+    private String panelSessionKey(String guildId, String userId) {
+        return guildId + ":" + userId;
+    }
+
+    /**
+     * Make sure a ticket panel exists for this wizard run and return its ID, or 0 on
+     * failure. Called when the ticket config step is opened, so every select on that
+     * step has a panel to write to regardless of the order they are used in. An existing
+     * panel with the wizard's name is reused instead of creating a duplicate on a second
+     * run through the wizard.
+     */
+    private int ensureSetupPanel(String guildId, String userId) {
+        String key = panelSessionKey(guildId, userId);
+
+        Integer existingId = setupPanelIds.get(key);
+        if (existingId != null && handler.getTicketPanel(existingId) != null) {
+            return existingId;
+        }
+
+        DatabaseHandler.TicketPanelData existing = handler.getTicketPanelByName(guildId, WIZARD_PANEL_NAME);
+        if (existing != null) {
+            // Reuse the panel from an earlier wizard run instead of creating a duplicate,
+            // and keep whatever the server has customised on it since
+            setupPanelIds.put(key, existing.id);
+            return existing.id;
+        }
+
+        int panelId = handler.createTicketPanel(guildId, WIZARD_PANEL_NAME);
+        if (panelId > 0) {
+            handler.updateTicketPanel(panelId, WIZARD_PANEL_NAME,
+                    "🎫 " + t(guildId, "setup_wizard.ticket_panel_default_title"),
+                    t(guildId, "setup_wizard.ticket_panel_default_desc"),
+                    t(guildId, "tickets.create_button"), "🎫", "PRIMARY");
+            setupPanelIds.put(key, panelId);
+        }
+        return panelId;
+    }
+
+    private void clearSetupPanel(String guildId, String userId) {
+        setupPanelIds.remove(panelSessionKey(guildId, userId));
     }
 
     // ==================== HELPER METHODS ====================
@@ -346,6 +409,7 @@ public class SetupWizardListener extends ListenerAdapter {
                                 .build()
                 ),
                 ActionRow.of(
+                        Button.primary("setup_ticket_config_next", t(guildId, "setup_wizard.btn_ticket_config_next")),
                         Button.secondary("setup_skip_config:ticket", t(guildId, "setup_wizard.btn_skip_use_default"))
                 )
         ).withAccentColor(0x9B59B6);
@@ -436,9 +500,10 @@ public class SetupWizardListener extends ListenerAdapter {
         // Ticket max tickets selection
         else if (componentId.equals("setup_ticket_max")) {
             String maxTickets = event.getValues().get(0);
-            Integer panelId = setupPanelIds.get(guildId);
-            if (panelId != null) {
-                handler.updateTicketPanelSettings(panelId, Integer.parseInt(maxTickets), false, false);
+            int panelId = ensureSetupPanel(guildId, event.getUser().getId());
+            if (panelId > 0) {
+                // Only the limit - the subject/description requirements keep their defaults
+                handler.updateTicketPanelMaxTickets(panelId, Integer.parseInt(maxTickets));
             }
             // Stay on config step
             event.deferEdit().queue();
@@ -506,18 +571,13 @@ public class SetupWizardListener extends ListenerAdapter {
                 GuildChannel category = event.getMentions().getChannels().get(0);
                 handler.setDefaultTicketCategory(guildId, category.getId());
 
-                // Create a default ticket panel for this guild
-                int panelId = handler.createTicketPanel(guildId, "Support");
+                int panelId = ensureSetupPanel(guildId, event.getUser().getId());
                 if (panelId > 0) {
-                    // Configure the panel with the category
                     handler.updateTicketPanelChannels(panelId, category.getId(), null, null, null);
-                    handler.updateTicketPanel(panelId, "Support", "🎫 " + t(guildId, "setup_wizard.ticket_panel_default_title"),
-                            t(guildId, "setup_wizard.ticket_panel_default_desc"), t(guildId, "tickets.create_button"), "🎫", "PRIMARY");
-                    setupPanelIds.put(guildId, panelId);
                 }
             }
-            // Show step to select panel channel
-            event.editMessage(new MessageEditBuilder().setComponents(buildTicketPanelChannelStep(guildId)).useComponentsV2().build()).queue();
+            // Stay on the config step so the other options remain reachable
+            event.deferEdit().queue();
         }
         // Ticket config - support role selection
         else if (componentId.equals("setup_ticket_role")) {
@@ -525,14 +585,13 @@ public class SetupWizardListener extends ListenerAdapter {
                 Role role = event.getMentions().getRoles().get(0);
                 handler.setDefaultTicketSupportRole(guildId, role.getId());
 
-                // Update panel with support role if we have one
-                Integer panelId = setupPanelIds.get(guildId);
-                if (panelId != null) {
+                int panelId = ensureSetupPanel(guildId, event.getUser().getId());
+                if (panelId > 0) {
                     handler.updateTicketPanelChannels(panelId, null, null, role.getId(), null);
                 }
             }
-            // Show step to select panel channel
-            event.editMessage(new MessageEditBuilder().setComponents(buildTicketPanelChannelStep(guildId)).useComponentsV2().build()).queue();
+            // Stay on the config step so the other options remain reachable
+            event.deferEdit().queue();
         }
         // Ticket config - panel channel selection (send the panel)
         else if (componentId.equals("setup_ticket_panel_channel")) {
@@ -540,17 +599,22 @@ public class SetupWizardListener extends ListenerAdapter {
                 GuildChannel channel = event.getMentions().getChannels().get(0);
                 if (channel.getType() == ChannelType.TEXT) {
                     TextChannel targetChannel = (TextChannel) channel;
-                    Integer panelId = setupPanelIds.get(guildId);
+                    // The panel is created when the config step opens, but recreate it if
+                    // this step was reached without going through the config step
+                    int panelId = ensureSetupPanel(guildId, event.getUser().getId());
 
-                    if (panelId != null) {
+                    if (panelId > 0) {
+                        // Persist the channel before rendering so the panel is sent with
+                        // its final configuration
+                        handler.updateTicketPanelChannels(panelId, null, targetChannel.getId(), null, null);
                         DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
                         if (panel != null) {
-                            // Send the ticket panel to the selected channel
-                            sendSetupTicketPanel(targetChannel, panel, panelId, guildId);
+                            sendSetupTicketPanel(targetChannel, panel, panelId);
                         }
                     }
                 }
             }
+            clearSetupPanel(guildId, event.getUser().getId());
             // Go to ticket step
             event.editMessage(new MessageEditBuilder().setComponents(buildTicketStep(guildId)).useComponentsV2().build()).queue();
         }
@@ -567,32 +631,13 @@ public class SetupWizardListener extends ListenerAdapter {
     // ==================== TICKET PANEL SENDING ====================
 
     private void sendSetupTicketPanel(TextChannel targetChannel, DatabaseHandler.TicketPanelData panel,
-                                       int panelId, String guildId) {
-        // Build the embed
-        EmbedBuilder embed = new EmbedBuilder();
-        embed.setTitle(panel.title != null ? panel.title : "🎫 " + t(guildId, "setup_wizard.ticket_panel_default_title"));
-        embed.setDescription(panel.description != null ? handler.processLinebreaks(panel.description) :
-                t(guildId, "setup_wizard.ticket_panel_default_desc"));
-        embed.setColor(new Color(0x9B59B6));
-        embed.setFooter("Ticket System • " + panel.name);
-
-        // Create button
-        Button ticketButton = Button.primary("create_ticket_" + panelId,
-                panel.buttonLabel != null ? panel.buttonLabel : t(guildId, "tickets.create_button"))
-                .withEmoji(Emoji.fromUnicode("🎫"));
-
-        // Send the panel
-        targetChannel.sendMessageEmbeds(embed.build())
-                .setComponents(ActionRow.of(ticketButton))
-                .queue(message -> {
-                    // Store the message ID for later editing
-                    handler.updateTicketPanelMessageId(panelId, message.getId());
-                    handler.updateTicketPanelChannels(panelId, panel.categoryId, targetChannel.getId(),
-                            panel.supportRoleId, panel.pingRoleId);
-                }, error -> System.err.println("Failed to send ticket panel: " + error.getMessage()));
-
-        // Clean up temporary storage
-        setupPanelIds.remove(guildId);
+                                       int panelId) {
+        // Rendered through the shared renderer so a wizard panel is identical to one sent
+        // from /ticket-panels, including category buttons if the panel already has any
+        targetChannel.sendMessageEmbeds(TicketPanelRenderer.buildEmbed(handler, panel).build())
+                .setComponents(TicketPanelRenderer.buildComponents(handler, panel, panelId))
+                .queue(message -> handler.updateTicketPanelMessageId(panelId, message.getId()),
+                        error -> System.err.println("Failed to send ticket panel: " + error.getMessage()));
     }
 
     // ==================== BREADCRUMB HELPER METHODS ====================

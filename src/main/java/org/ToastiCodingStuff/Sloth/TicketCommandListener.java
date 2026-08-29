@@ -97,26 +97,39 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
     }
 
 
+    // ==================== TICKET LOOKUP HELPERS ====================
+
+    /**
+     * Whether a member may act on a ticket as staff: they hold the support role of the
+     * panel this ticket belongs to (falling back to the legacy guild-wide role), or they
+     * can manage channels anyway.
+     * <p>
+     * Resolving the role per panel matters because a server configured only through
+     * /ticket-panels has no guild-wide ticket role at all.
+     */
+    private boolean hasSupportAccess(Member member, String guildId, String channelId) {
+        if (member == null) {
+            return false;
+        }
+        if (member.hasPermission(Permission.MANAGE_CHANNEL)) {
+            return true;
+        }
+
+        String supportRoleId = handler.resolveTicketSupportRole(guildId, channelId);
+        return supportRoleId != null && member.getRoles().stream()
+                .anyMatch(role -> role.getId().equals(supportRoleId));
+    }
+
     private void handleCloseTicket(SlashCommandInteractionEvent event, String guildId) {
         TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
-        
-        if (ticketInfo == null) {
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+
+        if (ticketId == null) {
             event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
         String reason = event.getOption("reason") != null ? Objects.requireNonNull(event.getOption("reason")).getAsString() : t(guildId, "moderation.no_reason");
-
-        // Close ticket in database (extract ticket ID from ticketInfo)
-        String[] parts = ticketInfo.split(" \\| ");
-        int ticketId;
-        try {
-            ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
-        } catch (NumberFormatException | IndexOutOfBoundsException e) {
-            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
-            return;
-        }
 
         boolean success = handler.closeTicket(ticketId, event.getUser().getId(), reason);
         
@@ -155,20 +168,10 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
         }
 
         TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
 
-        if (ticketInfo == null) {
-            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
-            return;
-        }
-
-        // Close ticket in database
-        String[] parts = ticketInfo.split(" \\| ");
-        int ticketId;
-        try {
-            ticketId = Integer.parseInt(parts[0].substring(4));
-        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+        if (ticketId == null) {
             event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
@@ -213,17 +216,7 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
         
         // Check if user has permission to delete the channel
         // Support role members or users with manage channels permission can delete
-        String supportRoleId = handler.getTicketRole(guildId);
-        boolean hasPermission = false;
-        
-        if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
-                .anyMatch(role -> role.getId().equals(supportRoleId))) {
-            hasPermission = true;
-        } else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            hasPermission = true;
-        }
-
-        if (!hasPermission) {
+        if (!hasSupportAccess(event.getMember(), guildId, channel.getId())) {
             event.reply(t(guildId, "tickets.delete_no_permission")).setEphemeral(true).queue();
             return;
         }
@@ -238,9 +231,9 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
 
     private void handleAssignTicket(SlashCommandInteractionEvent event, String guildId) {
         TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
-        
-        if (ticketInfo == null) {
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+
+        if (ticketId == null) {
             event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
@@ -251,10 +244,6 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
             return;
         }
 
-        // Assign ticket in database
-        String[] parts = ticketInfo.split(" \\| ");
-        int ticketId = Integer.parseInt(parts[0].substring(4));
-        
         boolean success = handler.assignTicket(ticketId, staffMember.getId());
         
         if (success) {
@@ -278,35 +267,21 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
 
     private void handleSetTicketPriority(SlashCommandInteractionEvent event, String guildId) {
         TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
-        
-        if (ticketInfo == null) {
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+
+        if (ticketId == null) {
             event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
             return;
         }
 
         // Check if user has permission to change priority (support role or manage channels)
-        String supportRoleId = handler.getTicketRole(guildId);
-        boolean hasPermission = false;
-        
-        if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
-                .anyMatch(role -> role.getId().equals(supportRoleId))) {
-            hasPermission = true;
-        } else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            hasPermission = true;
-        }
-
-        if (!hasPermission) {
+        if (!hasSupportAccess(event.getMember(), guildId, channel.getId())) {
             event.reply(t(guildId, "tickets.priority_no_permission")).setEphemeral(true).queue();
             return;
         }
 
         String newPriority = Objects.requireNonNull(event.getOption("priority")).getAsString();
-        
-        // Extract ticket ID from ticketInfo
-        String[] parts = ticketInfo.split(" \\| ");
-        int ticketId = Integer.parseInt(parts[0].substring(4)); // Remove "ID: " prefix
-        
+
         boolean success = handler.updateTicketPriority(ticketId, newPriority);
         
         if (success) {
@@ -320,23 +295,29 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
 
             event.replyEmbeds(embed.build()).queue();
             
-            // Sort channels by priority after updating
-            sortTicketChannelsByPriority(event.getGuild(), guildId);
+            // Sort channels by priority after updating, within the category this ticket
+            // actually lives in
+            sortTicketChannelsByPriority(event.getGuild(), guildId, channel.getId());
         } else {
             event.reply(t(guildId, "tickets.priority_failed")).setEphemeral(true).queue();
         }
     }
 
-    private void sortTicketChannelsByPriority(Guild guild, String guildId) {
+    private void sortTicketChannelsByPriority(Guild guild, String guildId, String ticketChannelId) {
         try {
-            String categoryId = handler.getTicketCategory(guildId);
+            // Resolve from the ticket's own panel, so servers configured only through
+            // /ticket-panels sort correctly instead of being skipped
+            String categoryId = handler.resolveTicketDiscordCategory(guildId, ticketChannelId);
             if (categoryId == null) return;
-            
+
             Category ticketCategory = guild.getCategoryById(categoryId);
             if (ticketCategory == null) return;
-            
+
             // Get the ticket panel channel ID
-            String ticketPanelChannelId = handler.getTicketChannel(guildId);
+            DatabaseHandler.TicketPanelData panel = handler.getTicketPanelByChannelId(ticketChannelId);
+            String ticketPanelChannelId = panel != null && panel.channelId != null
+                    ? panel.channelId
+                    : handler.getTicketChannel(guildId);
             
             // Get all ticket channels with their priorities
             java.util.List<java.util.Map<String, String>> ticketsWithPriority = handler.getTicketsByGuildWithPriority(guildId);
@@ -427,109 +408,6 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
                 .setTimestamp(java.time.Instant.now());
 
         event.replyEmbeds(embed.build()).setEphemeral(true).queue();
-    }
-
-    private void handleTicketTranscript(SlashCommandInteractionEvent event, String guildId) {
-        //check if bot has message content intent
-        if (!event.getJDA().getGatewayIntents().contains(net.dv8tion.jda.api.requests.GatewayIntent.MESSAGE_CONTENT)) {
-            event.reply(t(guildId, "tickets.transcript_no_intent")).setEphemeral(true).queue();
-            return;
-        }
-        TextChannel channel = event.getChannel().asTextChannel();
-        String ticketInfo = handler.getTicketByChannelId(channel.getId());
-        
-        if (ticketInfo == null) {
-            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
-            return;
-        }
-
-        // Check if transcripts are enabled for this guild
-        if (!handler.areTranscriptsEnabled(guildId)) {
-            event.reply(t(guildId, "tickets.transcript_disabled")).setEphemeral(true).queue();
-            return;
-        }
-
-        // Check if user has permission (ticket creator, assigned staff, or support role)
-        String supportRoleId = handler.getTicketRole(guildId);
-        boolean hasPermission = false;
-        
-        // Extract ticket info
-        String[] parts = ticketInfo.split(" \\| ");
-        String ticketIdStr = parts[0].substring(4); // Remove "ID: " prefix
-        String ticketUserIdStr = parts[1].substring(8, parts[1].length() - 1); // Extract user ID from <@...>
-        
-        // Check if user is ticket creator
-        if (event.getUser().getId().equals(ticketUserIdStr)) {
-            hasPermission = true;
-        }
-        // Check if user has support role
-        else if (supportRoleId != null && Objects.requireNonNull(event.getMember()).getRoles().stream()
-                .anyMatch(role -> role.getId().equals(supportRoleId))) {
-            hasPermission = true;
-        }
-        // Check if user has manage channels permission
-        else if (Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            hasPermission = true;
-        }
-
-        if (!hasPermission) {
-            event.reply(t(guildId, "tickets.transcript_no_permission")).setEphemeral(true).queue();
-            return;
-        }
-
-        event.deferReply(true).queue(); // Defer reply as this might take time
-        
-        // Generate transcript from channel history
-        channel.getHistory().retrievePast(100).queue(messages -> {
-            StringBuilder transcript = new StringBuilder();
-            transcript.append(t(guildId, "tickets.transcript_header")).append("\n");
-            transcript.append(t(guildId, "tickets.transcript_ticket_id", ticketIdStr)).append("\n");
-            transcript.append(t(guildId, "tickets.transcript_channel", channel.getName())).append("\n");
-            transcript.append(t(guildId, "tickets.transcript_generated_at", new java.util.Date())).append("\n");
-            transcript.append(t(guildId, "tickets.transcript_separator")).append("\n\n");
-
-            // Sort messages chronologically (oldest first)
-            messages.sort(Comparator.comparing(ISnowflake::getTimeCreated));
-            
-            for (Message msg : messages) {
-                transcript.append("[").append(msg.getTimeCreated()).append("] ");
-                transcript.append(msg.getAuthor().getEffectiveName()).append(": ");
-                transcript.append(msg.getContentDisplay()).append("\n");
-                
-                // Add attachment info if present
-                if (!msg.getAttachments().isEmpty()) {
-                    for (Message.Attachment attachment : msg.getAttachments()) {
-                        transcript.append(t(guildId, "tickets.transcript_attachment", attachment.getFileName(), attachment.getUrl())).append("\n");
-                    }
-                }
-                transcript.append("\n");
-            }
-            
-            // Send transcript as a file if it's too long, otherwise as embed
-            String transcriptText = transcript.toString();
-            if (transcriptText.length() > 4000) {
-                // Create temporary file and send as attachment
-                try {
-                    java.io.File tempFile = java.io.File.createTempFile("ticket-transcript-" + ticketIdStr, ".txt");
-                    java.nio.file.Files.write(tempFile.toPath(), transcriptText.getBytes());
-                    
-                    event.getHook().sendMessage(t(guildId, "tickets.transcript_generated"))
-                            .addFiles(net.dv8tion.jda.api.utils.FileUpload.fromData(tempFile, "ticket-" + ticketIdStr + "-transcript.txt"))
-                            .queue(success -> tempFile.delete()); // Clean up temp file
-                } catch (Exception e) {
-                    event.getHook().sendMessage(t(guildId, "tickets.transcript_failed")).queue();
-                }
-            } else {
-                // Send as embed if short enough
-                EmbedBuilder embed = new EmbedBuilder()
-                        .setTitle(t(guildId, "tickets.transcript_embed_title", ticketIdStr))
-                        .setDescription("```\n" + transcriptText + "```")
-                        .setColor(Color.BLUE)
-                        .setTimestamp(java.time.Instant.now());
-                
-                event.getHook().sendMessageEmbeds(embed.build()).queue();
-            }
-        }, error -> event.getHook().sendMessage(t(guildId, "tickets.transcript_history_failed")).queue());
     }
 
     private Color getPriorityColor(String priority) {

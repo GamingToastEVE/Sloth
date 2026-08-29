@@ -18,9 +18,9 @@ Sloth offers several systems that can be used:
 - User warning history tracking
 
 ### 🎫 Ticket System
-- Create support ticket channels
+- Multiple ticket panels per server, each with its own channel, category and support role
+- Category buttons per panel, with optional multi-step forms
 - Assign tickets to staff members
-- Generate ticket transcripts (not possible until discord approves message content intent)
 - Customizable ticket categories and priorities
 
 ### 📝 Log Channel System
@@ -126,6 +126,10 @@ DB_PASSWORD=delta_bot
 ./gradlew run
 ```
 
+### 5. Deploy on a Server (optional)
+The bot can run as a systemd service that picks up new commits on `main` by itself.
+See [deploy/README.md](deploy/README.md).
+
 ## Usage
 
 Sloth uses a modular system approach where server administrators can activate only the systems they need.
@@ -153,13 +157,14 @@ Navigate between help sections using the interactive buttons.
 - `/warn settings-get` - View current warning settings
 
 #### Ticket System
-- `/ticket setup` - Configure the ticket system
-- `/ticket panel` - Create a ticket creation panel
-- `/ticket config` - Set custom title and description for ticket panel
+- `/ticket-panels` - Set up and manage ticket panels, categories and forms
 - `/ticket close` - Close a ticket
 - `/ticket assign` - Assign ticket to staff member
 - `/ticket priority` - Change ticket priority
 - `/ticket info` - Get ticket information
+
+Ticket panels can also be set up through `/setup`, which creates a panel and posts it
+for you.
 
 #### Moderation System
 - `/mod kick` - Kick a user from the server
@@ -187,6 +192,7 @@ Navigate between help sections using the interactive buttons.
 - `/reminder list` - View all your active reminders
 
 #### General Commands
+- `/data info` - See what data the bot has stored about you
 - `/help` - Access interactive help system
 - `/feedback` - Send feedback to the developer
 - `/language` - Change the bot's language for your server
@@ -226,7 +232,7 @@ Navigate between help sections using the interactive buttons.
 Sloth uses MariaDB for data storage and automatically creates and manages the database that stores:
 - Guild configurations
 - User warnings and moderation history
-- Ticket information and transcripts
+- Ticket information
 - System activation status
 - Activity statistics
 - User XP and leveling data
@@ -251,6 +257,8 @@ Sloth/
 │   ├── TicketCommandListener.java              # Ticket system
 │   ├── TicketPanelCommandListener.java         # Ticket panel creation
 │   ├── TicketCreationListener.java             # Ticket creation handling
+│   ├── TicketPanelRenderer.java                # Shared panel embed/button rendering
+│   ├── DataCommandListener.java                # Stored-data transparency command
 │   ├── WarnCommandListener.java                # Warning system
 │   ├── ModerationCommandListener.java          # Moderation system
 │   ├── LogChannelSlashCommandListener.java     # Logging system

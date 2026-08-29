@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.events.guild.member.GenericGuildMemberEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,6 +29,16 @@ public class MemberRoleTrackingListener extends ListenerAdapter {
 
     public MemberRoleTrackingListener(DatabaseHandler handler) {
         this.handler = handler;
+    }
+
+    /**
+     * A member who left the guild no longer needs a role snapshot - it only exists to
+     * detect role changes while they are on the server, so keeping it would be personal
+     * data without a purpose.
+     */
+    @Override
+    public void onGuildMemberRemove(@NotNull GuildMemberRemoveEvent event) {
+        handler.deleteMemberRoleSnapshot(event.getGuild().getId(), event.getUser().getId());
     }
 
     @Override
