@@ -109,6 +109,7 @@ public class Sloth {
         api.addEventListener(languageListener);
         api.addEventListener(new SetupWizardListener(handler, systemsCommandListener));
         api.addEventListener(helpListener);
+        api.addEventListener(dataListener);
         api.addEventListener(new GuildEventListener(handler));
 
         // Register all system commands globally

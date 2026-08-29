@@ -1169,6 +1169,20 @@
     "count_levels": "Leveling-Datensätze",
     "count_statistics": "Aktivitätsstatistiken",
     "not_stored_note": "Sloth speichert niemals den Inhalt deiner Nachrichten, deine E-Mail-Adresse, deine IP-Adresse oder deine Direktnachrichten.",
-    "rights_note": "Du kannst jederzeit eine Kopie oder die Löschung deiner Daten anfordern – über den Support-Server oder slothbotdev@gmail.com. Die Daten eines Servers werden %d Tage nach dem Entfernen von Sloth gelöscht."
+    "rights_note": "Du kannst jederzeit eine Kopie oder die Löschung deiner Daten anfordern – über den Support-Server oder slothbotdev@gmail.com. Die Daten eines Servers werden %d Tage nach dem Entfernen von Sloth gelöscht.",
+    "delete_title": "🗑️ Deine Daten löschen",
+    "delete_description": "Das entfernt deine Daten von allen Servern, auf denen Sloth ist. Es lässt sich nicht rückgängig machen.",
+    "delete_will_remove": "Wird gelöscht",
+    "delete_will_keep": "Bleibt erhalten",
+    "delete_kept_reason": "Moderationsdaten bleiben, damit eine Löschung nicht dazu dient, die Moderationshistorie eines Servers zu umgehen. Melde dich bei uns, wenn auch diese entfernt werden sollen.",
+    "delete_nothing_stored": "Zu deinem Account ist nichts gespeichert, es gibt also nichts zu löschen.",
+    "delete_confirm_btn": "Endgültig löschen",
+    "delete_cancel_btn": "Abbrechen",
+    "delete_cancelled_title": "Abgebrochen",
+    "delete_cancelled": "Es wurde nichts gelöscht.",
+    "delete_done_title": "✅ Daten gelöscht",
+    "delete_done": "%d Datensätze wurden endgültig gelöscht.",
+    "delete_full_erasure": "Vollständige Löschung",
+    "delete_full_erasure_note": "Wenn auch deine Moderationsdaten entfernt werden sollen, melde dich im Support-Server oder unter slothbotdev@gmail.com."
   }
 }

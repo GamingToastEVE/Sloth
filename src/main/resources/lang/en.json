@@ -1169,6 +1169,20 @@
     "count_levels": "Leveling records",
     "count_statistics": "Activity statistics",
     "not_stored_note": "Sloth never stores the content of your messages, your email address, your IP address or your direct messages.",
-    "rights_note": "You can request a copy or the deletion of your data at any time via the support server or slothbotdev@gmail.com. A server's data is deleted %d days after Sloth is removed from it."
+    "rights_note": "You can request a copy or the deletion of your data at any time via the support server or slothbotdev@gmail.com. A server's data is deleted %d days after Sloth is removed from it.",
+    "delete_title": "🗑️ Delete your data",
+    "delete_description": "This removes your data from every server Sloth is on. It cannot be undone.",
+    "delete_will_remove": "Will be deleted",
+    "delete_will_keep": "Will be kept",
+    "delete_kept_reason": "Moderation records stay so that a deletion cannot be used to escape a server's moderation history. Contact us if you want these removed as well.",
+    "delete_nothing_stored": "There is nothing stored about your account, so there is nothing to delete.",
+    "delete_confirm_btn": "Delete permanently",
+    "delete_cancel_btn": "Cancel",
+    "delete_cancelled_title": "Cancelled",
+    "delete_cancelled": "Nothing was deleted.",
+    "delete_done_title": "✅ Data deleted",
+    "delete_done": "%d record(s) were permanently deleted.",
+    "delete_full_erasure": "Full erasure",
+    "delete_full_erasure_note": "To have your moderation records removed as well, contact us on the support server or at slothbotdev@gmail.com."
   }
 }

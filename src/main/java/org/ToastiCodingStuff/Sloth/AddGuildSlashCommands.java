@@ -353,7 +353,8 @@ public class AddGuildSlashCommands {
     private SlashCommandData getDataCommand() {
         return Commands.slash("data", "Information about the data stored about you")
                 .addSubcommands(
-                        new SubcommandData("info", "Show what data Sloth has stored about you")
+                        new SubcommandData("info", "Show what data Sloth has stored about you"),
+                        new SubcommandData("delete", "Delete the data Sloth has stored about you")
                 );
     }
 

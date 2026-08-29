@@ -59,7 +59,7 @@ Access: Ask for a copy of the data we hold about your User ID. You can also see 
 
 Rectification: Request correction of incorrect data.
 
-Erasure: Request that we delete your data ("Right to be forgotten").
+Erasure: You can delete your own activity data at any time with the /data delete command in Discord. Moderation records (warnings and moderation actions) are kept when you do so, because a self-service deletion must not be usable to escape a server's moderation history; we retain them on the basis of legitimate interest (Art. 6(1)(f) GDPR). To request the erasure of those records as well, contact us using the details in Section 1 and we will review the request.
 
 Restriction & Objection: Restrict how we process your data or object to processing based on legitimate interest.
 
