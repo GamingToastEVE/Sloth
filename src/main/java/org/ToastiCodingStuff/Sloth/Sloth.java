@@ -26,10 +26,22 @@ import java.util.concurrent.TimeUnit;
 public class Sloth {
     public static void main(String[] args) throws Exception {
         Dotenv dotenv = Dotenv.load();
-        JDA api = JDABuilder.createDefault(dotenv.get("TOKEN_TEST"))
+
+        // Which .env key holds the token. Defaults to TOKEN_TEST so a local run keeps
+        // using the test bot; the server sets TOKEN_KEY=TOKEN in its own .env.
+        // Deliberately explicit: silently preferring TOKEN would make a development
+        // run log in as the production bot.
+        String tokenKey = dotenv.get("TOKEN_KEY", "TOKEN_TEST");
+        String token = dotenv.get(tokenKey);
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("No bot token found: .env has no value for " + tokenKey
+                    + " (set TOKEN_KEY to choose a different key)");
+        }
+        System.out.println("Starting with token from " + tokenKey);
+
+        JDA api = JDABuilder.createDefault(token)
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
                 .setChunkingFilter(ChunkingFilter.ALL)
-                .setMemberCachePolicy(MemberCachePolicy.ALL)
                 .build();
         api.awaitReady();
 
@@ -61,6 +73,7 @@ public class Sloth {
         LevelingSystemCommandListener levelingListener = new LevelingSystemCommandListener(handler);
         LanguageCommandListener languageListener = new LanguageCommandListener(languageManager);
         HelpCommandListener helpListener = new HelpCommandListener(handler);
+        DataCommandListener dataListener = new DataCommandListener(handler);
 
         // Zentraler Slash-Command-Router: leitet SlashCommandInteractionEvents direkt an den
         // zuständigen Handler weiter, statt alle Listener zu durchlaufen.
@@ -69,7 +82,7 @@ public class Sloth {
                 statisticsListener, moderationListener, verifyListener, globalListener,
                 feedbackListener, selectRolesListener, timedRolesListener, roleEventListener,
                 embedEditorListener, systemsCommandListener, reminderListener,
-                levelingListener, languageListener, helpListener
+                levelingListener, languageListener, helpListener, dataListener
         ));
 
         // Router für Slash-Commands (ein einzelner Listener statt vieler)
@@ -110,6 +123,10 @@ public class Sloth {
         handler.syncGuilds(guilds);
         handler.updateGuildActivityStatus(guilds);
 
+        // Must run after syncGuilds, which clears the marker for guilds the bot is in.
+        // Starts the retention clock for guilds that were left before the clock existed.
+        handler.backfillGuildLeftTimestamps();
+
         java.util.concurrent.ScheduledExecutorService activityRotator = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         activityRotator.scheduleAtFixedRate(() -> {
             Random rand = new Random();
@@ -130,6 +147,22 @@ public class Sloth {
                 e.printStackTrace();
             }
         }, 0, 10, java.util.concurrent.TimeUnit.MINUTES);
+
+        // Delete the data of guilds the bot was removed from once the retention period
+        // stated in the privacy policy has passed. Checked once on startup and daily after.
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+            try {
+                List<String> purged = handler.purgeExpiredGuildData();
+                if (!purged.isEmpty()) {
+                    System.out.println("Retention purge removed data of " + purged.size() + " guild(s)");
+                }
+                // Afterwards, drop profiles that the purge left without any reference
+                handler.purgeOrphanedUsers();
+            } catch (Exception e) {
+                System.err.println("Error purging expired data: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, 0, 1, java.util.concurrent.TimeUnit.DAYS);
 
         // Starte den Background-Check für abgelaufene Rollen (jede Minute)
         java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
@@ -250,105 +283,99 @@ public class Sloth {
     }
 
     /**
-     * Register all system commands globally
+     * Register global commands and update guild-specific commands based on active systems.
+     * This method is called once at bot startup.
      */
     private static void registerGlobalCommands(JDA api, DatabaseHandler handler) throws InterruptedException {
-        System.out.println("Registering all system commands globally...");
-        //Guild guild = api.getGuildById("1169699077986988112"); // Replace with your test server ID if needed
+        System.out.println("\n=== Starting Command Registration ===");
 
-        // Create a temporary AddGuildSlashCommands instance to get command lists
-        // We can use null guild since we only need the command definitions
+        // 1. Register global commands (core commands available everywhere)
         AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(null, handler);
+        List<SlashCommandData> globalCommands = new java.util.ArrayList<>(commandProvider.getCoreCommands());
 
+        // Add reminder command with DM support
+        globalCommands.add(Commands.slash("reminder", "Manage your reminders")
+                .addSubcommands(
+                        new SubcommandData("set", "Create a new reminder")
+                                .addOption(OptionType.STRING, "time", "Time until i remind you (10m, 1h, 2d)", true)
+                                .addOption(OptionType.STRING, "title", "Title of the reminder", true)
+                                .addOption(OptionType.STRING, "message", "What should I remind you of?", false)
+                                .addOption(OptionType.BOOLEAN, "dm", "DM? Standard: YES", false),
+                        new SubcommandData("list", "Shows all active reminders"))
+                .setContexts(InteractionContextType.BOT_DM));
 
+        System.out.println("Registering " + globalCommands.size() + " global commands:");
+        for (SlashCommandData command : globalCommands) {
+            System.out.println("  - " + command.getName());
+        }
 
-        // Get all commands and register them globally
-        List<SlashCommandData> allCommands = new java.util.ArrayList<>(commandProvider.getCoreCommands());
+        api.updateCommands().addCommands(globalCommands).queue(
+                success -> System.out.println("✓ Successfully registered global commands"),
+                error -> System.err.println("✗ Failed to register global commands: " + error.getMessage())
+        );
 
-        allCommands.add(Commands.slash("reminder", "Manage your reminders")
-                        .addSubcommands(
-                                new SubcommandData("set", "Create a new reminder")
-                                        .addOption(OptionType.STRING, "time", "Time until i remind you (10m, 1h, 2d)", true)
-                                        .addOption(OptionType.STRING, "title", "Title of the reminder", true)
-                                        .addOption(OptionType.STRING, "message", "What should I remind you of?", false)
-                                        .addOption(OptionType.BOOLEAN, "dm", "DM? Standard: YES", false),
-                                new SubcommandData("list", "Shows all active reminders")).setContexts(InteractionContextType.BOT_DM));
-
+        // 2. Register test server specific commands (if needed)
         Guild testServer = api.getGuildById("1169699077986988112");
-
-        if (testServer == null) {
-            System.out.println("Test server not found. Skipping test server command registration.");
-        } else {
-            testServer.updateCommands().addCommands(Commands.slash("global-stats", "Show global bot statistics")).queue();
+        if (testServer != null) {
+            testServer.updateCommands()
+                    .addCommands(Commands.slash("global-stats", "Show global bot statistics"))
+                    .queue(
+                            success -> System.out.println("✓ Registered test server commands"),
+                            error -> System.err.println("✗ Failed to register test server commands: " + error.getMessage())
+                    );
         }
 
-        for (SlashCommandData command : allCommands) {
-            System.out.println(" - " + command.getName());
-        }
-        assert testServer != null;
-        //testServer.updateCommands().addCommands(allCommands).queue();
-
-        api.updateCommands().addCommands(allCommands).queue();
-        System.out.println("Finished registering " + allCommands.size() + " global commands");
-
-        System.out.println("Starting registering commands in servers...");
-
-        Thread t = new Thread(() -> {
+        // 3. Update guild-specific commands asynchronously to avoid blocking startup
+        System.out.println("\nStarting guild-specific command registration...");
+        Thread commandRegistrationThread = new Thread(() -> {
             List<Guild> guilds = api.getGuilds();
+            System.out.println("Updating commands for " + guilds.size() + " guilds");
+
             for (Guild guild : guilds) {
-                System.out.println("Registering commands in guild: " + guild.getName() + " (" + guild.getId() + ")");
-                AddGuildSlashCommands provider = new AddGuildSlashCommands(guild, handler);
-                List<CommandData> commandsToRegister = new ArrayList<>();
-                commandsToRegister.addAll(provider.getCoreCommands());
-                java.util.Map<String, Boolean> systems = handler.getGuildSystemsStatus(guild.getId());
-                for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
-                    if (entry.getValue()) { // If system is active
-                        commandsToRegister.addAll(provider.getCommandsForSystem(entry.getKey()));
-                        commandsToRegister.addAll(provider.getUserCommandsForSystem(entry.getKey()));
-                    }
-                }
-                guild.updateCommands().addCommands(commandsToRegister).queue(
-                        success -> System.out.println("Successfully registered commands in guild: " + guild.getName()),
-                        error -> System.err.println("Failed to register commands in guild: " + guild.getName() + " - " + error.getMessage())
-                );
                 try {
-                    TimeUnit.MILLISECONDS.sleep(500); // Sleep to avoid hitting rate limits
+                    AddGuildSlashCommands provider = new AddGuildSlashCommands(guild, handler);
+                    provider.updateGuildCommandsFromActiveSystems(null);
+
+                    // Rate limit protection: wait 500ms between guild updates
+                    TimeUnit.MILLISECONDS.sleep(500);
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    System.err.println("Command registration interrupted for guild: " + guild.getName());
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    System.err.println("Error updating commands for guild " + guild.getName() + ": " + e.getMessage());
                 }
             }
-        });
-        t.start();
+            System.out.println("=== Finished Guild Command Registration ===\n");
+        }, "CommandRegistration-Thread");
 
-
-        System.out.println("Finished registering commands in all servers.");
+        commandRegistrationThread.setDaemon(true);
+        commandRegistrationThread.start();
     }
 
+    /**
+     * Updates guild commands based on active systems.
+     * This method is called when a system is toggled on/off.
+     *
+     * @param guildId The ID of the guild to update
+     * @param databaseHandler The database handler instance
+     * @param api The JDA instance
+     */
     public static void updateGuildCommandsFromActiveSystems(String guildId, DatabaseHandler databaseHandler, JDA api) {
-        if (guildId.isBlank() || databaseHandler == null) {
-            System.err.println("Invalid guild ID or database handler is null.");
+        if (guildId == null || guildId.isBlank() || databaseHandler == null || api == null) {
+            System.err.println("Cannot update guild commands - invalid parameters");
             return;
         }
+
         Guild guild = api.getGuildById(guildId);
-
-        System.out.println("Updating guild commands based on active systems for guild " + guildId);
-
-        AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(guild, databaseHandler);
-
-        java.util.Map<String, Boolean> systems = databaseHandler.getGuildSystemsStatus(guild.getId());
-        List<CommandData> activeCommands = new ArrayList<>();
-
-        for (java.util.Map.Entry<String, Boolean> entry : systems.entrySet()) {
-            if (entry.getValue()) { // If system is active
-                activeCommands.addAll(commandProvider.getCommandsForSystem(entry.getKey()));
-                activeCommands.addAll(commandProvider.getUserCommandsForSystem(entry.getKey()));
-            }
+        if (guild == null) {
+            System.err.println("Cannot update guild commands - guild not found: " + guildId);
+            return;
         }
 
-        guild.updateCommands().addCommands(activeCommands).queue(
-                success -> System.out.println("Guild commands updated based on active systems for guild " + guild.getId()),
-                error -> System.err.println("Failed to update guild commands for guild " + guild.getId() + ": " + error.getMessage())
-        );
+        // Delegate to AddGuildSlashCommands for consistent behavior
+        AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(guild, databaseHandler);
+        commandProvider.updateGuildCommandsFromActiveSystems(null);
     }
 
     /**

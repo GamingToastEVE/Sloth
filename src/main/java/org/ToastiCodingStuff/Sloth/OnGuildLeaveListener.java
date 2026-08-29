@@ -15,6 +15,10 @@ public class OnGuildLeaveListener extends ListenerAdapter {
         String guildName = event.getGuild().getName();
 
         System.out.println("Bot left guild: " + guildName + " (ID: " + guildId + ")");
-        handler.deactivateGuild(guildId);
+
+        // Deactivate and start the retention clock. The data itself is removed by the
+        // scheduled purge once DatabaseHandler.GUILD_DATA_RETENTION_DAYS have passed,
+        // which is what the privacy policy promises.
+        handler.markGuildLeft(guildId);
     }
 }

@@ -56,6 +56,14 @@ public class GuildEventListener extends ListenerAdapter {
         System.out.println("Bot joined guild: " + guildName + " (ID: " + guildId + ")");
         handler.insertOrUpdateGuild(guildId, guildName);
 
+        // Re-added before the retention window expired: stop the deletion clock
+        handler.clearGuildLeftMarker(guildId);
+
+        // Register commands for the new guild based on default active systems
+        System.out.println("Registering commands for new guild: " + guildName);
+        AddGuildSlashCommands commandProvider = new AddGuildSlashCommands(guild, handler);
+        commandProvider.updateGuildCommandsFromActiveSystems(null);
+
         var channel = guild.getSystemChannel();
         if (channel == null || !channel.canTalk()) {
             channel = guild.getTextChannels().stream()

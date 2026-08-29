@@ -275,7 +275,6 @@
     "session_expired": "Your ticket creation session has expired. Please try again.",
     "close_button": "Close Ticket",
     "closed": "This ticket has been closed.",
-    "transcript_saved": "Transcript has been saved.",
     "already_open": "You already have an open ticket.",
     "not_found": "Ticket not found.",
     "no_permission": "You don't have permission to manage tickets.",
@@ -332,23 +331,10 @@
     "new_priority": "New Priority",
     "priority_failed": "❌ Failed to update ticket priority.",
     "info_embed_title": "🎫 Ticket Information",
-    "transcript_no_intent": "❌ Bot does not have Message Content Intent enabled. Cannot generate transcripts.",
-    "transcript_disabled": "❌ Transcripts are disabled for this server.",
-    "transcript_no_permission": "❌ You don't have permission to generate transcripts for this ticket.",
-    "transcript_generated": "📄 Ticket transcript generated:",
-    "transcript_failed": "❌ Failed to generate transcript file.",
-    "transcript_history_failed": "❌ Failed to retrieve channel history for transcript.",
     "audit_log_target": "Ticket #%s",
     "channel_delete_reason_closed": "Ticket closed",
     "closed_via_button": "Closed via button",
-    "channel_delete_reason_by_user": "Ticket channel deleted by %s",
-    "transcript_header": "=== TICKET TRANSCRIPT ===",
-    "transcript_ticket_id": "Ticket ID: %s",
-    "transcript_channel": "Channel: #%s",
-    "transcript_generated_at": "Generated: %s",
-    "transcript_separator": "=========================",
-    "transcript_attachment": "    [Attachment: %s (%s)]",
-    "transcript_embed_title": "📄 Ticket Transcript #%s"
+    "channel_delete_reason_by_user": "Ticket channel deleted by %s"
   },
   "ticket_panels": {
     "ui_title": "Ticket Panel Manager",
@@ -846,8 +832,8 @@
     "warn_defaults": "⚡ Commands: /warn, /warnings\n📋 Warning storage: Permanent until deleted\n👤 Per-user tracking: Unlimited warnings\n🗑️ Deletion: Admins can remove warnings",
 
     "step_ticket_title": "## 🎫 Step 5: Ticket System",
-    "step_ticket_description": "Create a support ticket system with customizable panels, categories, and automatic transcripts.",
-    "ticket_defaults": "⚡ Commands: /ticket setup, /ticket panel, /ticket close\n📋 Panels: Multiple customizable panels\n📝 Categories: Custom ticket categories with forms\n📄 Transcripts: Auto-generated on close\n👥 Max tickets per user: Configurable",
+    "step_ticket_description": "Create a support ticket system with customizable panels, categories, and forms.",
+    "ticket_defaults": "⚡ Commands: /ticket-panels, /ticket close, /ticket assign\n📋 Panels: Multiple customizable panels\n📝 Categories: Custom ticket categories with forms\n👥 Max tickets per user: Configurable",
 
     "step_leveling_title": "## 📈 Step 6: Leveling System",
     "step_leveling_description": "Engage your community with XP rewards for messages, voice activity, and reactions. Configure role rewards at specific levels.",
@@ -942,6 +928,7 @@
     "ticket_panel_sent": "Ticket panel sent",
 
     "config_ticket_max_tickets": "🎫 **Max Tickets Per User:**",
+    "btn_ticket_config_next": "Continue (Select Panel Channel)",
     "select_max_tickets_placeholder": "Select limit...",
     "ticket_per_user": "ticket per user",
     "tickets_per_user": "tickets per user",
@@ -1157,5 +1144,31 @@
   "selectroles_choose_type_desc": "Choose how users will select their roles.",
   "selectroles_sent_success_to_channel": "Role selection message sent to %s!",
   "selectroles_error_channel_not_found": "The selected channel was not found.",
-  "selectroles_error_no_selection": "No selection found. Please start over."
+  "selectroles_error_no_selection": "No selection found. Please start over.",
+
+  "data": {
+    "info_title": "🔒 Your stored data",
+    "info_description": "This is everything Sloth has stored about your Discord account, across every server you share with the bot. Only you can see this message.",
+    "section_profile": "👤 Profile",
+    "section_records": "📊 Records",
+    "section_not_stored": "🚫 Not stored",
+    "section_rights": "⚖️ Your rights",
+    "field_username": "Username",
+    "field_discriminator": "Discriminator",
+    "field_avatar": "Avatar URL",
+    "field_first_seen": "First stored",
+    "stored": "stored",
+    "not_stored": "not stored",
+    "no_profile": "No profile data is stored for your account.",
+    "count_warnings": "Warnings",
+    "count_moderation": "Moderation actions",
+    "count_tickets": "Tickets",
+    "count_role_snapshots": "Role snapshots (for timed roles)",
+    "count_timers": "Active timed roles",
+    "count_reminders": "Reminders",
+    "count_levels": "Leveling records",
+    "count_statistics": "Activity statistics",
+    "not_stored_note": "Sloth never stores the content of your messages, your email address, your IP address or your direct messages.",
+    "rights_note": "You can request a copy or the deletion of your data at any time via the support server or slothbotdev@gmail.com. A server's data is deleted %d days after Sloth is removed from it."
+  }
 }

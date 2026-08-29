@@ -252,7 +252,7 @@ public class DatabaseHandler {
 
             // Check for every table if already exist, if so apply migrations instead of full initialization
             String[] tableNames = {
-                    "users", "warnings", "moderation_actions", "tickets", "ticket_messages",
+                    "users", "warnings", "moderation_actions", "tickets",
                     "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds", "member_roles"
             };
             for (String tableName : tableNames) {
@@ -273,9 +273,6 @@ public class DatabaseHandler {
                             break;
                         case "tickets":
                             createTicketsTable();
-                            break;
-                        case "ticket_messages":
-                            createTicketMessagesTable();
                             break;
                         case "guild_settings":
                             createGuildSettingsTable();
@@ -326,13 +323,52 @@ public class DatabaseHandler {
             
             // Run migration check to ensure everything is up to date
             migrationManager.detectAndApplyMissingColumns();
-            
+
+            // Remove tables that no longer belong to any feature
+            dropObsoleteTables();
+
             // Validate the final schema
             migrationManager.validateDatabaseSchema();
-            
+
         } catch (SQLException e) {
             System.err.println("Error initializing database tables: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Tables that used to belong to removed features.
+     * <p>
+     * ticket_messages was created for the ticket transcript feature. It was never written
+     * to and the feature is gone, but a column literally named "content" in a schema
+     * contradicts the privacy policy's statement that no message content is stored.
+     */
+    private static final String[] OBSOLETE_TABLES = {"ticket_messages"};
+
+    /**
+     * Drop obsolete tables, but only when they are empty. A non-empty table is left in
+     * place with a warning rather than silently destroying data that was not expected
+     * to be there.
+     */
+    private void dropObsoleteTables() {
+        for (String table : OBSOLETE_TABLES) {
+            try (Connection connection = getConnection()) {
+                int rows;
+                try (ResultSet rs = connection.createStatement().executeQuery("SELECT COUNT(*) FROM " + table)) {
+                    rows = rs.next() ? rs.getInt(1) : 0;
+                }
+
+                if (rows > 0) {
+                    System.err.println("Obsolete table '" + table + "' still holds " + rows
+                            + " row(s) - leaving it in place. Remove it manually once the data is handled.");
+                    continue;
+                }
+
+                connection.createStatement().execute("DROP TABLE " + table);
+                System.out.println("Dropped obsolete empty table '" + table + "'");
+            } catch (SQLException e) {
+                // Table does not exist (already dropped, or a fresh database) - nothing to do
+            }
         }
     }
 
@@ -440,7 +476,8 @@ public class DatabaseHandler {
             "language VARCHAR(8) DEFAULT 'de', " +
             "created_at DATETIME, " +
             "updated_at DATETIME, " +
-            "active TINYINT(1) DEFAULT 1)";
+            "active TINYINT(1) DEFAULT 1, " +
+            "left_at DATETIME NULL)";
         try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
         }
@@ -533,24 +570,6 @@ public class DatabaseHandler {
             "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
             "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
             "closed_at DATETIME)";
-        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
-            stmt.execute(createTable);
-        }
-    }
-
-    /**
-     * Create ticket_messages table
-     */
-    private void createTicketMessagesTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS ticket_messages (" +
-            "id INTEGER PRIMARY KEY AUTO_INCREMENT, " +
-            "ticket_id INTEGER NOT NULL, " +
-            "user_id INTEGER NOT NULL, " +
-            "message_id INTEGER NOT NULL, " +
-            "content TEXT NOT NULL, " +
-            "attachments TEXT, " +
-            "is_staff INTEGER DEFAULT 0, " +
-            "created_at TEXT DEFAULT CURRENT_TIMESTAMP)";
         try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
             stmt.execute(createTable);
         }
@@ -1673,9 +1692,13 @@ public class DatabaseHandler {
                     String guildName = guild.getName();
                     System.out.println("Syncing guild: " + guildName + " (" + guildId + ")");
 
-                    // INSERT ... ON DUPLICATE KEY UPDATE verwenden statt Trigger
+                    // INSERT ... ON DUPLICATE KEY UPDATE verwenden statt Trigger.
+                    // active/left_at werden mit zurueckgesetzt: wird der Bot einem Server
+                    // wieder hinzugefuegt waehrend er offline ist, gibt es kein GuildJoinEvent,
+                    // und ohne das Zuruecksetzen wuerde die Aufbewahrungsfrist weiterlaufen
+                    // und die Daten eines aktiven Servers loeschen.
                     String upsertQuery = "INSERT INTO guilds (id, name) VALUES (?, ?) " +
-                            "ON DUPLICATE KEY UPDATE name = ?";
+                            "ON DUPLICATE KEY UPDATE name = ?, active = 1, left_at = NULL";
                     PreparedStatement stmt = connection.prepareStatement(upsertQuery);
                     stmt.setString(1, guildId);
                     stmt.setString(2, guildName);
@@ -1943,6 +1966,75 @@ public class DatabaseHandler {
     }
 
     /**
+     * Get the ticket ID for a channel, or null if the channel is not a ticket.
+     * Preferred over parsing the string from {@link #getTicketByChannelId(String)}.
+     */
+    public Integer getTicketIdByChannelId(String channelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT id FROM tickets WHERE channel_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, channelId);
+            ResultSet rs = stmt.executeQuery();
+
+            return rs.next() ? rs.getInt("id") : null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket id by channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get the panel a ticket channel belongs to, or null for tickets created before
+     * panels existed.
+     */
+    public TicketPanelData getTicketPanelByChannelId(String channelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT panel_id FROM tickets WHERE channel_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, channelId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                int panelId = rs.getInt("panel_id");
+                if (!rs.wasNull() && panelId > 0) {
+                    return getTicketPanel(panelId);
+                }
+            }
+            return null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket panel by channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Support role responsible for a ticket channel: the role of the panel the ticket was
+     * opened from, falling back to the guild-wide legacy setting for tickets that predate
+     * panels or panels without their own role.
+     */
+    public String resolveTicketSupportRole(String guildId, String channelId) {
+        TicketPanelData panel = getTicketPanelByChannelId(channelId);
+        if (panel != null && panel.supportRoleId != null && !panel.supportRoleId.isBlank()) {
+            return panel.supportRoleId;
+        }
+        return getTicketRole(guildId);
+    }
+
+    /**
+     * Discord category a ticket channel lives in, resolved the same way as the support
+     * role: panel first, legacy guild setting second.
+     */
+    public String resolveTicketDiscordCategory(String guildId, String channelId) {
+        TicketPanelData panel = getTicketPanelByChannelId(channelId);
+        if (panel != null && panel.categoryId != null && !panel.categoryId.isBlank()) {
+            return panel.categoryId;
+        }
+        return getTicketCategory(guildId);
+    }
+
+    /**
      * Get ticket role ID for a guild
      */
     public String getTicketRole(String guildId) {
@@ -1978,28 +2070,6 @@ public class DatabaseHandler {
             return rowsUpdated > 0;
         } catch (SQLException e) {
             System.err.println("Error assigning ticket: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    /**
-     * Prüft, ob Transkripte für eine Guild aktiviert sind (MariaDB-Syntax)
-     */
-    public boolean areTranscriptsEnabled(String guildId) {
-        try (Connection connection = getConnection()) {
-            String query = "SELECT ticket_transcript FROM guild_settings WHERE guild_id = ?";
-            PreparedStatement stmt = connection.prepareStatement(query);
-            stmt.setString(1, guildId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                int transcriptEnabled = rs.getInt("ticket_transcript");
-                return !rs.wasNull() && transcriptEnabled == 1;
-            }
-            return false; // Standard: deaktiviert, falls keine Einstellung gefunden
-        } catch (SQLException e) {
-            System.err.println("Error checking transcript settings: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -2299,13 +2369,18 @@ public class DatabaseHandler {
     }
 
     /**
-     * Update a ticket panel's channel settings
+     * Update a ticket panel's channel settings.
+     * Partial update: a null argument leaves the corresponding column unchanged,
+     * so callers can set a single value without having to re-supply the others.
      */
     public boolean updateTicketPanelChannels(int panelId, String categoryId, String channelId,
                                               String supportRoleId, String pingRoleId) {
         try (Connection connection = getConnection()) {
-            String updateQuery = "UPDATE ticket_panels SET category_id = ?, channel_id = ?, " +
-                    "support_role_id = ?, ping_role_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            String updateQuery = "UPDATE ticket_panels SET category_id = COALESCE(?, category_id), " +
+                    "channel_id = COALESCE(?, channel_id), " +
+                    "support_role_id = COALESCE(?, support_role_id), " +
+                    "ping_role_id = COALESCE(?, ping_role_id), " +
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?";
             PreparedStatement stmt = connection.prepareStatement(updateQuery);
             stmt.setString(1, categoryId);
             stmt.setString(2, channelId);
@@ -2339,6 +2414,26 @@ public class DatabaseHandler {
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Error updating ticket panel appearance: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Update only a ticket panel's max tickets per user, leaving the subject and
+     * description requirements untouched. 0 means unlimited.
+     */
+    public boolean updateTicketPanelMaxTickets(int panelId, int maxTicketsPerUser) {
+        try (Connection connection = getConnection()) {
+            String updateQuery = "UPDATE ticket_panels SET max_tickets_per_user = ?, " +
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            PreparedStatement stmt = connection.prepareStatement(updateQuery);
+            stmt.setInt(1, maxTicketsPerUser);
+            stmt.setInt(2, panelId);
+
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating ticket panel max tickets: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -6589,28 +6684,343 @@ public class DatabaseHandler {
         return false;
     }
 
-    public void deleteUserData(String userId) {
-        String[] tables = {
-                "users",
-                "user_statistics",
-                "active_timers",
-                "role_events",
-                "custom_embeds"
-        };
+    // ==================== DATA RETENTION / ERASURE ====================
+
+    /**
+     * How long data of a guild is kept after the bot was removed from it.
+     * Must match the retention period stated in the privacy policy.
+     */
+    public static final int GUILD_DATA_RETENTION_DAYS = 30;
+
+    /**
+     * Tables holding rows about a single user, mapped to the column carrying the user id.
+     * The users table keys the id directly, everything else uses user_id.
+     */
+    private static final Map<String, String> USER_DATA_TABLES = createUserDataTables();
+
+    private static Map<String, String> createUserDataTables() {
+        Map<String, String> tables = new LinkedHashMap<>();
+        tables.put("warnings", "user_id");
+        tables.put("moderation_actions", "user_id");
+        tables.put("tickets", "user_id");
+        tables.put("member_roles", "user_id");
+        tables.put("active_timers", "user_id");
+        tables.put("reminders", "user_id");
+        tables.put("user_levels", "user_id");
+        tables.put("user_statistics", "user_id");
+        tables.put("temporary_data", "user_id");
+        tables.put("bot_logs", "user_id");
+        tables.put("users", "id");
+        return tables;
+    }
+
+    /**
+     * Guild-scoped tables, all keyed by guild_id. Ticket categories, forms and fields are
+     * not listed here because they hang off a panel rather than a guild - they are removed
+     * by {@link #deleteGuildData(String)} through their parent panel.
+     */
+    private static final String[] GUILD_DATA_TABLES = {
+            "warnings", "moderation_actions", "tickets", "ticket_panels",
+            "guild_settings", "guild_systems", "statistics", "user_statistics",
+            "rules_embeds_channel", "log_channels", "warn_system_settings",
+            "just_verify_button", "custom_embeds", "role_events", "active_timers",
+            "role_permissions", "role_select", "role_select_embeds", "role_select_groups",
+            "member_roles", "user_levels", "level_settings", "reminders",
+            "temporary_data", "bot_logs"
+    };
+
+    /**
+     * Delete everything stored about a single user, across all guilds.
+     * <p>
+     * Each table is deleted in its own statement and its own try/catch, so a table that
+     * does not exist in a given deployment cannot abort the rest of the erasure.
+     *
+     * @return rows deleted per table
+     */
+    public Map<String, Integer> deleteUserData(String userId) {
+        Map<String, Integer> deleted = new LinkedHashMap<>();
 
         try (Connection connection = getConnection()) {
-            for (String table : tables) {
-                String query = "DELETE FROM " + table + " WHERE user_id = ?";
+            for (Map.Entry<String, String> entry : USER_DATA_TABLES.entrySet()) {
+                String table = entry.getKey();
+                String column = entry.getValue();
+                String query = "DELETE FROM " + table + " WHERE " + column + " = ?";
+
                 try (PreparedStatement stmt = connection.prepareStatement(query)) {
                     stmt.setString(1, userId);
-                    int rowsAffected = stmt.executeUpdate();
-                    System.out.println("Deleted " + rowsAffected + " rows from " + table + " for user " + userId);
+                    int rows = stmt.executeUpdate();
+                    deleted.put(table, rows);
+                } catch (SQLException e) {
+                    // Missing table or column in this deployment - keep going
+                    System.err.println("Skipping " + table + " while deleting user " + userId + ": " + e.getMessage());
                 }
             }
         } catch (SQLException e) {
             System.err.println("Error deleting user data for user " + userId + ": " + e.getMessage());
             e.printStackTrace();
         }
+
+        int total = deleted.values().stream().mapToInt(Integer::intValue).sum();
+        System.out.println("Deleted " + total + " rows for user " + userId + " across " + deleted.size() + " tables");
+        return deleted;
+    }
+
+    /**
+     * Delete everything stored about a guild, including the ticket categories, forms and
+     * form responses that are only reachable through the guild's panels and tickets.
+     *
+     * @return rows deleted per table
+     */
+    public Map<String, Integer> deleteGuildData(String guildId) {
+        Map<String, Integer> deleted = new LinkedHashMap<>();
+
+        try (Connection connection = getConnection()) {
+            // Ticket tree first: children before their parents, so nothing is orphaned if
+            // a later statement fails
+            exec(connection, deleted, "ticket_form_responses",
+                    "DELETE FROM ticket_form_responses WHERE ticket_id IN (SELECT id FROM tickets WHERE guild_id = ?)", guildId);
+            exec(connection, deleted, "ticket_form_fields",
+                    "DELETE FROM ticket_form_fields WHERE category_id IN (SELECT c.id FROM ticket_categories c " +
+                    "JOIN ticket_panels p ON c.panel_id = p.id WHERE p.guild_id = ?)", guildId);
+            exec(connection, deleted, "ticket_form_fields_by_form",
+                    "DELETE FROM ticket_form_fields WHERE form_id IN (SELECT f.id FROM ticket_forms f " +
+                    "JOIN ticket_categories c ON f.category_id = c.id " +
+                    "JOIN ticket_panels p ON c.panel_id = p.id WHERE p.guild_id = ?)", guildId);
+            exec(connection, deleted, "ticket_forms",
+                    "DELETE FROM ticket_forms WHERE category_id IN (SELECT c.id FROM ticket_categories c " +
+                    "JOIN ticket_panels p ON c.panel_id = p.id WHERE p.guild_id = ?)", guildId);
+            exec(connection, deleted, "ticket_categories",
+                    "DELETE FROM ticket_categories WHERE panel_id IN (SELECT id FROM ticket_panels WHERE guild_id = ?)", guildId);
+
+            for (String table : GUILD_DATA_TABLES) {
+                exec(connection, deleted, table, "DELETE FROM " + table + " WHERE guild_id = ?", guildId);
+            }
+
+            exec(connection, deleted, "guilds", "DELETE FROM guilds WHERE id = ?", guildId);
+        } catch (SQLException e) {
+            System.err.println("Error deleting guild data for guild " + guildId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        int total = deleted.values().stream().mapToInt(Integer::intValue).sum();
+        System.out.println("Deleted " + total + " rows for guild " + guildId + " across " + deleted.size() + " statements");
+        return deleted;
+    }
+
+    /** Run one delete statement, recording the row count and swallowing a missing table. */
+    private void exec(Connection connection, Map<String, Integer> deleted, String label, String sql, String parameter) {
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, parameter);
+            deleted.put(label, stmt.executeUpdate());
+        } catch (SQLException e) {
+            System.err.println("Skipping " + label + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Mark a guild as left, starting the retention clock.
+     * {@link #purgeExpiredGuildData()} deletes it once the window has passed.
+     */
+    public void markGuildLeft(String guildId) {
+        try (Connection connection = getConnection()) {
+            String query = "UPDATE guilds SET active = 0, left_at = CURRENT_TIMESTAMP WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, guildId);
+                stmt.executeUpdate();
+            }
+            System.out.println("Marked guild " + guildId + " as left; data is deleted after "
+                    + GUILD_DATA_RETENTION_DAYS + " days");
+        } catch (SQLException e) {
+            System.err.println("Error marking guild as left: " + e.getMessage());
+        }
+    }
+
+    /** Clear the retention clock when the bot is added back before the window expires. */
+    public void clearGuildLeftMarker(String guildId) {
+        try (Connection connection = getConnection()) {
+            String query = "UPDATE guilds SET active = 1, left_at = NULL WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, guildId);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error clearing guild left marker: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete the data of every guild the bot has been removed from for longer than the
+     * retention period. Run periodically; safe to call when there is nothing to do.
+     *
+     * @return the guild ids whose data was deleted
+     */
+    public List<String> purgeExpiredGuildData() {
+        List<String> purged = new ArrayList<>();
+
+        try (Connection connection = getConnection()) {
+            String query = "SELECT id FROM guilds WHERE active = 0 AND left_at IS NOT NULL " +
+                    "AND left_at < (NOW() - INTERVAL ? DAY)";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setInt(1, GUILD_DATA_RETENTION_DAYS);
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    purged.add(rs.getString("id"));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error looking up expired guild data: " + e.getMessage());
+            return purged;
+        }
+
+        for (String guildId : purged) {
+            System.out.println("Retention period expired for guild " + guildId + " - deleting data");
+            deleteGuildData(guildId);
+        }
+        return purged;
+    }
+
+    /**
+     * Start the retention clock for guilds that were left before the clock existed.
+     * <p>
+     * Without this, every guild the bot was removed from before this feature was added
+     * keeps its data forever, because purgeExpiredGuildData only considers rows that have
+     * a left_at. Their window starts now rather than retroactively, so nothing is deleted
+     * immediately. Call after syncGuilds, so guilds the bot is currently in are excluded.
+     *
+     * @return number of guilds whose clock was started
+     */
+    public int backfillGuildLeftTimestamps() {
+        try (Connection connection = getConnection()) {
+            String query = "UPDATE guilds SET left_at = CURRENT_TIMESTAMP WHERE active = 0 AND left_at IS NULL";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                int rows = stmt.executeUpdate();
+                if (rows > 0) {
+                    System.out.println("Started the retention clock for " + rows
+                            + " previously left guild(s); their data is deleted in "
+                            + GUILD_DATA_RETENTION_DAYS + " days");
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error backfilling guild left timestamps: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Delete the stored role snapshot of a member who left a guild.
+     * <p>
+     * The snapshot exists only to detect role changes while someone is on the server, so
+     * once they leave it is personal data without a purpose.
+     */
+    public void deleteMemberRoleSnapshot(String guildId, String userId) {
+        try (Connection connection = getConnection()) {
+            String query = "DELETE FROM member_roles WHERE guild_id = ? AND user_id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, guildId);
+                stmt.setString(2, userId);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Error deleting member role snapshot: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete profile rows in the users table that nothing references any more.
+     * <p>
+     * The users table is global rather than per guild, so a profile survives the deletion
+     * of every guild that user appeared in. Such a row is a username and avatar URL kept
+     * for no remaining purpose, which is exactly what data minimisation forbids.
+     *
+     * @return number of profiles removed
+     */
+    public int purgeOrphanedUsers() {
+        String query =
+                "DELETE FROM users WHERE NOT EXISTS (SELECT 1 FROM warnings w WHERE w.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM moderation_actions m WHERE m.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM member_roles r WHERE r.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM active_timers ti WHERE ti.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM reminders re WHERE re.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM user_levels l WHERE l.user_id = users.id) " +
+                "AND NOT EXISTS (SELECT 1 FROM user_statistics s WHERE s.user_id = users.id) " +
+                // statistics holds guild-level daily aggregates and its user_id is
+                // currently never written, but a profile must not be removed while
+                // anything at all still points at it
+                "AND NOT EXISTS (SELECT 1 FROM statistics st WHERE st.user_id = users.id)";
+
+        try (Connection connection = getConnection()) {
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                int rows = stmt.executeUpdate();
+                if (rows > 0) {
+                    System.out.println("Removed " + rows + " orphaned user profile(s)");
+                }
+                return rows;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error purging orphaned users: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Count what is stored about a user, per category, for the /data info command.
+     * Categories with nothing stored are included with a count of 0 so the answer is
+     * explicit rather than silently omitting them.
+     */
+    public Map<String, Integer> getUserDataSummary(String userId) {
+        Map<String, Integer> summary = new LinkedHashMap<>();
+
+        Map<String, String> counts = new LinkedHashMap<>();
+        counts.put("profile", "SELECT COUNT(*) FROM users WHERE id = ?");
+        counts.put("warnings", "SELECT COUNT(*) FROM warnings WHERE user_id = ?");
+        counts.put("moderation_actions", "SELECT COUNT(*) FROM moderation_actions WHERE user_id = ?");
+        counts.put("tickets", "SELECT COUNT(*) FROM tickets WHERE user_id = ?");
+        counts.put("role_snapshots", "SELECT COUNT(*) FROM member_roles WHERE user_id = ?");
+        counts.put("active_timers", "SELECT COUNT(*) FROM active_timers WHERE user_id = ?");
+        counts.put("reminders", "SELECT COUNT(*) FROM reminders WHERE user_id = ?");
+        counts.put("levels", "SELECT COUNT(*) FROM user_levels WHERE user_id = ?");
+        counts.put("statistics", "SELECT COUNT(*) FROM user_statistics WHERE user_id = ?");
+
+        try (Connection connection = getConnection()) {
+            for (Map.Entry<String, String> entry : counts.entrySet()) {
+                try (PreparedStatement stmt = connection.prepareStatement(entry.getValue())) {
+                    stmt.setString(1, userId);
+                    ResultSet rs = stmt.executeQuery();
+                    summary.put(entry.getKey(), rs.next() ? rs.getInt(1) : 0);
+                } catch (SQLException e) {
+                    System.err.println("Skipping " + entry.getKey() + " in data summary: " + e.getMessage());
+                    summary.put(entry.getKey(), 0);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error building user data summary: " + e.getMessage());
+        }
+        return summary;
+    }
+
+    /**
+     * The profile row stored for a user: username, discriminator, avatar and when it was
+     * first seen. Returns null when nothing is stored.
+     */
+    public String[] getStoredUserProfile(String userId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT username, discriminator, avatar, created_at, updated_at FROM users WHERE id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                stmt.setString(1, userId);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return new String[]{
+                            rs.getString("username"), rs.getString("discriminator"),
+                            rs.getString("avatar"), rs.getString("created_at"), rs.getString("updated_at")
+                    };
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error reading stored user profile: " + e.getMessage());
+        }
+        return null;
     }
 
     public static class ReminderData {
