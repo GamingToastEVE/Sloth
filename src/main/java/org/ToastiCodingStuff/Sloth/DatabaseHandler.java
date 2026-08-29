@@ -6698,6 +6698,14 @@ public class DatabaseHandler {
      */
     private static final Map<String, String> USER_DATA_TABLES = createUserDataTables();
 
+    /**
+     * Tables holding moderation records. These are kept when a user erases their own
+     * activity data through /data delete: a self-service command that also wiped warning
+     * history would be a way to escape moderation on every server at once. They are
+     * removed by a full erasure request and by the guild retention purge.
+     */
+    private static final Set<String> MODERATION_TABLES = Set.of("warnings", "moderation_actions");
+
     private static Map<String, String> createUserDataTables() {
         Map<String, String> tables = new LinkedHashMap<>();
         tables.put("warnings", "user_id");
@@ -6738,12 +6746,30 @@ public class DatabaseHandler {
      * @return rows deleted per table
      */
     public Map<String, Integer> deleteUserData(String userId) {
+        return deleteUserData(userId, true);
+    }
+
+    /**
+     * Delete a user's activity data but keep their moderation records - the scope of the
+     * self-service /data delete command. See {@link #MODERATION_TABLES} for why.
+     *
+     * @return rows deleted per table
+     */
+    public Map<String, Integer> deleteUserActivityData(String userId) {
+        return deleteUserData(userId, false);
+    }
+
+    private Map<String, Integer> deleteUserData(String userId, boolean includeModerationRecords) {
         Map<String, Integer> deleted = new LinkedHashMap<>();
 
         try (Connection connection = getConnection()) {
             for (Map.Entry<String, String> entry : USER_DATA_TABLES.entrySet()) {
                 String table = entry.getKey();
                 String column = entry.getValue();
+
+                if (!includeModerationRecords && MODERATION_TABLES.contains(table)) {
+                    continue;
+                }
                 String query = "DELETE FROM " + table + " WHERE " + column + " = ?";
 
                 try (PreparedStatement stmt = connection.prepareStatement(query)) {

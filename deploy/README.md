@@ -1,11 +1,12 @@
 # Deploying Sloth on a Debian server
 
-Step by step, from a fresh Debian box to a bot that restarts itself whenever `main`
-moves. Written for **Debian 12 (bookworm)**; the only version-specific part is the
+Step by step, from a fresh Debian box to a bot that restarts itself whenever the
+default branch moves. Written for **Debian 12 (bookworm)**; the only version-specific part is the
 Java package.
 
-The deploy works by pulling: a systemd timer checks `main` every five minutes and
-restarts the bot only when the branch actually changed. Nothing has to reach the
+The deploy works by pulling: a systemd timer checks the default branch every five minutes and
+restarts the bot only when the branch actually changed. The branch is the
+remote's default branch, resolved automatically (master in this repository). Nothing has to reach the
 server from outside — no open ports, no SSH key in GitHub, no webhook secret.
 
 Assumed throughout: repository at `/DiscordBot`, service running as `root`. To change
@@ -80,7 +81,7 @@ Then stop the old instance, so two bots are not online with the same token.
 ```bash
 git clone https://github.com/GamingToastEVE/Sloth.git /DiscordBot
 cd /DiscordBot
-git checkout main
+git checkout master        # the repository's default branch
 chmod +x gradlew scripts/deploy.sh
 ```
 
@@ -209,7 +210,7 @@ A check that found nothing prints nothing, so the journal only shows real deploy
 
 ### What the deploy does in the awkward cases
 
-- **`main` unchanged** → nothing happens, no restart, no log noise.
+- **default branch unchanged** → nothing happens, no restart, no log noise.
 - **Build fails** → the running bot is left completely untouched with its old jar.
   The next timer run tries again.
 - **Uncommitted changes on the server** → no deploy, only a note in the journal.
@@ -235,10 +236,10 @@ git checkout "$GOOD"
 systemctl restart sloth
 ```
 
-Once `main` is fixed:
+Once the default branch is fixed:
 
 ```bash
-git checkout main
+git checkout master        # the repository's default branch
 systemctl start sloth-deploy.timer
 ```
 

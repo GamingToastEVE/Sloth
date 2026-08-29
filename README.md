@@ -193,6 +193,7 @@ for you.
 
 #### General Commands
 - `/data info` - See what data the bot has stored about you
+- `/data delete` - Delete your own activity data
 - `/help` - Access interactive help system
 - `/feedback` - Send feedback to the developer
 - `/language` - Change the bot's language for your server
