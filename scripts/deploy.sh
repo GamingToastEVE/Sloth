@@ -14,7 +14,6 @@
 set -euo pipefail
 
 REPO="${REPO:-/DiscordBot}"
-MAIN="${MAIN:-main}"
 SERVICE="${SERVICE:-sloth}"
 JAR="${JAR:-$REPO/sloth.jar}"
 # /var/lock is standard on Linux; fall back to /tmp so the script still runs where
@@ -47,6 +46,21 @@ if [ -z "${REMOTE:-}" ]; then
     fi
 fi
 [ -n "$REMOTE" ] || fail "no git remote configured"
+
+# Branch to deploy. Resolved from the remote's own default branch rather than
+# assumed to be "main" - this repository's default branch is master, and hardcoding
+# main made every deploy fail at the fetch below.
+if [ -z "${MAIN:-}" ]; then
+    MAIN="$(git symbolic-ref --quiet --short "refs/remotes/$REMOTE/HEAD" 2>/dev/null | sed "s#^$REMOTE/##")"
+fi
+if [ -z "${MAIN:-}" ]; then
+    MAIN="$(git remote show "$REMOTE" 2>/dev/null | sed -n 's/.*HEAD branch: //p' | head -n1)"
+fi
+if [ -z "${MAIN:-}" ]; then
+    if git ls-remote --exit-code --heads "$REMOTE" main >/dev/null 2>&1; then MAIN=main; else MAIN=master; fi
+fi
+git ls-remote --exit-code --heads "$REMOTE" "$MAIN" >/dev/null 2>&1 \
+    || fail "branch '$MAIN' does not exist on remote '$REMOTE' - set MAIN= explicitly"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
