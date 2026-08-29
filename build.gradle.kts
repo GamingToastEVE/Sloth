@@ -1,7 +1,7 @@
 plugins {
     application
     java
-    id ("com.github.johnrengelman.shadow") version "8.1.1"
+    id ("com.gradleup.shadow") version "9.3.0"
 }
 
 application.mainClass = "org.ToastiCodingStuff.Sloth.Sloth"
@@ -38,45 +38,4 @@ tasks.withType<JavaCompile> {
 
 tasks.jar {
     manifest.attributes["Main-Class"] = application.mainClass
-}
-
-// Holt vor jedem Bot-Start automatisch die neueste Version des Haupt-Branches.
-// Deaktivieren mit:  ./gradlew run -PskipUpdate    oder  SLOTH_SKIP_UPDATE=1
-val updateMain = tasks.register<Exec>("updateMain") {
-    group = "git"
-    description = "Pullt die neueste Version des Haupt-Branches."
-
-    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-    if (isWindows) {
-        commandLine(
-            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-File", file("scripts/update-main.ps1").absolutePath
-        )
-    } else {
-        commandLine("bash", file("scripts/update-main.sh").absolutePath)
-    }
-
-    // Ein fehlgeschlagener Pull (offline, uncommittete Aenderungen, Merge-Konflikt)
-    // darf den Bot-Start nicht verhindern - es gibt nur eine Warnung.
-    isIgnoreExitValue = true
-
-    onlyIf {
-        !project.hasProperty("skipUpdate") && System.getenv("SLOTH_SKIP_UPDATE") != "1"
-    }
-
-    doLast {
-        val exit = executionResult.get().exitValue
-        if (exit != 0) {
-            logger.lifecycle("!! update-main fehlgeschlagen (Exit $exit) - der Bot startet mit dem aktuellen lokalen Stand.")
-        }
-    }
-}
-
-tasks.named<JavaExec>("run") {
-    dependsOn(updateMain)
-}
-
-// Erst pullen, dann kompilieren - sonst laeuft der Bot mit altem Code weiter.
-tasks.named("compileJava") {
-    mustRunAfter(updateMain)
 }
