@@ -1183,6 +1183,10 @@
     "delete_done_title": "✅ Data deleted",
     "delete_done": "%d record(s) were permanently deleted.",
     "delete_full_erasure": "Full erasure",
-    "delete_full_erasure_note": "To have your moderation records removed as well, contact us on the support server or at slothbotdev@gmail.com."
+    "delete_full_erasure_note": "To have your moderation records removed as well, contact us on the support server or at slothbotdev@gmail.com.",
+    "delete_keyword": "DELETE",
+    "delete_modal_title": "Confirm deletion",
+    "delete_modal_label": "Type %s to confirm",
+    "delete_wrong_keyword": "Nothing was deleted - the confirmation did not match. Type %s exactly to confirm."
   }
 }

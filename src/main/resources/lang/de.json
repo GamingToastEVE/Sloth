@@ -1183,6 +1183,10 @@
     "delete_done_title": "✅ Daten gelöscht",
     "delete_done": "%d Datensätze wurden endgültig gelöscht.",
     "delete_full_erasure": "Vollständige Löschung",
-    "delete_full_erasure_note": "Wenn auch deine Moderationsdaten entfernt werden sollen, melde dich im Support-Server oder unter slothbotdev@gmail.com."
+    "delete_full_erasure_note": "Wenn auch deine Moderationsdaten entfernt werden sollen, melde dich im Support-Server oder unter slothbotdev@gmail.com.",
+    "delete_keyword": "DELETE",
+    "delete_modal_title": "Löschung bestätigen",
+    "delete_modal_label": "Tippe %s zur Bestätigung",
+    "delete_wrong_keyword": "Es wurde nichts gelöscht - die Bestätigung stimmte nicht. Tippe genau %s, um zu bestätigen."
   }
 }

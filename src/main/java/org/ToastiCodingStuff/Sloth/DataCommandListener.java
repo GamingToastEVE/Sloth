@@ -3,9 +3,14 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.modals.Modal;
 
 import java.awt.Color;
 import java.util.Map;
@@ -153,10 +158,62 @@ public class DataCommandListener extends ListenerAdapter implements SlashCommand
             return;
         }
 
+        // A single click is too little for something irreversible, so the confirmation
+        // word has to be typed out before anything is deleted.
+        String keyword = t(guildId, "data.delete_keyword");
+        TextInput input = TextInput.create("confirmation", TextInputStyle.SHORT)
+                .setPlaceholder(keyword)
+                .setRequiredRange(1, 32)
+                .build();
+
+        Modal modal = Modal.create("data_delete_modal_" + targetUserId, t(guildId, "data.delete_modal_title"))
+                .addComponents(Label.of(t(guildId, "data.delete_modal_label", keyword), input))
+                .build();
+
+        event.replyModal(modal).queue();
+    }
+
+    /**
+     * Whether the typed confirmation matches the required word. Leading and trailing
+     * spaces are forgiven and case is ignored - typing the word at all is the deliberate
+     * act being asked for, exact capitalisation adds nothing but frustration.
+     */
+    static boolean isConfirmationValid(String typed, String keyword) {
+        if (typed == null || keyword == null) {
+            return false;
+        }
+        return typed.trim().equalsIgnoreCase(keyword.trim());
+    }
+
+    @Override
+    public void onModalInteraction(ModalInteractionEvent event) {
+        String modalId = event.getModalId();
+        if (!modalId.startsWith("data_delete_modal_")) {
+            return;
+        }
+
+        String guildId = event.getGuild() != null ? event.getGuild().getId() : null;
+        String targetUserId = modalId.substring("data_delete_modal_".length());
+
+        if (!targetUserId.equals(event.getUser().getId())) {
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
+            return;
+        }
+
+        var value = event.getValue("confirmation");
+        String typed = value != null ? value.getAsString() : null;
+
+        if (!isConfirmationValid(typed, t(guildId, "data.delete_keyword"))) {
+            event.reply(t(guildId, "data.delete_wrong_keyword", t(guildId, "data.delete_keyword")))
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
         Map<String, Integer> deleted = handler.deleteUserActivityData(targetUserId);
         int total = deleted.values().stream().mapToInt(Integer::intValue).sum();
 
-        event.editMessageEmbeds(new EmbedBuilder()
+        event.replyEmbeds(new EmbedBuilder()
                         .setTitle(t(guildId, "data.delete_done_title"))
                         .setDescription(t(guildId, "data.delete_done", total))
                         .addField(t(guildId, "data.delete_full_erasure"),
@@ -164,7 +221,7 @@ public class DataCommandListener extends ListenerAdapter implements SlashCommand
                         .setColor(new Color(0x2ECC71))
                         .setTimestamp(java.time.Instant.now())
                         .build())
-                .setComponents()
+                .setEphemeral(true)
                 .queue();
     }
 
