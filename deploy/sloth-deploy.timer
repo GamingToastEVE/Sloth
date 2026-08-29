@@ -1,0 +1,18 @@
+[Unit]
+Description=Check main for new commits every 5 minutes
+Documentation=https://github.com/GamingToastEVE/Sloth
+
+[Timer]
+# First check shortly after boot, then every 5 minutes measured from the end of
+# the previous run - so a slow build never causes overlapping deploys.
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=sloth-deploy.service
+
+# Run a missed check after downtime instead of waiting for the next slot
+Persistent=true
+# Spread the check a little so it does not fire at the exact same second every time
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

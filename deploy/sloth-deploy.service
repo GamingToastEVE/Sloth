@@ -1,0 +1,19 @@
+[Unit]
+Description=Sloth deploy check (fetch main, rebuild and restart only when it changed)
+Documentation=https://github.com/GamingToastEVE/Sloth
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/DiscordBot
+ExecStart=/DiscordBot/scripts/deploy.sh
+
+# A cold Gradle build can take a few minutes; do not let systemd kill it halfway
+# through and leave a partially written jar behind.
+TimeoutStartSec=900
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sloth-deploy

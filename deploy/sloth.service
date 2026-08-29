@@ -1,0 +1,30 @@
+[Unit]
+Description=Sloth Discord Bot
+Documentation=https://github.com/GamingToastEVE/Sloth
+# The bot needs a reachable network and its database before it can start.
+# Drop mariadb.service from both lines if the database runs on another host.
+After=network-online.target mariadb.service
+Wants=network-online.target
+After=mariadb.service
+
+[Service]
+Type=simple
+User=root
+# Must stay /DiscordBot: the bot reads its .env relative to the working directory,
+# and Dotenv.load() aborts startup when the file cannot be found.
+WorkingDirectory=/DiscordBot
+# A fixed jar path rather than build/libs/*.jar, so this unit never has to guess
+# which build is current. scripts/deploy.sh installs the new build here.
+ExecStart=/usr/bin/java -jar /DiscordBot/sloth.jar
+
+Restart=always
+RestartSec=10
+# Give JDA time to log out cleanly before SIGKILL
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sloth
+
+[Install]
+WantedBy=multi-user.target

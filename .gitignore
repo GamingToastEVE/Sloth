@@ -6,7 +6,13 @@ build/
 *.class
 server.db
 test.db
+server.sqlite
 .env
+
+### Deployment artifacts ###
+# Jar installed by scripts/deploy.sh at the repository root
+sloth.jar
+sloth.jar.new
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
