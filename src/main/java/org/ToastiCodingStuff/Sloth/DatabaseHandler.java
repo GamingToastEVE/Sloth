@@ -253,7 +253,7 @@ public class DatabaseHandler {
             // Check for every table if already exist, if so apply migrations instead of full initialization
             String[] tableNames = {
                     "users", "warnings", "moderation_actions", "tickets",
-                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds", "member_roles"
+                    "guild_settings", "role_permissions", "statistics", "guilds", "guild_systems", "rules_embeds_channel", "just_verify_button", "user_statistics", "role_select", "role_select_embeds", "role_select_groups", "active_timers", "role_events", "custom_embeds"
             };
             for (String tableName : tableNames) {
                 if (!tableAlreadyExist(tableName)) {
@@ -306,9 +306,6 @@ public class DatabaseHandler {
                             break;
                         case "custom_embeds":
                             createCustomEmbedsTable();
-                            break;
-                        case "member_roles":
-                            createMemberRolesTable();
                             break;
                     }
                     return;
@@ -692,19 +689,6 @@ public class DatabaseHandler {
 
     // ==================== MEMBER ROLES SNAPSHOT TABLE ====================
 
-    private void createMemberRolesTable() throws SQLException {
-        String createTable = "CREATE TABLE IF NOT EXISTS member_roles (" +
-                "id INT PRIMARY KEY AUTO_INCREMENT, " +
-                "guild_id VARCHAR(32) NOT NULL, " +
-                "user_id VARCHAR(32) NOT NULL, " +
-                "role_ids TEXT NOT NULL DEFAULT '', " +
-                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                "UNIQUE(guild_id, user_id))";
-        try (Connection connection = getConnection(); Statement stmt = connection.createStatement()) {
-            stmt.execute(createTable);
-            System.out.println("Table 'member_roles' created successfully.");
-        }
-    }
 
     /**
      * Returns the stored role IDs for a guild member.
