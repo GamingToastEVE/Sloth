@@ -21,9 +21,16 @@ import net.dv8tion.jda.api.utils.MemberCachePolicy;
 
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Sloth {
+
+    /** Numbers the event pool threads so a stack trace names the thread that stalled. */
+    private static final AtomicInteger EVENT_THREAD_COUNTER = new AtomicInteger(1);
+
     public static void main(String[] args) throws Exception {
         Dotenv dotenv = Dotenv.load();
 
@@ -39,9 +46,25 @@ public class Sloth {
         }
         System.out.println("Starting with token from " + tokenKey);
 
+        // Listeners are dispatched on their own pool. Without it JDA runs every listener
+        // on the gateway thread, so a single database query or REST call delays the
+        // heartbeat for everyone - the bot then looks frozen until the gateway reconnects.
+        ExecutorService eventPool = Executors.newFixedThreadPool(
+                Math.max(4, Runtime.getRuntime().availableProcessors() * 2),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "Sloth-Events-" + EVENT_THREAD_COUNTER.getAndIncrement());
+                    thread.setDaemon(true);
+                    return thread;
+                });
+
         JDA api = JDABuilder.createDefault(token)
                 .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MEMBERS)
-                .setChunkingFilter(ChunkingFilter.ALL)
+                // No chunking: requesting every member of every guild on startup costs
+                // bandwidth, startup time and permanent heap for data almost no command
+                // needs. The few places that do need members fetch them on demand.
+                .setChunkingFilter(ChunkingFilter.NONE)
+                .setMemberCachePolicy(MemberCachePolicy.DEFAULT)
+                .setEventPool(eventPool, true)
                 .build();
         api.awaitReady();
 

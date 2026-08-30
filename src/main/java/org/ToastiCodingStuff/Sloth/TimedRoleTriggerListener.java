@@ -116,7 +116,9 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
             for (DatabaseHandler.RoleEventData configData : events) {
                 JSONObject config = new JSONObject(configData);
                 if (config.has("message_threshold")) {
-                    guild.getMembers().forEach(member -> {
+                    // Members are loaded for this sweep instead of being held in the cache
+                    // permanently - only guilds that configured such an event pay for it
+                    guild.loadMembers().onSuccess(members -> members.forEach(member -> {
                         List<DatabaseHandler.ActiveTimerData> activeTimers = handler.getActiveTimersForUser(guild.getId(), member.getId());
                         boolean hasActiveTimer = activeTimers.stream().anyMatch(timer ->
                                 timer.sourceEventId == configData.id);
@@ -124,7 +126,8 @@ public class TimedRoleTriggerListener extends ListenerAdapter {
                             return; // Timer bereits aktiv, überspringen
                         }
                         processTrigger(guild, member, RoleEventType.MESSAGE_THRESHOLD, "");
-                    });
+                    })).onError(error ->
+                            System.err.println("Failed to load members for message threshold check: " + error.getMessage()));
 
                 }
             }

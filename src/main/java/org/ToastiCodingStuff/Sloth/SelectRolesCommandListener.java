@@ -772,31 +772,42 @@ public class SelectRolesCommandListener extends ListenerAdapter implements Slash
 
     @Override
     public void onMessageReactionRemove (MessageReactionRemoveEvent event) {
-        Member member = event.getGuild().getMemberById(event.getUserId());
-        if (member == null) {
-            member = event.getGuild().retrieveMemberById(event.getUserId()).complete();
-        }
-        if (handler.getAllRoleSelectForGuild(event.getGuild().getId()).isEmpty()) {
-            return;
-        }
+        // The cheap checks come first: every removed reaction in every guild runs through
+        // here, so neither a database query nor a member lookup may happen unconditionally
         if (event.getUser() != null && event.getUser().isBot()) {
             return;
         }
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
         String emoji = event.getReaction().getEmoji().getFormatted();
         String roleId = handler.getRoleSelectRoleIDByEmoji(guildId, emoji);
-        if (roleId != null) {
-            Role role = event.getGuild().getRoleById(roleId);
-            if (member == null || !member.getRoles().contains(role)) {
-                return;
-            }
-            if (role != null) {
-                member.getGuild().removeRoleFromMember(member, role).queue(
-                    success -> {},
-                    error -> System.out.println("Fehler beim Entfernen der Rolle via Reaction Role: " + error.getMessage())
-                );
-            }
+        if (roleId == null) {
+            return;
         }
+        Role role = event.getGuild().getRoleById(roleId);
+        if (role == null) {
+            return;
+        }
+
+        Member cached = event.getGuild().getMemberById(event.getUserId());
+        if (cached != null) {
+            removeReactionRole(cached, role);
+            return;
+        }
+        // Uncached member: retrieved without blocking, unlike the previous complete()
+        event.getGuild().retrieveMemberById(event.getUserId()).queue(
+            member -> removeReactionRole(member, role),
+            error -> System.out.println("Member für Reaction Role nicht gefunden: " + error.getMessage())
+        );
+    }
+
+    private void removeReactionRole(Member member, Role role) {
+        if (member == null || !member.getRoles().contains(role)) {
+            return;
+        }
+        member.getGuild().removeRoleFromMember(member, role).queue(
+            success -> {},
+            error -> System.out.println("Fehler beim Entfernen der Rolle via Reaction Role: " + error.getMessage())
+        );
     }
 
     // ==================== BUTTON INTERACTION HANDLER ====================
@@ -1519,12 +1530,16 @@ public class SelectRolesCommandListener extends ListenerAdapter implements Slash
             }
         }
         assert mChannel != null;
-        Message message = mChannel.sendMessageEmbeds(embedBuilder.build()).complete();
-        for (String emoji : emojiList) {
-            Emoji emj = Emoji.fromFormatted(emoji);
-            System.out.println(emj + "; " + emj.getName());
-            message.addReaction(Emoji.fromFormatted(emoji)).queue();
-        }
+        // Reactions are added in the callback instead of blocking on complete(), which
+        // would stall the caller for a full REST round-trip plus rate limits
+        mChannel.sendMessageEmbeds(embedBuilder.build()).queue(message -> {
+            for (String emoji : emojiList) {
+                message.addReaction(Emoji.fromFormatted(emoji)).queue(
+                    success -> {},
+                    error -> System.err.println("Failed to add reaction " + emoji + ": " + error.getMessage())
+                );
+            }
+        }, error -> System.err.println("Failed to send role select message: " + error.getMessage()));
     }
 
     private void handleSendSelectRolesDropdown (Guild guild, Channel channel) {

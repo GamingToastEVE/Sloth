@@ -2,7 +2,7 @@ package org.ToastiCodingStuff.Sloth;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -62,7 +62,15 @@ public class FeedbackCommandListener extends ListenerAdapter implements SlashCom
         eb2.addField(t(guildId, "feedback.field_user_id"), event.getUser().getId(), false);
         eb2.setColor(Color.BLUE);
         eb2.setTimestamp(Instant.now());
-        PrivateChannel channel = Objects.requireNonNull(event.getJDA().getUserById("365042010626719745")).openPrivateChannel().complete();
-        channel.sendMessageEmbeds(eb2.build()).queue();
+        // Chained instead of blocking on complete(): the feedback DM is a REST round-trip
+        // that must not hold up the thread handling this event
+        User owner = event.getJDA().getUserById("365042010626719745");
+        if (owner == null) {
+            System.err.println("Feedback could not be forwarded: owner user is not cached");
+            return;
+        }
+        owner.openPrivateChannel().queue(
+                channel -> channel.sendMessageEmbeds(eb2.build()).queue(),
+                error -> System.err.println("Failed to forward feedback: " + error.getMessage()));
     }
 }

@@ -515,8 +515,9 @@ public class LevelingSystemCommandListener extends ListenerAdapter implements Sl
             return;
         }
 
-        // Check if user has an ignored role
-        Member member = event.getGuild().getMemberById(userId);
+        // Taken from the event rather than the cache: without full member chunking a
+        // cache lookup can miss, which would silently hand XP to an ignored role
+        Member member = event.getMember();
         if (member != null && hasIgnoredRole(settings, member)) {
             return;
         }
@@ -1228,8 +1229,18 @@ public class LevelingSystemCommandListener extends ListenerAdapter implements Sl
 
         event.deferReply().setEphemeral(true).queue();
 
+        // Members are loaded for this one run instead of being kept in memory for every
+        // guild all the time - this is the only command that needs the whole member list
+        event.getGuild().loadMembers().onSuccess(members -> applyLevelsToMembers(event, guildId, members))
+                .onError(error -> {
+                    System.err.println("Failed to load members: " + error.getMessage());
+                    event.getHook().sendMessage("❌ " + t(guildId, "leveling.applied_levels_to_members_with_role_failure")
+                            + ": " + error.getMessage()).setEphemeral(true).queue();
+                });
+    }
+
+    private void applyLevelsToMembers(IReplyCallback event, String guildId, List<Member> members) {
         try {
-            List<Member> members = event.getGuild().getMembers();
             DatabaseHandler.LevelSettingsData settings = handler.getLevelSettings(guildId);
 
             // --- Optimierung: JSON vorher parsen (nur 1x statt 500x) ---
@@ -1477,71 +1488,109 @@ public class LevelingSystemCommandListener extends ListenerAdapter implements Sl
             return;
         }
 
-        // Build leaderboard entries
-        StringBuilder entries = new StringBuilder();
-        int rank = offset + 1;
+        // Names come from one request for the whole page: without full member chunking a
+        // cache lookup would print "Unknown User" for everyone JDA has never seen
+        event.deferReply().setEphemeral(false).queue();
+        resolveDisplayNames(event.getGuild(), leaderboard, names -> {
 
-        for (DatabaseHandler.UserLevelData userData : leaderboard) {
-            String medal = switch (rank) {
-                case 1 -> "🥇";
-                case 2 -> "🥈";
-                case 3 -> "🥉";
-                default -> "**#" + rank + "**";
-            };
+            // Build leaderboard entries
+            StringBuilder entries = new StringBuilder();
+            int rank = offset + 1;
 
-            // Try to get member name
-            Member member = event.getGuild().getMemberById(userData.userId);
-            String displayName = member != null ? member.getEffectiveName() : "Unknown User";
+            for (DatabaseHandler.UserLevelData userData : leaderboard) {
+                String medal = switch (rank) {
+                    case 1 -> "🥇";
+                    case 2 -> "🥈";
+                    case 3 -> "🥉";
+                    default -> "**#" + rank + "**";
+                };
 
-            entries.append(String.format(
-                    "%s %s\n" +
-                    "-# %s %d • %,d XP\n\n",
-                    medal, displayName,
-                    t(guildId, "leveling.level"), userData.level, userData.totalXp
-            ));
-            rank++;
+                String displayName = names.getOrDefault(userData.userId, "Unknown User");
+
+                entries.append(String.format(
+                        "%s %s\n" +
+                        "-# %s %d • %,d XP\n\n",
+                        medal, displayName,
+                        t(guildId, "leveling.level"), userData.level, userData.totalXp
+                ));
+                rank++;
+            }
+
+            // Get caller's rank
+            String callerId = event.getUser().getId();
+            int callerRank = handler.getUserRank(guildId, callerId);
+            DatabaseHandler.UserLevelData callerData = handler.getUserLevel(guildId, callerId);
+
+            // Build leaderboard container
+            Container leaderboardContainer = Container.of(
+                    TextDisplay.of(t(guildId, "leveling.breadcrumb_leaderboard")),
+                    TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
+                    TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"),
+                            page, Math.max(1, totalPages), totalUsers)),
+
+                    Separator.createDivider(Separator.Spacing.SMALL),
+
+                    TextDisplay.of(entries.toString().trim()),
+
+                    Separator.createDivider(Separator.Spacing.SMALL),
+
+                    TextDisplay.of(String.format(
+                            "**%s:** #%d (%s %d, %,d XP)",
+                            t(guildId, "leveling.your_rank"), callerRank,
+                            t(guildId, "leveling.level"), callerData.level, callerData.totalXp
+                    )),
+
+                    Separator.createDivider(Separator.Spacing.SMALL),
+
+                    // Pagination buttons
+                    ActionRow.of(
+                            Button.secondary("level_leaderboard_prev_" + page, "⬅️")
+                                    .withDisabled(page <= 1),
+                            Button.secondary("level_leaderboard_refresh_" + page, t(guildId, "buttons.refresh")),
+                            Button.secondary("level_leaderboard_next_" + page, "➡️")
+                                    .withDisabled(page >= totalPages)
+                    )
+            ).withAccentColor(0xFEE75C);
+
+            event.getHook().sendMessageComponents(leaderboardContainer).useComponentsV2().queue();
+        });
+    }
+
+    /**
+     * Resolve the display names for one leaderboard page. Cached members are used as they
+     * are, the rest is retrieved in a single request; members Discord does not return
+     * (they left the guild) simply stay absent from the map.
+     */
+    private void resolveDisplayNames(Guild guild, List<DatabaseHandler.UserLevelData> page,
+                                     java.util.function.Consumer<Map<String, String>> callback) {
+        Map<String, String> names = new HashMap<>();
+        List<String> missing = new ArrayList<>();
+
+        for (DatabaseHandler.UserLevelData userData : page) {
+            Member cached = guild.getMemberById(userData.userId);
+            if (cached != null) {
+                names.put(userData.userId, cached.getEffectiveName());
+            } else {
+                missing.add(userData.userId);
+            }
         }
 
-        // Get caller's rank
-        String callerId = event.getUser().getId();
-        int callerRank = handler.getUserRank(guildId, callerId);
-        DatabaseHandler.UserLevelData callerData = handler.getUserLevel(guildId, callerId);
+        if (missing.isEmpty()) {
+            callback.accept(names);
+            return;
+        }
 
-        // Build leaderboard container
-        Container leaderboardContainer = Container.of(
-                TextDisplay.of(t(guildId, "leveling.breadcrumb_leaderboard")),
-                TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
-                TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"),
-                        page, Math.max(1, totalPages), totalUsers)),
-
-                Separator.createDivider(Separator.Spacing.SMALL),
-
-                TextDisplay.of(entries.toString().trim()),
-
-                Separator.createDivider(Separator.Spacing.SMALL),
-
-                TextDisplay.of(String.format(
-                        "**%s:** #%d (%s %d, %,d XP)",
-                        t(guildId, "leveling.your_rank"), callerRank,
-                        t(guildId, "leveling.level"), callerData.level, callerData.totalXp
-                )),
-
-                Separator.createDivider(Separator.Spacing.SMALL),
-
-                // Pagination buttons
-                ActionRow.of(
-                        Button.secondary("level_leaderboard_prev_" + page, "⬅️")
-                                .withDisabled(page <= 1),
-                        Button.secondary("level_leaderboard_refresh_" + page, t(guildId, "buttons.refresh")),
-                        Button.secondary("level_leaderboard_next_" + page, "➡️")
-                                .withDisabled(page >= totalPages)
-                )
-        ).withAccentColor(0xFEE75C);
-
-        MessageCreateBuilder message = new MessageCreateBuilder()
-                .setComponents(leaderboardContainer);
-
-        event.reply(message.useComponentsV2().build()).setEphemeral(false).queue();
+        guild.retrieveMembersByIds(missing.toArray(new String[0]))
+                .onSuccess(members -> {
+                    for (Member member : members) {
+                        names.put(member.getId(), member.getEffectiveName());
+                    }
+                    callback.accept(names);
+                })
+                .onError(error -> {
+                    System.err.println("Failed to resolve leaderboard names: " + error.getMessage());
+                    callback.accept(names);
+                });
     }
 
     /**
@@ -1573,68 +1622,71 @@ public class LevelingSystemCommandListener extends ListenerAdapter implements Sl
             return;
         }
 
-        // Build leaderboard entries
-        StringBuilder entries = new StringBuilder();
-        int rank = offset + 1;
+        // One request per page instead of relying on a fully chunked member cache;
+        // copied because a lambda may only capture effectively final variables
+        final int targetPage = newPage;
+        event.deferEdit().queue();
+        resolveDisplayNames(event.getGuild(), leaderboard, names -> {
 
-        for (DatabaseHandler.UserLevelData userData : leaderboard) {
-            String medal = switch (rank) {
-                case 1 -> "🥇";
-                case 2 -> "🥈";
-                case 3 -> "🥉";
-                default -> "**#" + rank + "**";
-            };
+            // Build leaderboard entries
+            StringBuilder entries = new StringBuilder();
+            int rank = offset + 1;
 
-            Member member = event.getGuild().getMemberById(userData.userId);
-            String displayName = member != null ? member.getEffectiveName() : "Unknown User";
+            for (DatabaseHandler.UserLevelData userData : leaderboard) {
+                String medal = switch (rank) {
+                    case 1 -> "🥇";
+                    case 2 -> "🥈";
+                    case 3 -> "🥉";
+                    default -> "**#" + rank + "**";
+                };
 
-            entries.append(String.format(
-                    "%s %s\n" +
-                    "-# Level %d • %,d XP\n\n",
-                    medal, displayName,
-                    userData.level, userData.totalXp
-            ));
-            rank++;
-        }
+                String displayName = names.getOrDefault(userData.userId, "Unknown User");
 
-        // Get caller's rank
-        String callerId = event.getUser().getId();
-        int callerRank = handler.getUserRank(guildId, callerId);
-        DatabaseHandler.UserLevelData callerData = handler.getUserLevel(guildId, callerId);
+                entries.append(String.format(
+                        "%s %s\n" +
+                        "-# Level %d • %,d XP\n\n",
+                        medal, displayName,
+                        userData.level, userData.totalXp
+                ));
+                rank++;
+            }
 
-        // Build leaderboard container
-        Container leaderboardContainer = Container.of(
-                TextDisplay.of(t(guildId, "leveling.breadcrumb_leaderboard")),
-                TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
-                TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"), newPage, Math.max(1, totalPages), totalUsers)),
+            // Get caller's rank
+            String callerId = event.getUser().getId();
+            int callerRank = handler.getUserRank(guildId, callerId);
+            DatabaseHandler.UserLevelData callerData = handler.getUserLevel(guildId, callerId);
 
-                Separator.createDivider(Separator.Spacing.SMALL),
+            // Build leaderboard container
+            Container leaderboardContainer = Container.of(
+                    TextDisplay.of(t(guildId, "leveling.breadcrumb_leaderboard")),
+                    TextDisplay.of(String.format("# " + t(guildId, "leveling.leaderboard_title"), event.getGuild().getName())),
+                    TextDisplay.of(String.format("-# " + t(guildId, "leveling.page") + " • " + t(guildId, "leveling.total_members"), targetPage, Math.max(1, totalPages), totalUsers)),
 
-                TextDisplay.of(entries.toString().trim()),
+                    Separator.createDivider(Separator.Spacing.SMALL),
 
-                Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(entries.toString().trim()),
 
-                TextDisplay.of(String.format(
-                        "**%s:** #%d (%s %d, %,d XP)",
-                        t(guildId, "leveling.your_rank"), callerRank,
-                        t(guildId, "leveling.level"), callerData.level, callerData.totalXp
-                )),
+                    Separator.createDivider(Separator.Spacing.SMALL),
 
-                Separator.createDivider(Separator.Spacing.SMALL),
+                    TextDisplay.of(String.format(
+                            "**%s:** #%d (%s %d, %,d XP)",
+                            t(guildId, "leveling.your_rank"), callerRank,
+                            t(guildId, "leveling.level"), callerData.level, callerData.totalXp
+                    )),
 
-                ActionRow.of(
-                        Button.secondary("level_leaderboard_prev_" + newPage, t(guildId, "buttons.previous_page"))
-                                .withDisabled(newPage <= 1),
-                        Button.secondary("level_leaderboard_refresh_" + newPage, t(guildId, "buttons.refresh")),
-                        Button.secondary("level_leaderboard_next_" + newPage, t(guildId, "buttons.next_page"))
-                                .withDisabled(newPage >= totalPages)
-                )
-        ).withAccentColor(0xFEE75C);
+                    Separator.createDivider(Separator.Spacing.SMALL),
 
-        MessageEditBuilder editBuilder = new MessageEditBuilder()
-                .setComponents(leaderboardContainer);
+                    ActionRow.of(
+                            Button.secondary("level_leaderboard_prev_" + targetPage, t(guildId, "buttons.previous_page"))
+                                    .withDisabled(targetPage <= 1),
+                            Button.secondary("level_leaderboard_refresh_" + targetPage, t(guildId, "buttons.refresh")),
+                            Button.secondary("level_leaderboard_next_" + targetPage, t(guildId, "buttons.next_page"))
+                                    .withDisabled(targetPage >= totalPages)
+                    )
+            ).withAccentColor(0xFEE75C);
 
-        event.editMessage(editBuilder.useComponentsV2().build()).queue();
+            event.getHook().editOriginalComponents(leaderboardContainer).useComponentsV2().queue();
+        });
     }
 
     public void handleSettings(SlashCommandInteractionEvent event) {
