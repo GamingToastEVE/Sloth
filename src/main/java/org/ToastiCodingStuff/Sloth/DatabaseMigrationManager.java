@@ -143,6 +143,7 @@ public class DatabaseMigrationManager {
         schemas.put("custom_embeds", createCustomEmbedsSchema());
         schemas.put("role_events", createRoleEventsSchema());
         schemas.put("active_timers", createActiveTimersSchema());
+        schemas.put("member_roles", createMemberRolesSchema());
         schemas.put("reminders", createRemindersSchema());
         schemas.put("level_settings", createLevelSettingsSchema());
         schemas.put("user_levels", createUserLevelsSchema());
@@ -503,6 +504,34 @@ public class DatabaseMigrationManager {
                 .addColumn("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
                 // Index für schnelle Abfragen im Background-Loop
                 .addIndex("CREATE INDEX IF NOT EXISTS idx_timers_expires ON active_timers(expires_at)");
+    }
+
+    /**
+     * Define the member_roles table schema.
+     * <p>
+     * Holds one snapshot per guild member of the role IDs they currently hold, so that
+     * MemberRoleTrackingListener can tell which roles were added or removed. The table
+     * was previously only created by DatabaseHandler's raw CREATE TABLE and was unknown
+     * to this manager, so it received no column migrations and no schema validation.
+     */
+    private TableSchema createMemberRolesSchema() {
+        return new TableSchema("member_roles")
+                .addColumn("id", "INTEGER PRIMARY KEY AUTO_INCREMENT")
+                .addColumn("guild_id", "VARCHAR(32) NOT NULL")
+                .addColumn("user_id", "VARCHAR(32) NOT NULL")
+                .addColumn("role_ids", "TEXT NOT NULL")
+                .addColumn("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+                // One snapshot per member and guild. This is not just an optimisation:
+                // setMemberRoles upserts with ON DUPLICATE KEY UPDATE, so without the
+                // unique key it would silently accumulate duplicate rows per member.
+                //
+                // The name has to be "guild_id": existing databases got this constraint
+                // from UNIQUE(guild_id, user_id) in the original CREATE TABLE, which the
+                // server auto-names after the first column. Any other name is treated as
+                // a new index and MariaDB creates a redundant duplicate - verified, it
+                // warns "Duplicate index ... will be disallowed in a future release".
+                .addIndex("CREATE UNIQUE INDEX IF NOT EXISTS guild_id "
+                        + "ON member_roles(guild_id, user_id)");
     }
 
     // Neue Methode hinzufügen:
