@@ -1181,35 +1181,56 @@ public class TicketPanelCommandListener extends ListenerAdapter implements Slash
             return;
         }
 
-        if (panel.categoryId == null) {
+        if (panel.categoryId == null || panel.categoryId.isBlank()) {
             event.reply(t(guildId, "ticket_panels.category_not_set")).setEphemeral(true).queue();
             return;
         }
 
-        // Get the channel to send to (either the configured channel or current channel)
+        // Either the configured panel channel or, when none is set, the channel the UI was
+        // opened in - which is not necessarily a text channel (threads, voice chats)
         TextChannel targetChannel;
-        if (panel.channelId != null) {
+        if (panel.channelId != null && !panel.channelId.isBlank()) {
             targetChannel = event.getGuild().getTextChannelById(panel.channelId);
-            if (targetChannel == null) {
-                event.reply(t(guildId, "ticket_panels.channel_not_found")).setEphemeral(true).queue();
-                return;
-            }
-        } else {
+        } else if (event.getChannelType() == ChannelType.TEXT) {
             targetChannel = event.getChannel().asTextChannel();
+        } else {
+            targetChannel = null;
+        }
+        if (targetChannel == null) {
+            event.reply(t(guildId, "ticket_panels.channel_not_found")).setEphemeral(true).queue();
+            return;
+        }
+
+        // Checked up front because JDA throws InsufficientPermissionException straight out
+        // of sendMessageEmbeds - which would leave the button click unanswered
+        if (!event.getGuild().getSelfMember().hasPermission(targetChannel,
+                Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND, Permission.MESSAGE_EMBED_LINKS)) {
+            event.reply(t(guildId, "ticket_panels.no_send_permission", targetChannel.getAsMention()))
+                .setEphemeral(true).queue();
+            return;
         }
 
         EmbedBuilder embed = TicketPanelRenderer.buildEmbed(handler, panel);
         List<ActionRow> actionRows = TicketPanelRenderer.buildComponents(handler, panel, panelId);
 
-        targetChannel.sendMessageEmbeds(embed.build())
-            .setComponents(actionRows)
-            .queue(message -> {
-                handler.updateTicketPanelMessageId(panelId, message.getId());
-                event.reply(t(guildId, "ticket_panels.sent", targetChannel.getAsMention())).setEphemeral(true).queue();
-            }, error -> {
-                System.out.println("Error sending ticket panel message: " + error.getMessage());
-                event.reply(t(guildId, "general.error")).setEphemeral(true).queue();
-            });
+        // Acknowledge first: the interaction token is only valid for three seconds, while
+        // the answer is only known once the panel message came back from Discord
+        event.deferReply(true).queue();
+
+        try {
+            targetChannel.sendMessageEmbeds(embed.build())
+                .setComponents(actionRows)
+                .queue(message -> {
+                    handler.updateTicketPanelMessageId(panelId, message.getId());
+                    event.getHook().editOriginal(t(guildId, "ticket_panels.sent", targetChannel.getAsMention())).queue();
+                }, error -> {
+                    System.err.println("Error sending ticket panel message: " + error.getMessage());
+                    event.getHook().editOriginal(t(guildId, "general.error")).queue();
+                });
+        } catch (RuntimeException e) {
+            System.err.println("Error building ticket panel message: " + e.getMessage());
+            event.getHook().editOriginal(t(guildId, "general.error")).queue();
+        }
     }
 
     // ==================== DELETE PANEL ====================

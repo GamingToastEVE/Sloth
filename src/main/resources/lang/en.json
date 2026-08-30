@@ -412,6 +412,7 @@
     "category_not_set": "Please configure a category for this panel first.",
     "category_not_found": "The configured category was not found.",
     "channel_not_found": "The configured channel was not found.",
+    "no_send_permission": "I am missing permissions in %s (View Channel, Send Messages, Embed Links).",
     "delete_confirm_title": "Delete Panel?",
     "delete_confirm_desc": "Are you sure you want to delete the panel '%s'? This action cannot be undone.",
     "btn_categories": "Categories",

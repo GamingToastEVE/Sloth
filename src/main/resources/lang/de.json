@@ -412,6 +412,7 @@
     "category_not_set": "Bitte konfiguriere zuerst eine Kategorie für dieses Panel.",
     "category_not_found": "Die konfigurierte Kategorie wurde nicht gefunden.",
     "channel_not_found": "Der konfigurierte Kanal wurde nicht gefunden.",
+    "no_send_permission": "Mir fehlen Berechtigungen in %s (Kanal ansehen, Nachrichten senden, Links einbetten).",
     "delete_confirm_title": "Panel löschen?",
     "delete_confirm_desc": "Bist du sicher, dass du das Panel '%s' löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
     "btn_categories": "Kategorien",
