@@ -357,7 +357,8 @@
     "audit_log_target": "Ticket #%s",
     "channel_delete_reason_closed": "Ticket geschlossen",
     "closed_via_button": "Über Button geschlossen",
-    "channel_delete_reason_by_user": "Ticket-Kanal gelöscht von %s"
+    "channel_delete_reason_by_user": "Ticket-Kanal gelöscht von %s",
+    "already_closed": "❌ Dieses Ticket ist bereits geschlossen."
   },
   "ticket_panels": {
     "ui_title": "Ticket-Panel Manager",

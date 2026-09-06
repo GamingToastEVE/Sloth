@@ -3,7 +3,6 @@ package org.ToastiCodingStuff.Sloth;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
-import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -89,10 +88,10 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
     public void onButtonInteraction(ButtonInteractionEvent event) {
         String customId = event.getComponentId();
         
+        // Delete buttons - both the current and the legacy custom id - are owned by
+        // TicketCreationListener, so a click is answered exactly once.
         if (customId.equals("close_ticket_confirm")) {
             handleCloseTicketConfirm(event);
-        } else if (customId.equals("delete_channel")) {
-            handleDeleteChannel(event);
         }
     }
 
@@ -123,110 +122,92 @@ public class TicketCommandListener extends ListenerAdapter implements SlashComma
     private void handleCloseTicket(SlashCommandInteractionEvent event, String guildId) {
         TextChannel channel = event.getChannel().asTextChannel();
         Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+        String status = handler.getTicketStatusByChannelId(channel.getId());
 
-        if (ticketId == null) {
-            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
+        switch (TicketCloseFlow.evaluateClose(ticketId, status)) {
+            case NOT_A_TICKET:
+                event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
+                return;
+            case ALREADY_CLOSED:
+                event.reply(t(guildId, "tickets.already_closed")).setEphemeral(true).queue();
+                return;
+            default:
+                break;
+        }
+
+        String reason = event.getOption("reason") != null
+                ? Objects.requireNonNull(event.getOption("reason")).getAsString()
+                : t(guildId, "moderation.no_reason");
+
+        if (!handler.closeTicket(ticketId, event.getUser().getId(), reason)) {
+            event.reply(t(guildId, "tickets.close_failed")).setEphemeral(true).queue();
             return;
         }
 
-        String reason = event.getOption("reason") != null ? Objects.requireNonNull(event.getOption("reason")).getAsString() : t(guildId, "moderation.no_reason");
+        handler.incrementTicketsClosed(guildId);
+        handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
+        handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
+                t(guildId, "tickets.audit_log_target", ticketId),
+                event.getMember(), null, reason);
 
-        boolean success = handler.closeTicket(ticketId, event.getUser().getId(), reason);
-        
-        if (success) {
-            // Update statistics for tickets closed
-            handler.incrementTicketsClosed(guildId);
-            
-            // Update user statistics for ticket closure
-            handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
-            
-            // Send audit log entry for ticket closure
-            handler.sendAuditLogEntry(Objects.requireNonNull(event.getGuild()), "TICKET_CLOSED",
-                    t(guildId, "tickets.audit_log_target", ticketId),
-                    event.getMember(), null, reason);
-            
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle(t(guildId, "tickets.close_title"))
-                    .setDescription(t(guildId, "tickets.close_description", event.getUser().getAsMention()))
-                    .addField(t(guildId, "general.reason"), reason, false)
-                    .addField(t(guildId, "tickets.closed_at"), "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
-                    .setColor(Color.RED);
+        // The channel is kept and only marked as closed. Deleting it is a separate,
+        // deliberate click - otherwise the whole conversation is gone before anyone has
+        // read the closing embed.
+        event.replyEmbeds(TicketCloseFlow
+                        .buildClosedEmbed(guildId, event.getUser().getAsMention(), reason, null).build())
+                .setComponents(ActionRow.of(TicketCloseFlow.buildDeleteButton(guildId)))
+                .queue();
 
-            event.replyEmbeds(embed.build()).queue();
-            
-            // Archive channel after 5 seconds
-            channel.delete().reason(t(guildId, "tickets.channel_delete_reason_closed")).queue();
+        renameToClosed(channel);
+    }
 
-        } else {
-            event.reply(t(guildId, "tickets.close_failed")).setEphemeral(true).queue();
+    /** Mark the channel as closed, unless it already carries the prefix. */
+    private void renameToClosed(TextChannel channel) {
+        String closedName = TicketCloseFlow.closedChannelName(channel.getName());
+        if (!closedName.equals(channel.getName())) {
+            channel.getManager().setName(closedName).queue();
         }
     }
 
+    /**
+     * Legacy confirm button. Still handled because such buttons may sit under old
+     * messages in live servers; new closes go through the panel close button.
+     */
     private void handleCloseTicketConfirm(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getCustomId(), "close_ticket_confirm")) {
-            return;
-        }
-
         TextChannel channel = event.getChannel().asTextChannel();
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
         Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+        String status = handler.getTicketStatusByChannelId(channel.getId());
 
-        if (ticketId == null) {
-            event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
-            return;
+        switch (TicketCloseFlow.evaluateClose(ticketId, status)) {
+            case NOT_A_TICKET:
+                event.reply(t(guildId, "tickets.not_a_ticket")).setEphemeral(true).queue();
+                return;
+            case ALREADY_CLOSED:
+                event.reply(t(guildId, "tickets.already_closed")).setEphemeral(true).queue();
+                return;
+            default:
+                break;
         }
 
-        boolean success = handler.closeTicket(ticketId, event.getUser().getId(), t(guildId, "tickets.closed_via_button"));
-
-        if (success) {
-            handler.incrementTicketsClosed(guildId);
-            handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
-            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED",
-                    t(guildId, "tickets.audit_log_target", ticketId),
-                    event.getMember(), null, t(guildId, "tickets.closed_via_button"));
-
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle(t(guildId, "tickets.close_title"))
-                    .setDescription(t(guildId, "tickets.close_description", event.getUser().getAsMention()))
-                    .addField(t(guildId, "tickets.closed_at"), "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
-                    .setColor(Color.RED);
-
-            Button deleteChannelButton = Button.danger("delete_channel", t(guildId, "tickets.delete_channel_btn"));
-
-            event.replyEmbeds(embed.build()).setComponents(ActionRow.of(deleteChannelButton)).queue();
-            channel.getManager().setName("closed-" + channel.getName()).queue();
-        } else {
+        String reason = t(guildId, "tickets.closed_via_button");
+        if (!handler.closeTicket(ticketId, event.getUser().getId(), reason)) {
             event.reply(t(guildId, "tickets.close_failed")).setEphemeral(true).queue();
-        }
-    }
-
-    private void handleDeleteChannel(ButtonInteractionEvent event) {
-        if (!Objects.equals(event.getButton().getCustomId(), "delete_channel")) {
             return;
         }
 
-        TextChannel channel = event.getChannel().asTextChannel();
-        String guildId = Objects.requireNonNull(event.getGuild()).getId();
-        
-        // Check if this is a closed ticket channel (should start with "closed-")
-        if (!channel.getName().startsWith("closed-")) {
-            event.reply(t(guildId, "tickets.delete_only_closed")).setEphemeral(true).queue();
-            return;
-        }
-        
-        // Check if user has permission to delete the channel
-        // Support role members or users with manage channels permission can delete
-        if (!hasSupportAccess(event.getMember(), guildId, channel.getId())) {
-            event.reply(t(guildId, "tickets.delete_no_permission")).setEphemeral(true).queue();
-            return;
-        }
+        handler.incrementTicketsClosed(guildId);
+        handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
+        handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED",
+                t(guildId, "tickets.audit_log_target", ticketId),
+                event.getMember(), null, reason);
 
-        // Acknowledge the interaction and delete the channel
-        event.reply(t(guildId, "tickets.deleting_channel")).setEphemeral(true).queue(
-            success -> channel.delete().reason(t(guildId, "tickets.channel_delete_reason_by_user", event.getUser().getEffectiveName())).queue(),
-            // Bug fix: can't call event.reply() again in error callback (already acknowledged)
-            error -> System.err.println("Failed to send delete acknowledgment: " + error.getMessage())
-        );
+        event.replyEmbeds(TicketCloseFlow
+                        .buildClosedEmbed(guildId, event.getUser().getAsMention(), reason, null).build())
+                .setComponents(ActionRow.of(TicketCloseFlow.buildDeleteButton(guildId)))
+                .queue();
+
+        renameToClosed(channel);
     }
 
     private void handleAssignTicket(SlashCommandInteractionEvent event, String guildId) {

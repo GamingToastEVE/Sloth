@@ -142,8 +142,9 @@ public class TicketCreationListener extends ListenerAdapter {
             return;
         }
 
-        // Handle delete channel button
-        if (customId.equals("delete_ticket_channel")) {
+        // Handle delete channel button (both the current and the legacy custom id, so
+        // buttons under older messages keep working)
+        if (TicketCloseFlow.isDeleteButtonId(customId)) {
             handleDeleteChannel(event);
         }
     }
@@ -357,43 +358,61 @@ public class TicketCreationListener extends ListenerAdapter {
     private void handleCloseTicketButton(ButtonInteractionEvent event, int panelId) {
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
         TextChannel channel = event.getChannel().asTextChannel();
-        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+        String reason = t(guildId, "tickets.closed_via_button");
 
-        if (ticketId == null) {
-            event.reply(t(guildId, "tickets.not_found")).setEphemeral(true).queue();
+        DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
+        String panelName = panel != null ? panel.name : null;
+
+        // Grey out the close button that was clicked, so the ticket cannot be closed a
+        // second time from the same message.
+        event.getMessage()
+            .editMessageComponents(ActionRow.of(event.getButton().asDisabled()))
+            .queue(null, error -> {});
+
+        closeTicket(event, guildId, channel, reason, panelName);
+    }
+
+    /**
+     * Close the ticket of a channel and reply with the closed embed plus a delete button.
+     * <p>
+     * Shared by the panel close button and (through {@link TicketCloseFlow}) by
+     * {@code /ticket close}, so both behave identically: the channel is renamed and kept,
+     * never deleted on the spot.
+     */
+    private void closeTicket(ButtonInteractionEvent event, String guildId, TextChannel channel,
+                             String reason, String panelName) {
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+        String status = handler.getTicketStatusByChannelId(channel.getId());
+
+        switch (TicketCloseFlow.evaluateClose(ticketId, status)) {
+            case NOT_A_TICKET:
+                event.reply(t(guildId, "tickets.not_found")).setEphemeral(true).queue();
+                return;
+            case ALREADY_CLOSED:
+                event.reply(t(guildId, "tickets.already_closed")).setEphemeral(true).queue();
+                return;
+            default:
+                break;
+        }
+
+        if (!handler.closeTicket(ticketId, event.getUser().getId(), reason)) {
+            event.reply(t(guildId, "general.error")).setEphemeral(true).queue();
             return;
         }
 
-        boolean success = handler.closeTicket(ticketId, event.getUser().getId(), "Closed via button");
+        handler.incrementTicketsClosed(guildId);
+        handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
+        handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED",
+            "Ticket #" + ticketId, null, event.getMember(), reason);
 
-        if (success) {
-            // Update statistics
-            handler.incrementTicketsClosed(guildId);
-            handler.incrementUserTicketsClosed(guildId, event.getUser().getId());
+        event.replyEmbeds(TicketCloseFlow
+                .buildClosedEmbed(guildId, event.getUser().getAsMention(), reason, panelName).build())
+            .setComponents(ActionRow.of(TicketCloseFlow.buildDeleteButton(guildId)))
+            .queue();
 
-            // Send audit log entry
-            handler.sendAuditLogEntry(event.getGuild(), "TICKET_CLOSED",
-                "Ticket #" + ticketId, null, event.getMember(), "Closed via button");
-
-            DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
-            String panelName = panel != null ? panel.name : "Unknown";
-
-            EmbedBuilder embed = new EmbedBuilder()
-                .setTitle("🔒 Ticket Closed")
-                .setDescription("This ticket has been closed by " + event.getUser().getAsMention())
-                .addField("Closed at", "<t:" + (System.currentTimeMillis() / 1000) + ":F>", true)
-                .setColor(Color.RED)
-                .setFooter(panelName);
-
-            Button deleteButton = Button.danger("delete_ticket_channel", "🗑️ Delete Channel");
-
-            event.replyEmbeds(embed.build())
-                .setComponents(ActionRow.of(deleteButton))
-                .queue();
-
-            channel.getManager().setName("closed-" + channel.getName()).queue();
-        } else {
-            event.reply(t(guildId, "general.error")).setEphemeral(true).queue();
+        String closedName = TicketCloseFlow.closedChannelName(channel.getName());
+        if (!closedName.equals(channel.getName())) {
+            channel.getManager().setName(closedName).queue();
         }
     }
 
@@ -401,38 +420,50 @@ public class TicketCreationListener extends ListenerAdapter {
         String guildId = Objects.requireNonNull(event.getGuild()).getId();
         TextChannel channel = event.getChannel().asTextChannel();
 
-        // Check if this is a closed ticket channel
-        if (!channel.getName().startsWith("closed-")) {
-            event.reply(t(guildId, "tickets.cannot_delete")).setEphemeral(true).queue();
+        Integer ticketId = handler.getTicketIdByChannelId(channel.getId());
+        String status = handler.getTicketStatusByChannelId(channel.getId());
+
+        // The stored status decides, so a renamed channel stays deletable; only an
+        // orphaned channel falls back to the "closed-" prefix.
+        switch (TicketCloseFlow.evaluateDelete(ticketId, status, channel.getName())) {
+            case NOT_A_TICKET:
+            case NOT_CLOSED:
+                event.reply(t(guildId, "tickets.delete_only_closed")).setEphemeral(true).queue();
+                return;
+            default:
+                break;
+        }
+
+        if (!hasDeletePermission(event, channel)) {
+            event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
             return;
         }
 
-        // Check permissions
-        if (!Objects.requireNonNull(event.getMember()).hasPermission(Permission.MANAGE_CHANNEL)) {
-            // Check if user has support role for any panel
-            Integer panelId = handler.getTicketPanelIdByChannel(channel.getId());
-            if (panelId != null) {
-                DatabaseHandler.TicketPanelData panel = handler.getTicketPanel(panelId);
-                if (panel != null && panel.supportRoleId != null) {
-                    boolean hasRole = event.getMember().getRoles().stream()
-                        .anyMatch(role -> role.getId().equals(panel.supportRoleId));
-                    if (!hasRole) {
-                        event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
-                        return;
-                    }
-                }
-            } else {
-                event.reply(t(guildId, "general.permission_denied")).setEphemeral(true).queue();
-                return;
-            }
+        event.reply(t(guildId, "tickets.deleting_channel")).setEphemeral(true).queue(
+            success -> channel.delete()
+                .reason(t(guildId, "tickets.channel_delete_reason_by_user", event.getUser().getEffectiveName()))
+                .queue(),
+            // Already acknowledged at this point, so a second reply would fail too.
+            error -> System.err.println("Failed to send delete acknowledgment: " + error.getMessage())
+        );
+    }
+
+    /**
+     * Whether the clicking member may delete this ticket channel: they can manage
+     * channels anyway, or they hold the support role of the ticket's panel.
+     */
+    private boolean hasDeletePermission(ButtonInteractionEvent event, TextChannel channel) {
+        if (event.getMember() == null) {
+            return false;
+        }
+        if (event.getMember().hasPermission(Permission.MANAGE_CHANNEL)) {
+            return true;
         }
 
-        event.reply("🗑️ Deleting channel...").setEphemeral(true).queue(
-            success -> channel.delete()
-                .reason("Ticket channel deleted by " + event.getUser().getEffectiveName())
-                .queue(),
-            error -> event.reply(t(guildId, "general.error")).setEphemeral(true).queue()
-        );
+        String supportRoleId = handler.resolveTicketSupportRole(
+            Objects.requireNonNull(event.getGuild()).getId(), channel.getId());
+        return supportRoleId != null && event.getMember().getRoles().stream()
+            .anyMatch(role -> role.getId().equals(supportRoleId));
     }
 
     // ==================== CONTINUE FORM BUTTON HANDLER ====================

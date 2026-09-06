@@ -1910,7 +1910,10 @@ public class DatabaseHandler {
     public boolean closeTicket(int ticketId, String closedById, String reason) {
         try (Connection connection = getConnection()) {
             // MariaDB-Syntax: IDs als VARCHAR(32) oder TEXT behandeln
-            String closeTicket = "UPDATE tickets SET status = 'CLOSED', closed_by = ?, closed_reason = ?, closed_at = CURRENT_TIMESTAMP WHERE id = ?";
+            // The status guard makes a second close a no-op instead of re-closing the
+            // ticket: without it a double click re-posted the embed and counted the
+            // ticket as closed twice in the statistics.
+            String closeTicket = "UPDATE tickets SET status = 'CLOSED', closed_by = ?, closed_reason = ?, closed_at = CURRENT_TIMESTAMP WHERE id = ? AND status != 'CLOSED'";
             PreparedStatement stmt = connection.prepareStatement(closeTicket);
             stmt.setString(1, closedById); // VARCHAR(32) statt Long
             stmt.setString(2, reason);
@@ -1944,6 +1947,25 @@ public class DatabaseHandler {
             return null;
         } catch (SQLException e) {
             System.err.println("Error getting ticket by channel: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Get the status of the ticket a channel belongs to, or null when the channel is not
+     * a ticket. Used by the close and delete guards in {@link TicketCloseFlow}.
+     */
+    public String getTicketStatusByChannelId(String channelId) {
+        try (Connection connection = getConnection()) {
+            String query = "SELECT status FROM tickets WHERE channel_id = ?";
+            PreparedStatement stmt = connection.prepareStatement(query);
+            stmt.setString(1, channelId);
+            ResultSet rs = stmt.executeQuery();
+
+            return rs.next() ? rs.getString("status") : null;
+        } catch (SQLException e) {
+            System.err.println("Error getting ticket status by channel: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
